@@ -1,0 +1,64 @@
+/* ================================================ */
+/* src/styles/workflow.css */
+/* Estilos específicos para el workflow */
+
+.workflow-canvas {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+    background: #f8fafc;
+  }
+  
+  /* Estilos para nodos */
+  .workflow-node {
+    transition: all var(--transition-base);
+    cursor: pointer;
+  }
+  
+  .workflow-node:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .workflow-node.selected {
+    transform: scale(1.02);
+    box-shadow: 0 8px 25px -8px rgba(59, 130, 246, 0.4);
+  }
+  
+  /* Estilos para handles */
+  .react-flow__handle {
+    transition: all var(--transition-fast);
+  }
+  
+  .react-flow__handle:hover {
+    transform: scale(1.2);
+  }
+  
+  /* Estilos para edges */
+  .react-flow__edge-path {
+    transition: stroke var(--transition-base);
+  }
+  
+  .react-flow__edge:hover .react-flow__edge-path {
+    stroke: var(--color-primary);
+    stroke-width: 3;
+  }
+  
+  /* Panel de controles personalizado */
+  .react-flow__controls {
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-gray-200);
+  }
+  
+  .react-flow__controls-button {
+    border-bottom: 1px solid var(--color-gray-200);
+    transition: all var(--transition-fast);
+  }
+  
+  .react-flow__controls-button:hover {
+    background: var(--color-gray-50);
+  }
+  
+  /* MiniMap personalizado */
+  .react-flow__minimap {
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--color-gray-200);
+  }

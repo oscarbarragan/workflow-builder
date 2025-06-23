@@ -1,0 +1,130 @@
+/* ================================================ */
+/* src/styles/layout-designer.css */
+/* Estilos específicos para el layout designer */
+
+.layout-designer-modal {
+    animation: fadeIn var(--transition-base);
+  }
+  
+  .layout-canvas {
+    background-image: 
+      repeating-linear-gradient(0deg, transparent, transparent 19px, var(--color-gray-200) 20px),
+      repeating-linear-gradient(90deg, transparent, transparent 19px, var(--color-gray-200) 20px);
+    background-size: 20px 20px;
+  }
+  
+  .layout-element {
+    transition: all var(--transition-fast);
+    user-select: none;
+  }
+  
+  .layout-element:hover {
+    filter: brightness(1.05);
+  }
+  
+  .layout-element.selected {
+    animation: pulse 2s infinite;
+  }
+  
+  .layout-element.dragging {
+    z-index: 1000;
+    cursor: grabbing !important;
+  }
+  
+  /* Handles de redimensionamiento */
+  .resize-handle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--color-primary);
+    border: 1px solid white;
+    border-radius: 50%;
+    transition: all var(--transition-fast);
+  }
+  
+  .resize-handle:hover {
+    transform: scale(1.2);
+    background: var(--color-purple);
+  }
+  
+  /* Toolbar del layout designer */
+  .layout-toolbar {
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-md);
+  }
+  
+  /* Panel de propiedades */
+  .properties-panel {
+    background: var(--color-gray-50);
+    border: 1px solid var(--color-gray-200);
+    border-radius: var(--border-radius);
+  }
+  
+  .properties-panel .form-group {
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .properties-panel .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: var(--spacing-xs);
+    color: var(--color-gray-700);
+  }
+  
+  .properties-panel .form-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--color-gray-300);
+    border-radius: var(--border-radius-sm);
+    font-size: 12px;
+    transition: border-color var(--transition-fast);
+  }
+  
+  .properties-panel .form-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  /* Variables disponibles */
+  .available-variables {
+    max-height: 150px;
+    overflow-y: auto;
+  }
+  
+  .variable-item {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--color-gray-100);
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+  
+  .variable-item:hover {
+    background-color: var(--color-gray-50);
+  }
+  
+  .variable-item:last-child {
+    border-bottom: none;
+  }
+  
+  /* Responsive */
+  @media (max-width: 768px) {
+    .layout-designer-modal .modal-content {
+      width: 95vw;
+      height: 95vh;
+      margin: 2.5vh auto;
+    }
+    
+    .layout-toolbar {
+      flex-wrap: wrap;
+      gap: var(--spacing-sm);
+    }
+    
+    .properties-panel {
+      width: 100%;
+      max-width: none;
+    }
+  }
