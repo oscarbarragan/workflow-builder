@@ -1,21 +1,21 @@
-// src/components/workflow/nodes/ScriptProcessor/ScriptProcessor.jsx
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+// src/components/workflow/nodes/ScriptProcessor/ScriptProcessor.jsx - COMPACTO
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Code, 
   Play, 
-  Square, 
-  AlertCircle, 
-  CheckCircle, 
-  Database,
-  FileText,
-  Zap,
   RotateCcw,
   Save,
   Eye,
-  EyeOff
+  EyeOff,
+  CheckCircle,
+  FileText,
+  Database,
+  Zap
 } from 'lucide-react';
 import Button from '../../../common/Button/Button';
+import ScriptCodeEditor from './ScriptCodeEditor';
+import { scriptTemplates, getDefaultScript } from '../../../../utils/scriptTemplates';
 
 const ScriptProcessor = ({ 
   isOpen, 
@@ -30,66 +30,19 @@ const ScriptProcessor = ({
   const [executionError, setExecutionError] = useState(null);
   const [logs, setLogs] = useState([]);
   const [outputVariables, setOutputVariables] = useState(initialData.outputVariables || {});
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showInputData, setShowInputData] = useState(true);
-  
-  const editorRef = useRef(null);
-  const monacoRef = useRef(null);
-
-  // Función para syntax highlighting mejorada
-  const highlightSyntax = useCallback((code) => {
-    if (!code) return '';
-    
-    // Escapar HTML primero
-    let highlighted = code
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    
-    // Aplicar highlighting con orden específico para evitar conflictos
-    highlighted = highlighted
-      // 1. Comentarios primero (más específicos)
-      .replace(/(\/\/[^\r\n]*)/g, '<span style="color: #6A9955; font-style: italic;">$1</span>')
-      .replace(/(\/\*[\s\S]*?\*\/)/g, '<span style="color: #6A9955; font-style: italic;">$1</span>')
-      
-      // 2. Strings (proteger contenido)
-      .replace(/("(?:[^"\\]|\\.)*")/g, '<span style="color: #CE9178;">$1</span>')
-      .replace(/('(?:[^'\\]|\\.)*')/g, '<span style="color: #CE9178;">$1</span>')
-      .replace(/(`(?:[^`\\]|\\.)*`)/g, '<span style="color: #CE9178;">$1</span>')
-      
-      // 3. Keywords (solo palabras completas)
-      .replace(/\b(function|return|const|let|var|if|else|for|while|do|try|catch|finally|class|extends|import|export|default|async|await|true|false|null|undefined|typeof|instanceof|new|this|super)\b(?![">])/g, 
-        '<span style="color: #569CD6; font-weight: bold;">$1</span>')
-      
-      // 4. Numbers (solo números completos)
-      .replace(/\b(\d+\.?\d*)\b(?![">])/g, '<span style="color: #B5CEA8;">$1</span>')
-      
-      // 5. Console específico
-      .replace(/\b(console)(?=\.)(?![">])/g, '<span style="color: #4EC9B0;">$1</span>')
-      .replace(/\.(log|error|warn|info|debug|trace)\b(?![">])/g, '.<span style="color: #DCDCAA;">$1</span>')
-      
-      // 6. Propiedades y métodos (más conservador)
-      .replace(/\.([a-zA-Z_$][a-zA-Z0-9_$]*)\b(?![">])/g, '.<span style="color: #9CDCFE;">$1</span>');
-    
-    return highlighted;
-  }, []);
 
   // Disable ReactFlow when modal is open
   useEffect(() => {
     if (isOpen) {
-      console.log('⚡ Script Processor opened - disabling ReactFlow');
-      
       const reactFlowWrapper = document.querySelector('.react-flow');
       if (reactFlowWrapper) {
         reactFlowWrapper.style.pointerEvents = 'none';
         reactFlowWrapper.style.userSelect = 'none';
-        console.log('✅ ReactFlow disabled');
       }
-      
       document.body.style.overflow = 'hidden';
       
       return () => {
-        console.log('⚡ Script Processor closed - re-enabling ReactFlow');
         if (reactFlowWrapper) {
           reactFlowWrapper.style.pointerEvents = 'auto';
           reactFlowWrapper.style.userSelect = 'auto';
@@ -99,72 +52,15 @@ const ScriptProcessor = ({
     }
   }, [isOpen]);
 
-  // Initialize Monaco Editor
-  useEffect(() => {
-    if (isOpen && !monacoRef.current) {
-      // Simular Monaco Editor con textarea mejorada
-      // En producción, aquí cargarías el Monaco Editor real
-      console.log('📝 Initializing Monaco Editor simulation');
-    }
-  }, [isOpen]);
-
-  function getDefaultScript() {
-    return `// Script Processor - Procesa datos del workflow
-// Variables disponibles: input (datos de entrada)
-// Retorna: objeto con las variables de salida
-
-function processData(input) {
-  // Tus datos de entrada están en 'input'
-  console.log('📥 Datos de entrada:', input);
-  
-  // Ejemplo de procesamiento
-  const result = {
-    // Procesar datos aquí
-    processedAt: new Date().toISOString(),
-    totalItems: Object.keys(input).length,
-    
-    // Ejemplos de transformaciones
-    upperCaseNames: {},
-    calculations: {}
-  };
-  
-  // Transformar nombres a mayúsculas
-  Object.entries(input).forEach(([key, value]) => {
-    if (typeof value === 'string') {
-      result.upperCaseNames[key] = value.toUpperCase();
-    }
-  });
-  
-  // Realizar cálculos
-  const numbers = Object.values(input).filter(v => typeof v === 'number');
-  if (numbers.length > 0) {
-    result.calculations.sum = numbers.reduce((a, b) => a + b, 0);
-    result.calculations.average = result.calculations.sum / numbers.length;
-    result.calculations.max = Math.max(...numbers);
-    result.calculations.min = Math.min(...numbers);
-  }
-  
-  console.log('📤 Datos de salida:', result);
-  return result;
-}
-
-// Ejecutar el procesamiento
-return processData(input);`;
-  }
-
   const prepareInputData = () => {
     const inputData = {};
-    
     Object.entries(availableData).forEach(([key, varData]) => {
       if (typeof varData === 'object' && varData !== null && varData.value !== undefined) {
-        // Nuevo formato con metadatos
         inputData[key] = varData.value;
       } else {
-        // Formato viejo o valor simple
         inputData[key] = varData;
       }
     });
-    
     return inputData;
   };
 
@@ -175,11 +71,8 @@ return processData(input);`;
     
     try {
       const inputData = prepareInputData();
-      
-      // Crear contexto seguro para ejecución
       const sandboxedFunction = new Function('input', 'console', script);
       
-      // Mock console para capturar logs
       const mockConsole = {
         log: (...args) => {
           const logEntry = {
@@ -209,12 +102,9 @@ return processData(input);`;
         }
       };
       
-      // Ejecutar script
       const result = await sandboxedFunction(inputData, mockConsole);
-      
       setExecutionResult(result);
       
-      // Generar variables de salida
       if (result && typeof result === 'object') {
         const newOutputVariables = {};
         
@@ -288,156 +178,23 @@ return processData(input);`;
     onClose();
   };
 
-  const loadTemplate = (template) => {
-    const templates = {
-      basic: getDefaultScript(),
-      dataTransform: `// Transformación de Datos
-function processData(input) {
-  const result = {};
-  
-  // Filtrar solo valores numéricos
-  const numbers = Object.entries(input)
-    .filter(([key, value]) => typeof value === 'number')
-    .reduce((acc, [key, value]) => {
-      acc[key] = value;
-      return acc;
-    }, {});
-  
-  // Filtrar solo strings
-  const strings = Object.entries(input)
-    .filter(([key, value]) => typeof value === 'string')
-    .reduce((acc, [key, value]) => {
-      acc[key] = value;
-      return acc;
-    }, {});
-  
-  result.numbers = numbers;
-  result.strings = strings;
-  result.summary = {
-    totalNumbers: Object.keys(numbers).length,
-    totalStrings: Object.keys(strings).length
-  };
-  
-  return result;
-}
-
-return processData(input);`,
-      validation: `// Validación de Datos
-function processData(input) {
-  const errors = [];
-  const warnings = [];
-  const validData = {};
-  
-  Object.entries(input).forEach(([key, value]) => {
-    // Validar emails
-    if (key.includes('email') || key.includes('mail')) {
-      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)) {
-        errors.push(\`Email inválido en \${key}: \${value}\`);
-      } else {
-        validData[key] = value;
-      }
-    }
-    // Validar números
-    else if (typeof value === 'number') {
-      if (value < 0) {
-        warnings.push(\`Valor negativo en \${key}: \${value}\`);
-      }
-      validData[key] = value;
-    }
-    // Otros datos
-    else {
-      validData[key] = value;
-    }
-  });
-  
-  return {
-    validData,
-    errors,
-    warnings,
-    isValid: errors.length === 0,
-    summary: {
-      totalFields: Object.keys(input).length,
-      validFields: Object.keys(validData).length,
-      errorCount: errors.length,
-      warningCount: warnings.length
-    }
-  };
-}
-
-return processData(input);`,
-      calculations: `// Cálculos Avanzados
-function processData(input) {
-  const numbers = Object.values(input).filter(v => typeof v === 'number');
-  const strings = Object.values(input).filter(v => typeof v === 'string');
-  
-  const calculations = {
-    // Estadísticas numéricas
-    count: numbers.length,
-    sum: numbers.reduce((a, b) => a + b, 0),
-    average: numbers.length > 0 ? numbers.reduce((a, b) => a + b, 0) / numbers.length : 0,
-    min: numbers.length > 0 ? Math.min(...numbers) : null,
-    max: numbers.length > 0 ? Math.max(...numbers) : null,
-    
-    // Análisis de strings
-    stringStats: {
-      count: strings.length,
-      totalLength: strings.reduce((acc, str) => acc + str.length, 0),
-      averageLength: strings.length > 0 ? strings.reduce((acc, str) => acc + str.length, 0) / strings.length : 0,
-      longestString: strings.reduce((longest, current) => 
-        current.length > longest.length ? current : longest, ''
-      )
-    },
-    
-    // Transformaciones
-    normalized: numbers.map(n => n / Math.max(...numbers) || 0),
-    rounded: numbers.map(n => Math.round(n * 100) / 100)
-  };
-  
-  return {
-    originalData: input,
-    calculations,
-    processedAt: new Date().toISOString()
-  };
-}
-
-return processData(input);`
-    };
-    
-    setScript(templates[template]);
-  };
-
   if (!isOpen) return null;
 
-  const modalOverlayStyle = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.75)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999999,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
-  };
-
-  const modalContentStyle = {
-    background: 'white',
-    borderRadius: '12px',
-    width: '95vw',
-    height: '90vh',
-    maxWidth: '1400px',
-    display: 'flex',
-    flexDirection: 'column',
-    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    padding: '24px',
-    position: 'relative'
-  };
-
-  const modalContent = (
+  return createPortal(
     <div 
-      style={modalOverlayStyle}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.75)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 999999,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
+      }}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           handleClose();
@@ -445,7 +202,18 @@ return processData(input);`
       }}
     >
       <div 
-        style={modalContentStyle}
+        style={{
+          background: 'white',
+          borderRadius: '12px',
+          width: '95vw',
+          height: '90vh',
+          maxWidth: '1400px',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          padding: '24px',
+          position: 'relative'
+        }}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
@@ -464,10 +232,9 @@ return processData(input);`
             fontWeight: '700',
             color: '#1f2937'
           }}>
-            ⚡ Script Processor - Procesamiento de Datos
+            ⚡ Script Processor
           </h2>
           
-          {/* Status info */}
           <div style={{
             fontSize: '12px',
             color: '#6b7280',
@@ -477,9 +244,9 @@ return processData(input);`
             padding: '4px 8px',
             borderRadius: '4px'
           }}>
-            <div><strong>Input vars:</strong> {Object.keys(availableData).length}</div>
-            <div><strong>Output vars:</strong> {Object.keys(outputVariables).length}</div>
-            <div><strong>Status:</strong> {executionResult ? '✅ Executed' : '⏸️ Not executed'}</div>
+            <div><strong>Input:</strong> {Object.keys(availableData).length}</div>
+            <div><strong>Output:</strong> {Object.keys(outputVariables).length}</div>
+            <div><strong>Status:</strong> {executionResult ? '✅' : '⏸️'}</div>
           </div>
           
           <button 
@@ -492,16 +259,7 @@ return processData(input);`
               borderRadius: '6px',
               color: '#6b7280',
               fontSize: '24px',
-              fontWeight: 'bold',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.target.style.background = '#f3f4f6';
-              e.target.style.color = '#374151';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = 'none';
-              e.target.style.color = '#6b7280';
+              fontWeight: 'bold'
             }}
           >
             ✕
@@ -526,7 +284,7 @@ return processData(input);`
             disabled={isExecuting}
             loading={isExecuting}
           >
-            {isExecuting ? 'Ejecutando...' : 'Ejecutar Script'}
+            {isExecuting ? 'Ejecutando...' : 'Ejecutar'}
           </Button>
           
           <Button
@@ -537,15 +295,8 @@ return processData(input);`
             Reset
           </Button>
           
-          <div style={{
-            width: '1px',
-            background: '#e2e8f0',
-            margin: '0 8px',
-            alignSelf: 'stretch'
-          }} />
-          
           <select
-            onChange={(e) => loadTemplate(e.target.value)}
+            onChange={(e) => setScript(scriptTemplates[e.target.value] || getDefaultScript())}
             style={{
               padding: '6px 12px',
               border: '1px solid #d1d5db',
@@ -554,19 +305,14 @@ return processData(input);`
               background: 'white'
             }}
           >
-            <option value="">Cargar Template...</option>
+            <option value="">Templates...</option>
             <option value="basic">Básico</option>
+            <option value="dataMapper">🗂️ Data Mapper</option>
+            <option value="workflowData">🔄 Workflow</option>
             <option value="dataTransform">Transformación</option>
             <option value="validation">Validación</option>
             <option value="calculations">Cálculos</option>
           </select>
-          
-          <div style={{
-            width: '1px',
-            background: '#e2e8f0',
-            margin: '0 8px',
-            alignSelf: 'stretch'
-          }} />
           
           <Button
             variant="secondary"
@@ -582,161 +328,14 @@ return processData(input);`
         <div style={{ display: 'flex', gap: '20px', flex: 1, minHeight: 0 }}>
           
           {/* Left Panel - Script Editor */}
-          <div style={{ flex: '1 1 60%', display: 'flex', flexDirection: 'column' }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-              📝 Editor de Script (JavaScript)
-            </h4>
-            
-            {/* Monaco Editor Simulation con Syntax Highlighting */}
-            <div style={{
-              flex: 1,
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              overflow: 'hidden',
-              background: '#1e1e1e',
-              position: 'relative'
-            }}>
-              {/* Editor Header */}
-              <div style={{
-                background: '#2d2d30',
-                padding: '8px 16px',
-                borderBottom: '1px solid #3e3e42',
-                fontSize: '12px',
-                color: '#cccccc',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  background: '#ff5f57'
-                }} />
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  background: '#ffbd2e'
-                }} />
-                <div style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  background: '#28ca42'
-                }} />
-                <span style={{ marginLeft: '8px', fontFamily: 'monospace' }}>
-                  script.js
-                </span>
-              </div>
-              
-              {/* Line Numbers */}
-              <div style={{
-                display: 'flex',
-                height: 'calc(100% - 40px)'
-              }}>
-                <div style={{
-                  background: '#1e1e1e',
-                  borderRight: '1px solid #3e3e42',
-                  padding: '16px 8px 16px 16px',
-                  fontSize: '13px',
-                  fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-                  color: '#858585',
-                  lineHeight: '1.5',
-                  minWidth: '50px',
-                  textAlign: 'right',
-                  userSelect: 'none'
-                }}>
-                  {script.split('\n').map((_, index) => (
-                    <div key={index}>{index + 1}</div>
-                  ))}
-                </div>
-                
-                {/* Code Editor with Syntax Highlighting */}
-                <div style={{
-                  flex: 1,
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  {/* Syntax Highlighted Background */}
-                  <div 
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      padding: '16px',
-                      fontSize: '13px',
-                      fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-                      lineHeight: '1.5',
-                      whiteSpace: 'pre-wrap',
-                      overflow: 'hidden',
-                      pointerEvents: 'none',
-                      userSelect: 'none',
-                      zIndex: 1,
-                      color: '#d4d4d4' // Color base del texto
-                    }}
-                    dangerouslySetInnerHTML={{
-                      __html: highlightSyntax(script)
-                    }}
-                  />
-                  
-                  {/* Actual Textarea */}
-                  <textarea
-                    value={script}
-                    onChange={(e) => setScript(e.target.value)}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: '100%',
-                      padding: '16px',
-                      border: 'none',
-                      background: 'transparent',
-                      color: 'transparent', // Mantener transparente para mostrar highlighting
-                      fontFamily: '"Fira Code", "Consolas", "Monaco", monospace',
-                      fontSize: '13px',
-                      lineHeight: '1.5',
-                      resize: 'none',
-                      outline: 'none',
-                      caretColor: '#ffffff',
-                      zIndex: 2,
-                      whiteSpace: 'pre-wrap'
-                    }}
-                    placeholder=""
-                    spellCheck={false}
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Execution Error */}
-            {executionError && (
-              <div style={{
-                marginTop: '8px',
-                padding: '12px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                color: '#dc2626',
-                fontSize: '12px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px'
-              }}>
-                <AlertCircle size={16} />
-                <div>
-                  <strong>Error de Ejecución:</strong><br />
-                  {executionError}
-                </div>
-              </div>
-            )}
-          </div>
+          <ScriptCodeEditor
+            script={script}
+            onScriptChange={setScript}
+            executionError={executionError}
+          />
 
           {/* Right Panel - Data & Results */}
-          <div style={{ flex: '1 1 40%', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ flex: '1 1 40%', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
             
             {/* Input Data */}
             {showInputData && Object.keys(availableData).length > 0 && (
@@ -744,7 +343,9 @@ return processData(input);`
                 flex: '0 0 200px',
                 border: '1px solid #e5e7eb',
                 borderRadius: '6px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
               }}>
                 <div style={{
                   background: '#f3f4f6',
@@ -755,7 +356,8 @@ return processData(input);`
                   color: '#374151',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  flexShrink: 0
                 }}>
                   <Database size={14} />
                   Datos de Entrada ({Object.keys(availableData).length})
@@ -763,8 +365,8 @@ return processData(input);`
                 <div style={{
                   padding: '8px',
                   background: '#f8fafc',
-                  height: '160px',
-                  overflowY: 'auto',
+                  flex: 1,
+                  overflow: 'auto',
                   fontSize: '11px',
                   fontFamily: 'monospace'
                 }}>
@@ -782,7 +384,8 @@ return processData(input);`
               borderRadius: '6px',
               overflow: 'hidden',
               display: 'flex',
-              flexDirection: 'column'
+              flexDirection: 'column',
+              minHeight: 0
             }}>
               <div style={{
                 background: executionResult ? '#f0fdf4' : '#f3f4f6',
@@ -793,7 +396,8 @@ return processData(input);`
                 color: executionResult ? '#15803d' : '#374151',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '6px',
+                flexShrink: 0
               }}>
                 {executionResult ? <CheckCircle size={14} /> : <FileText size={14} />}
                 Resultado de Ejecución
@@ -803,7 +407,7 @@ return processData(input);`
                 flex: 1,
                 padding: '8px',
                 background: '#ffffff',
-                overflowY: 'auto',
+                overflow: 'auto',
                 fontSize: '11px',
                 fontFamily: 'monospace'
               }}>
@@ -830,7 +434,9 @@ return processData(input);`
                 flex: '0 0 120px',
                 border: '1px solid #e5e7eb',
                 borderRadius: '6px',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column'
               }}>
                 <div style={{
                   background: '#1f2937',
@@ -840,7 +446,8 @@ return processData(input);`
                   color: 'white',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  flexShrink: 0
                 }}>
                   <Code size={12} />
                   Console ({logs.length})
@@ -848,8 +455,8 @@ return processData(input);`
                 <div style={{
                   padding: '4px',
                   background: '#111827',
-                  height: '90px',
-                  overflowY: 'auto',
+                  flex: 1,
+                  overflow: 'auto',
                   fontSize: '10px',
                   fontFamily: 'monospace'
                 }}>
@@ -890,7 +497,7 @@ return processData(input);`
               gap: '4px'
             }}>
               <Zap size={14} />
-              Variables de Salida Generadas ({Object.keys(outputVariables).length})
+              Variables de Salida ({Object.keys(outputVariables).length})
             </h5>
             
             <div style={{
@@ -933,10 +540,10 @@ return processData(input);`
             color: '#6b7280',
             fontWeight: '500'
           }}>
-            💡 <strong>Tip:</strong> Usa <code>console.log()</code> para debugear y <code>return</code> para generar variables de salida
+            💡 <code>console.log()</code> para debug | <code>return</code> para variables
             {Object.keys(outputVariables).length > 0 && (
               <span style={{ marginLeft: '20px', color: '#3b82f6' }}>
-                <strong>📊 Variables generadas:</strong> {Object.keys(outputVariables).length}
+                📊 <strong>{Object.keys(outputVariables).length}</strong> variables
               </span>
             )}
           </div>
@@ -956,15 +563,14 @@ return processData(input);`
               size="large"
               icon={<Save size={16} />}
             >
-              💾 Guardar Script
+              💾 Guardar
             </Button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
-
-  return createPortal(modalContent, document.body);
 };
 
 export default ScriptProcessor;

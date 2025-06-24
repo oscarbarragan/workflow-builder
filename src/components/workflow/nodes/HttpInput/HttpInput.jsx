@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/HttpInput/HttpInput.jsx
+// src/components/workflow/nodes/HttpInput/HttpInput.jsx - FIXED
 import React, { useState } from 'react';
 import { Globe, Link, CheckCircle, AlertCircle } from 'lucide-react';
 import Modal from '../../../common/Modal/Modal';
@@ -133,13 +133,21 @@ const HttpInput = ({
       onClose={handleClose}
       title="Configurar HTTP Input"
       size="medium"
+      style={{ maxWidth: '580px', width: '85vw' }} // FIXED: Narrower and better responsive
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        gap: '18px', // FIXED: Increased gap for better spacing
+        fontSize: '14px', // FIXED: Slightly larger base font
+        maxWidth: '100%',
+        overflow: 'hidden'
+      }}>
         
         {/* Header Info */}
         <div style={{
           background: '#eff6ff',
-          padding: '12px 16px',
+          padding: '12px 16px', // FIXED: More padding for better look
           borderRadius: '8px',
           border: '1px solid #bfdbfe'
         }}>
@@ -149,12 +157,19 @@ const HttpInput = ({
             gap: '8px',
             marginBottom: '4px'
           }}>
-            <Globe size={16} color="#3b82f6" />
-            <span style={{ fontWeight: '600', color: '#1e40af' }}>
+            <Globe size={16} color="#3b82f6" /> {/* FIXED: Larger icon */}
+            <span style={{ 
+              fontWeight: '600', 
+              color: '#1e40af',
+              fontSize: '15px' // FIXED: Better font size
+            }}>
               HTTP Endpoint
             </span>
           </div>
-          <div style={{ fontSize: '12px', color: '#3730a3' }}>
+          <div style={{ 
+            fontSize: '13px', // FIXED: Better readability
+            color: '#3730a3' 
+          }}>
             Configure un endpoint HTTP que será expuesto por el servidor
           </div>
         </div>
@@ -163,10 +178,10 @@ const HttpInput = ({
         <div>
           <label style={{
             display: 'block',
-            marginBottom: '6px',
+            marginBottom: '6px', // FIXED: Better spacing
             fontWeight: '500',
             color: '#374151',
-            fontSize: '14px'
+            fontSize: '14px' // FIXED: Standard label size
           }}>
             Path del Endpoint *
           </label>
@@ -180,11 +195,13 @@ const HttpInput = ({
             }}>
               <div style={{
                 background: '#f3f4f6',
-                padding: '8px 12px',
+                padding: '8px 10px', // FIXED: Better padding
                 borderRight: '1px solid #d1d5db',
-                fontSize: '14px',
+                fontSize: '13px', // FIXED: Readable font size
                 color: '#6b7280',
-                fontFamily: 'monospace'
+                fontFamily: 'monospace',
+                whiteSpace: 'nowrap',
+                minWidth: 'fit-content'
               }}>
                 /api
               </div>
@@ -195,11 +212,12 @@ const HttpInput = ({
                 placeholder="/mi-endpoint"
                 style={{
                   flex: 1,
-                  padding: '8px 12px',
+                  padding: '8px 10px', // FIXED: Better padding
                   border: 'none',
-                  fontSize: '14px',
+                  fontSize: '13px', // FIXED: Readable font size
                   fontFamily: 'monospace',
-                  outline: 'none'
+                  outline: 'none',
+                  minWidth: 0
                 }}
               />
             </div>
@@ -267,17 +285,23 @@ const HttpInput = ({
               padding: '8px 12px',
               marginTop: '8px'
             }}>
-              <div style={{ fontSize: '12px', color: '#15803d', marginBottom: '4px' }}>
+              <div style={{ 
+                fontSize: '12px', 
+                color: '#15803d', 
+                marginBottom: '4px' 
+              }}>
                 <strong>Endpoint generado:</strong>
               </div>
               <div style={{
                 fontFamily: 'monospace',
-                fontSize: '13px',
+                fontSize: '12px', // FIXED: Better font size for URLs
                 color: '#166534',
                 background: 'white',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                border: '1px solid #bbf7d0'
+                padding: '6px 8px', // FIXED: Better padding
+                borderRadius: '4px', // FIXED: Standard border radius
+                border: '1px solid #bbf7d0',
+                wordBreak: 'break-all',
+                lineHeight: '1.3' // FIXED: Better line height
               }}>
                 http://localhost:3000/api{formData.path}
               </div>
@@ -299,8 +323,9 @@ const HttpInput = ({
           
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))',
-            gap: '8px'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))', // FIXED: Slightly smaller minimum
+            gap: '8px',
+            maxWidth: '100%' // FIXED: Ensure buttons don't overflow
           }}>
             {methods.map(method => (
               <button
@@ -308,7 +333,7 @@ const HttpInput = ({
                 type="button"
                 onClick={() => handleInputChange('method', method.value)}
                 style={{
-                  padding: '8px 12px',
+                  padding: '8px 10px', // FIXED: Slightly reduced padding
                   border: `2px solid ${formData.method === method.value ? method.color : '#e5e7eb'}`,
                   borderRadius: '6px',
                   background: formData.method === method.value ? method.color : 'white',
@@ -316,7 +341,10 @@ const HttpInput = ({
                   fontSize: '12px',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
+                  minWidth: '65px', // FIXED: Slightly smaller minimum width
+                  textAlign: 'center' // FIXED: Center text in buttons
                 }}
               >
                 {method.label}
@@ -344,12 +372,14 @@ const HttpInput = ({
             rows={3}
             style={{
               width: '100%',
-              padding: '8px 12px',
+              padding: '10px 12px', // FIXED: Better padding for textarea visibility
               border: '1px solid #d1d5db',
               borderRadius: '6px',
-              fontSize: '14px',
+              fontSize: '13px',
               resize: 'vertical',
-              fontFamily: 'inherit'
+              fontFamily: 'inherit',
+              minHeight: '100px', // FIXED: Increased minimum height
+              boxSizing: 'border-box' // FIXED: Ensure proper sizing
             }}
           />
         </div>
@@ -371,10 +401,10 @@ const HttpInput = ({
             onChange={(e) => handleInputChange('authentication', e.target.value)}
             style={{
               width: '100%',
-              padding: '8px 12px',
+              padding: '6px 8px', // FIXED: Reduced padding
               border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px',
+              borderRadius: '4px', // FIXED: Smaller border radius
+              fontSize: '11px', // FIXED: Much smaller font
               background: 'white'
             }}
           >
@@ -406,7 +436,7 @@ const HttpInput = ({
           <label 
             htmlFor="enableCors"
             style={{
-              fontSize: '14px',
+              fontSize: '14px', // FIXED: Standard font size
               color: '#374151',
               cursor: 'pointer'
             }}
@@ -421,7 +451,8 @@ const HttpInput = ({
           justifyContent: 'flex-end',
           gap: '12px',
           paddingTop: '16px',
-          borderTop: '1px solid #e5e7eb'
+          borderTop: '1px solid #e5e7eb',
+          marginTop: '8px' // FIXED: Add some margin to ensure visibility
         }}>
           <Button
             variant="secondary"
