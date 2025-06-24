@@ -1,15 +1,22 @@
+// src/components/workflow/nodes/CustomNode/CustomNode.jsx - FINAL ACTUALIZADO
 import React, { useState } from 'react';
 import { Handle, Position } from 'reactflow';
-import { User, MapPin, FileText } from 'lucide-react';
-import { getNodeConfig } from '../../../../utils/nodeHelpers';
+import { User, MapPin, FileText, Globe, Database, Code } from 'lucide-react';
+import { getNodeConfig, getMappedVariablesForLayout } from '../../../../utils/nodeHelpers';
 import { NODE_TYPES, STYLES } from '../../../../utils/constants';
 import NodeModal from './NodeModal';
 import DataFlow from './DataFlow';
 import LayoutDesigner from '../../../layout-designer/LayoutDesigner/LayoutDesigner';
+import HttpInput from '../HttpInput/HttpInput';
+import DataMapper from '../DataMapper/DataMapper';
+import ScriptProcessor from '../ScriptProcessor/ScriptProcessor';
 
 const CustomNode = ({ id, data, selected }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLayoutDesignerOpen, setIsLayoutDesignerOpen] = useState(false);
+  const [isHttpInputOpen, setIsHttpInputOpen] = useState(false);
+  const [isDataMapperOpen, setIsDataMapperOpen] = useState(false);
+  const [isScriptProcessorOpen, setIsScriptProcessorOpen] = useState(false);
 
   const nodeConfig = getNodeConfig(data.type);
 
@@ -18,10 +25,21 @@ const CustomNode = ({ id, data, selected }) => {
     e.stopPropagation();
     e.preventDefault();
     
-    if (data.type === NODE_TYPES.LAYOUT_DESIGNER) {
-      setIsLayoutDesignerOpen(true);
-    } else {
-      setIsModalOpen(true);
+    switch (data.type) {
+      case NODE_TYPES.LAYOUT_DESIGNER:
+        setIsLayoutDesignerOpen(true);
+        break;
+      case NODE_TYPES.HTTP_INPUT:
+        setIsHttpInputOpen(true);
+        break;
+      case NODE_TYPES.DATA_MAPPER:
+        setIsDataMapperOpen(true);
+        break;
+      case NODE_TYPES.SCRIPT_PROCESSOR:
+        setIsScriptProcessorOpen(true);
+        break;
+      default:
+        setIsModalOpen(true);
     }
   };
 
@@ -36,20 +54,9 @@ const CustomNode = ({ id, data, selected }) => {
     });
   };
 
+  // MEJORADO: Usar la nueva función para obtener variables mapeadas
   const getAvailableDataForLayout = () => {
-    const availableData = {};
-    const incomingEdges = (data.allEdges || []).filter(edge => edge.target === id);
-    
-    incomingEdges.forEach(edge => {
-      const sourceNode = (data.allNodes || []).find(node => node.id === edge.source);
-      if (sourceNode && sourceNode.data.properties) {
-        Object.keys(sourceNode.data.properties).forEach(key => {
-          availableData[`${sourceNode.data.type}.${key}`] = sourceNode.data.properties[key];
-        });
-      }
-    });
-    
-    return availableData;
+    return getMappedVariablesForLayout(id, data.allNodes || [], data.allEdges || []);
   };
 
   const getIcon = () => {
@@ -60,6 +67,12 @@ const CustomNode = ({ id, data, selected }) => {
         return <MapPin size={16} color={nodeConfig.color} />;
       case NODE_TYPES.LAYOUT_DESIGNER:
         return <FileText size={16} color={nodeConfig.color} />;
+      case NODE_TYPES.HTTP_INPUT:
+        return <Globe size={16} color={nodeConfig.color} />;
+      case NODE_TYPES.DATA_MAPPER:
+        return <Database size={16} color={nodeConfig.color} />;
+      case NODE_TYPES.SCRIPT_PROCESSOR:
+        return <Code size={16} color={nodeConfig.color} />;
       default:
         return (
           <div style={{
@@ -71,6 +84,58 @@ const CustomNode = ({ id, data, selected }) => {
         );
     }
   };
+
+  const getNodeStatusInfo = () => {
+    const hasProperties = data.properties && Object.keys(data.properties).length > 0;
+    
+    // Special status logic for different node types
+    switch (data.type) {
+      case NODE_TYPES.HTTP_INPUT:
+        return {
+          configured: hasProperties && data.properties.endpoint,
+          statusText: hasProperties && data.properties.endpoint 
+            ? `${data.properties.method} ${data.properties.path}`
+            : 'Configurar endpoint'
+        };
+        
+      case NODE_TYPES.DATA_MAPPER:
+        const mappingsCount = data.properties?.mappings?.length || 0;
+        const validMappings = data.properties?.mappings?.filter(m => m.isValid && m.variableName)?.length || 0;
+        return {
+          configured: hasProperties && validMappings > 0,
+          statusText: validMappings > 0 
+            ? `${validMappings} variables mapeadas`
+            : 'Configurar mapeo'
+        };
+        
+      case NODE_TYPES.SCRIPT_PROCESSOR:
+        const hasScript = hasProperties && data.properties.script;
+        const hasResult = hasProperties && data.properties.executionResult;
+        return {
+          configured: hasScript,
+          statusText: hasResult 
+            ? `Script ejecutado - ${Object.keys(data.properties.outputVariables || {}).length} vars`
+            : hasScript ? 'Script configurado' : 'Configurar script'
+        };
+        
+      case NODE_TYPES.LAYOUT_DESIGNER:
+        const elementsCount = data.properties?.layout?.elements?.length || 0;
+        return {
+          configured: hasProperties && elementsCount > 0,
+          statusText: elementsCount > 0 
+            ? `Layout con ${elementsCount} elementos`
+            : 'Diseñar layout'
+        };
+        
+      default:
+        return {
+          configured: hasProperties,
+          statusText: hasProperties ? 'Configurado' : 'Pendiente'
+        };
+    }
+  };
+
+  const statusInfo = getNodeStatusInfo();
 
   const nodeStyle = {
     ...STYLES.node,
@@ -110,14 +175,14 @@ const CustomNode = ({ id, data, selected }) => {
 
   const statusStyle = {
     fontSize: '9px',
-    color: '#16a34a',
+    color: statusInfo.configured ? '#16a34a' : '#f59e0b',
     marginTop: '2px',
     display: 'flex',
     alignItems: 'center',
-    gap: '2px'
+    gap: '2px',
+    textAlign: 'center',
+    maxWidth: '120px'
   };
-
-  const hasProperties = data.properties && Object.keys(data.properties).length > 0;
 
   return (
     <>
@@ -150,32 +215,17 @@ const CustomNode = ({ id, data, selected }) => {
               {nodeConfig.title}
             </div>
             
-            {hasProperties && (
-              <div style={statusStyle}>
-                <span style={{ 
-                  width: '6px', 
-                  height: '6px', 
-                  background: '#16a34a', 
-                  borderRadius: '50%' 
-                }} />
-                Configurado
-              </div>
-            )}
-            
-            {!hasProperties && (
-              <div style={{
-                ...statusStyle,
-                color: '#f59e0b'
-              }}>
-                <span style={{ 
-                  width: '6px', 
-                  height: '6px', 
-                  background: '#f59e0b', 
-                  borderRadius: '50%' 
-                }} />
-                Pendiente
-              </div>
-            )}
+            <div style={statusStyle}>
+              <span style={{ 
+                width: '6px', 
+                height: '6px', 
+                background: statusInfo.configured ? '#16a34a' : '#f59e0b', 
+                borderRadius: '50%' 
+              }} />
+              <span style={{ fontSize: '8px' }}>
+                {statusInfo.statusText}
+              </span>
+            </div>
           </div>
           
           {/* Data Flow */}
@@ -199,7 +249,7 @@ const CustomNode = ({ id, data, selected }) => {
         }}
       />
 
-      {/* Configuration Modal */}
+      {/* Standard Configuration Modal */}
       <NodeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -208,13 +258,44 @@ const CustomNode = ({ id, data, selected }) => {
         onSave={handleSave}
       />
 
-      {/* Layout Designer - Portal para evitar conflictos */}
+      {/* Layout Designer */}
       {data.type === NODE_TYPES.LAYOUT_DESIGNER && isLayoutDesignerOpen && (
         <LayoutDesigner
           isOpen={isLayoutDesignerOpen}
           onClose={() => setIsLayoutDesignerOpen(false)}
           onSave={handleLayoutSave}
           initialData={data.properties?.layout}
+          availableData={getAvailableDataForLayout()}
+        />
+      )}
+
+      {/* HTTP Input */}
+      {data.type === NODE_TYPES.HTTP_INPUT && isHttpInputOpen && (
+        <HttpInput
+          isOpen={isHttpInputOpen}
+          onClose={() => setIsHttpInputOpen(false)}
+          initialData={data.properties || {}}
+          onSave={handleSave}
+        />
+      )}
+
+      {/* Data Mapper */}
+      {data.type === NODE_TYPES.DATA_MAPPER && isDataMapperOpen && (
+        <DataMapper
+          isOpen={isDataMapperOpen}
+          onClose={() => setIsDataMapperOpen(false)}
+          initialData={data.properties || {}}
+          onSave={handleSave}
+          availableData={getAvailableDataForLayout()}
+        />
+      )}
+      {/* Script Processor */}
+      {data.type === NODE_TYPES.SCRIPT_PROCESSOR && isScriptProcessorOpen && (
+        <ScriptProcessor
+          isOpen={isScriptProcessorOpen}
+          onClose={() => setIsScriptProcessorOpen(false)}
+          initialData={data.properties || {}}
+          onSave={handleSave}
           availableData={getAvailableDataForLayout()}
         />
       )}

@@ -1,8 +1,12 @@
+// src/utils/constants.js - CORREGIDO
 // Node types
 export const NODE_TYPES = {
   USER_FORM: 'user-form',
   LOCATION_FORM: 'location-form',
-  LAYOUT_DESIGNER: 'layout-designer'
+  LAYOUT_DESIGNER: 'layout-designer',
+  HTTP_INPUT: 'http-input',
+  DATA_MAPPER: 'data-mapper',
+  SCRIPT_PROCESSOR: 'script-processor'
 };
 
 // Element types for layout designer
@@ -70,6 +74,17 @@ export const STYLES = {
       color: 'white',
       fontSize: '14px',
       fontWeight: '500'
+    },
+    
+    warning: {
+      padding: '10px 16px',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      background: '#f59e0b',
+      color: 'white',
+      fontSize: '14px',
+      fontWeight: '500'
     }
   },
 
@@ -117,20 +132,83 @@ export const NODE_CONFIG = {
     title: 'Formulario Usuario',
     icon: 'User',
     color: '#2563eb',
-    fields: ['nombre']
+    fields: ['nombre'],
+    category: 'forms'
   },
   
   [NODE_TYPES.LOCATION_FORM]: {
     title: 'Formulario Ubicación',
     icon: 'MapPin',
     color: '#16a34a',
-    fields: ['apellido', 'ciudad']
+    fields: ['apellido', 'ciudad'],
+    category: 'forms'
   },
   
   [NODE_TYPES.LAYOUT_DESIGNER]: {
     title: 'Diseñador Layout',
     icon: 'FileText',
     color: '#7c3aed',
-    fields: []
+    fields: [],
+    category: 'output'
+  },
+  
+  [NODE_TYPES.HTTP_INPUT]: {
+    title: 'HTTP Input',
+    icon: 'Globe',
+    color: '#f59e0b',
+    fields: ['path', 'method'],
+    category: 'input'
+  },
+  
+  [NODE_TYPES.DATA_MAPPER]: {
+    title: 'Data Mapper',
+    icon: 'Database',
+    color: '#14b8a6',
+    fields: [],
+    category: 'processing'
+  },
+  
+  [NODE_TYPES.SCRIPT_PROCESSOR]: {
+    title: 'Script Processor',
+    icon: 'Code',
+    color: '#8b5cf6',
+    fields: [],
+    category: 'processing'
   }
+};
+
+// Data types for data mapper
+export const DATA_TYPES = {
+  STRING: 'string',
+  NUMBER: 'number',
+  BOOLEAN: 'boolean',
+  ARRAY: 'array',
+  OBJECT: 'object',
+  DATE: 'date'
+};
+
+// HTTP methods
+export const HTTP_METHODS = [
+  { value: 'GET', label: 'GET', color: '#16a34a' },
+  { value: 'POST', label: 'POST', color: '#3b82f6' },
+  { value: 'PUT', label: 'PUT', color: '#f59e0b' },
+  { value: 'DELETE', label: 'DELETE', color: '#dc2626' },
+  { value: 'PATCH', label: 'PATCH', color: '#7c3aed' }
+];
+
+// Authentication types
+export const AUTH_TYPES = [
+  { value: 'none', label: 'Sin autenticación' },
+  { value: 'basic', label: 'Basic Auth' },
+  { value: 'bearer', label: 'Bearer Token' },
+  { value: 'apikey', label: 'API Key' },
+  { value: 'oauth', label: 'OAuth 2.0' }
+];
+
+// Node categories for UI grouping
+export const NODE_CATEGORIES = {
+  INPUT: 'input',
+  PROCESSING: 'processing',
+  OUTPUT: 'output',
+  FORMS: 'forms'
 };

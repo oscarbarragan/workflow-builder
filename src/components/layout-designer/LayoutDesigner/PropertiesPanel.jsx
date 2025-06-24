@@ -1,3 +1,4 @@
+// src/components/layout-designer/LayoutDesigner/PropertiesPanel.jsx - CORREGIDO
 import React from 'react';
 import { ELEMENT_TYPES } from '../../../utils/constants';
 
@@ -93,6 +94,25 @@ const PropertiesPanel = ({
   const renderElementProperties = () => {
     if (!selectedElement) return null;
 
+    // CORREGIDO: Crear opciones de variables de forma segura
+    const variableOptions = Object.entries(availableData).map(([key, varData]) => {
+      // Manejar tanto el formato nuevo como el viejo
+      let displayLabel;
+      if (typeof varData === 'object' && varData.displayValue !== undefined) {
+        // Nuevo formato con metadatos
+        displayLabel = `${key} (${varData.type}) - ${varData.displayValue}`;
+      } else {
+        // Formato viejo o string simple
+        const value = typeof varData === 'string' ? varData : String(varData);
+        displayLabel = `${key} - ${value.length > 30 ? value.substring(0, 30) + '...' : value}`;
+      }
+      
+      return {
+        value: key,
+        label: displayLabel
+      };
+    });
+
     switch (selectedElement.type) {
       case ELEMENT_TYPES.TEXT:
         return (
@@ -129,10 +149,7 @@ const PropertiesPanel = ({
           <>
             {renderFormField('Variable', 'variable', 'select', {
               placeholder: 'Selecciona una variable del workflow',
-              options: Object.keys(availableData).map(key => ({
-                value: key,
-                label: `${key} (${availableData[key]})`
-              }))
+              options: variableOptions
             })}
             {renderFormField('Tamaño de Fuente', 'fontSize', 'number', {
               min: 8,
@@ -317,7 +334,7 @@ const PropertiesPanel = ({
         </div>
       )}
 
-      {/* Available Variables - MEJORADO */}
+      {/* Available Variables - CORREGIDO */}
       {availableData && Object.keys(availableData).length > 0 && (
         <div style={{ marginTop: '24px' }}>
           <h4 style={{
@@ -336,47 +353,82 @@ const PropertiesPanel = ({
             borderRadius: '6px',
             background: 'white'
           }}>
-            {Object.entries(availableData).map(([key, value]) => (
-              <div
-                key={key}
-                style={{
-                  fontSize: '12px',
-                  padding: '8px 12px',
-                  borderBottom: '1px solid #f3f4f6',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s'
-                }}
-                onClick={() => {
-                  if (selectedElement?.type === ELEMENT_TYPES.VARIABLE) {
-                    onUpdateSelectedElement('variable', key);
-                  }
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#f8fafc'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
-                title={`Click para usar en elemento variable\nValor actual: ${value}`}
-              >
-                <div style={{
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}>
-                  <span style={{ color: '#3b82f6' }}>🔗</span>
-                  {key}
+            {Object.entries(availableData).map(([key, varData]) => {
+              // CORREGIDO: Manejar tanto formato nuevo como viejo de forma segura
+              let displayValue, typeInfo;
+              
+              if (typeof varData === 'object' && varData !== null && varData.displayValue !== undefined) {
+                // Nuevo formato con metadatos
+                displayValue = varData.displayValue;
+                typeInfo = varData.type || 'unknown';
+              } else {
+                // Formato viejo o valor simple
+                displayValue = typeof varData === 'string' ? varData : String(varData);
+                typeInfo = 'string';
+              }
+              
+              // Truncar valores largos
+              const truncatedValue = displayValue.length > 40 
+                ? `${displayValue.substring(0, 40)}...` 
+                : displayValue;
+
+              return (
+                <div
+                  key={key}
+                  style={{
+                    fontSize: '12px',
+                    padding: '8px 12px',
+                    borderBottom: '1px solid #f3f4f6',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onClick={() => {
+                    if (selectedElement?.type === ELEMENT_TYPES.VARIABLE) {
+                      onUpdateSelectedElement('variable', key);
+                    }
+                  }}
+                  onMouseOver={(e) => e.target.style.backgroundColor = '#f8fafc'}
+                  onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+                  title={`Click para usar en elemento variable\nTipo: ${typeInfo}\nValor: ${displayValue}`}
+                >
+                  <div style={{
+                    fontWeight: '600',
+                    color: '#374151',
+                    marginBottom: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <span style={{ 
+                      color: typeInfo === 'string' ? '#16a34a' : 
+                            typeInfo === 'number' ? '#3b82f6' : 
+                            typeInfo === 'boolean' ? '#f59e0b' : 
+                            typeInfo === 'array' ? '#7c3aed' : 
+                            typeInfo === 'object' ? '#dc2626' : '#6b7280'
+                    }}>
+                      🔗
+                    </span>
+                    {key}
+                    <span style={{
+                      fontSize: '10px',
+                      padding: '1px 4px',
+                      background: '#e5e7eb',
+                      borderRadius: '3px',
+                      color: '#6b7280'
+                    }}>
+                      {typeInfo}
+                    </span>
+                  </div>
+                  <div style={{
+                    color: '#6b7280',
+                    wordBreak: 'break-word',
+                    fontSize: '11px'
+                  }}>
+                    {truncatedValue}
+                  </div>
                 </div>
-                <div style={{
-                  color: '#6b7280',
-                  wordBreak: 'break-word',
-                  fontSize: '11px'
-                }}>
-                  {typeof value === 'string' && value.length > 40 
-                    ? `${value.substring(0, 40)}...` 
-                    : value}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           <div style={{

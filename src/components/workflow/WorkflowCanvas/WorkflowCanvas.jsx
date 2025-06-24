@@ -1,4 +1,4 @@
-// src/components/workflow/WorkflowCanvas/WorkflowCanvas.jsx
+// src/components/workflow/WorkflowCanvas/WorkflowCanvas.jsx - CORREGIDO
 import React, { useMemo } from 'react';
 import ReactFlow, {
   Background,
@@ -11,6 +11,11 @@ import CustomNode from '../nodes/CustomNode/CustomNode';
 import AddNodesPanel from '../panels/AddNodesPanel/AddNodesPanel';
 import PreviewPanel from '../panels/PreviewPanel/PreviewPanel';
 import { getWorkflowStats } from '../../../utils/nodeHelpers';
+
+// CORREGIDO: Definir nodeTypes fuera del componente para evitar recreación
+const nodeTypes = {
+  customNode: CustomNode,
+};
 
 const WorkflowCanvas = ({
   nodes,
@@ -25,11 +30,6 @@ const WorkflowCanvas = ({
   onSaveWorkflow,
   workflowData
 }) => {
-  // Define custom node types
-  const nodeTypes = useMemo(() => ({
-    customNode: CustomNode,
-  }), []);
-
   // Get workflow statistics
   const workflowStats = useMemo(() => 
     getWorkflowStats(nodes, edges), 
@@ -37,19 +37,19 @@ const WorkflowCanvas = ({
   );
 
   // ReactFlow configuration
-  const defaultEdgeOptions = {
+  const defaultEdgeOptions = useMemo(() => ({
     type: 'smoothstep',
     animated: true,
     style: {
       stroke: '#3b82f6',
       strokeWidth: 2,
     },
-  };
+  }), []);
 
-  const connectionLineStyle = {
+  const connectionLineStyle = useMemo(() => ({
     stroke: '#3b82f6',
     strokeWidth: 2,
-  };
+  }), []);
 
   return (
     <div style={{
@@ -117,6 +117,8 @@ const WorkflowCanvas = ({
               case 'user-form': return '#3b82f6';
               case 'location-form': return '#16a34a';
               case 'layout-designer': return '#7c3aed';
+              case 'http-input': return '#f59e0b';
+              case 'data-mapper': return '#14b8a6';
               default: return '#6b7280';
             }
           }}

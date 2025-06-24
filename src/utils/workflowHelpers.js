@@ -402,6 +402,199 @@ export const executeWorkflow = (nodes, edges) => {
     
     return Math.round(totalTime);
   };
+
+  /**
+ * Validate HTTP Input configuration
+ */
+export const validateHttpInput = (properties) => {
+  const errors = [];
+  
+  if (!properties.path || !properties.path.startsWith('/')) {
+    errors.push('Path inválido: debe comenzar con /');
+  }
+  
+  if (!properties.method || !['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].includes(properties.method)) {
+    errors.push('Método HTTP inválido');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+/**
+ * Validate Data Mapper configuration
+ */
+export const validateDataMapper = (properties) => {
+  const errors = [];
+  
+  if (!properties.mappings || !Array.isArray(properties.mappings)) {
+    errors.push('No hay mapeos configurados');
+  }
+  
+  if (properties.mappings && properties.mappings.length === 0) {
+    errors.push('Debe tener al menos un mapeo configurado');
+  }
+  
+  // Validate each mapping
+  if (properties.mappings) {
+    properties.mappings.forEach((mapping, index) => {
+      if (!mapping.variableName || mapping.variableName.trim() === '') {
+        errors.push(`Mapeo ${index + 1}: nombre de variable requerido`);
+      }
+      
+      if (!mapping.isValid) {
+        errors.push(`Mapeo ${index + 1}: tipos incompatibles`);
+      }
+    });
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+/**
+ * Generate API specification from HTTP Input nodes
+ */
+export const generateApiSpec = (nodes) => {
+  const httpNodes = nodes.filter(node => node.data.type === 'http-input');
+  
+  const endpoints = httpNodes.map(node => {
+    const props = node.data.properties;
+    return {
+      path: props.path,
+      method: props.method,
+      description: props.description,
+      authentication: props.authentication,
+      cors: props.enableCors,
+      nodeId: node.id
+    };
+  });
+  
+  return {
+    openapi: '3.0.0',
+    info: {
+      title: 'Workflow API',
+      version: '1.0.0',
+      description: 'API generada automáticamente desde el workflow'
+    },
+    servers: [
+      {
+        url: 'http://localhost:3000/api',
+        description: 'Servidor de desarrollo'
+      }
+    ],
+    paths: endpoints.reduce((acc, endpoint) => {
+      acc[endpoint.path] = {
+        [endpoint.method.toLowerCase()]: {
+          summary: endpoint.description || `${endpoint.method} ${endpoint.path}`,
+          description: endpoint.description,
+          responses: {
+            '200': {
+              description: 'Respuesta exitosa',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object'
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+      return acc;
+    }, {})
+  };
+};
+
+/**
+ * Generate data structure documentation from Data Mapper nodes
+ */
+export const generateDataStructureDoc = (nodes) => {
+  const mapperNodes = nodes.filter(node => node.data.type === 'data-mapper');
+  
+  return mapperNodes.map(node => {
+    const props = node.data.properties;
+    return {
+      nodeId: node.id,
+      inputStructure: props.parsedJson,
+      outputVariables: props.outputVariables,
+      mappings: props.mappings?.map(mapping => ({
+        variable: mapping.variableName,
+        type: mapping.dataType,
+        jsonPath: mapping.jsonPath,
+        sourceValue: mapping.sourceValue
+      })) || []
+    };
+  });
+};
+
+/**
+ * Enhanced workflow execution for new node types
+ */
+export const executeWorkflowEnhanced = (nodes, edges) => {
+  const processedData = {};
+  const executionOrder = getExecutionOrder(nodes, edges);
+  
+  executionOrder.forEach(node => {
+    const nodeType = node.data.type;
+    const properties = node.data.properties;
+    
+    if (!properties || Object.keys(properties).length === 0) {
+      return;
+    }
+    
+    switch (nodeType) {
+      case 'http-input':
+        processedData[node.id] = {
+          type: 'http-endpoint',
+          endpoint: properties.endpoint,
+          method: properties.method,
+          path: properties.path,
+          authentication: properties.authentication,
+          cors: properties.enableCors,
+          status: 'configured',
+          timestamp: new Date().toISOString()
+        };
+        break;
+        
+      case 'data-mapper':
+        processedData[node.id] = {
+          type: 'data-mapping',
+          variables: properties.outputVariables || {},
+          mappingsCount: properties.mappings?.length || 0,
+          inputStructure: properties.parsedJson,
+          status: 'configured',
+          timestamp: new Date().toISOString()
+        };
+        break;
+        
+      case 'layout-designer':
+        processedData[node.id] = {
+          type: 'layout-design',
+          elementsCount: properties.layout?.elements?.length || 0,
+          layout: properties.layout,
+          status: 'configured',
+          timestamp: new Date().toISOString()
+        };
+        break;
+        
+      default:
+        // Handle existing node types
+        processedData[node.id] = {
+          type: nodeType,
+          properties: properties,
+          timestamp: new Date().toISOString()
+        };
+    }
+  });
+  
+  return processedData;
+};
   
   // Re-export node helpers for convenience
   export { getNodeConfig, validateNodeData } from './nodeHelpers';

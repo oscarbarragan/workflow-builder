@@ -1,4 +1,5 @@
-import { NODE_CONFIG } from './constants';
+// src/utils/nodeHelpers.js - ACTUALIZADO para manejar datos mapeados
+import { NODE_CONFIG, NODE_TYPES } from './constants';
 
 // Generate unique node ID
 export const generateNodeId = () => `node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -16,7 +17,7 @@ export const getNodeConfig = (nodeType) => {
   };
 };
 
-// Get available data from incoming nodes
+// Get available data from incoming nodes - MEJORADO
 export const getAvailableData = (nodeId, nodes, edges) => {
   const availableData = {};
   const incomingEdges = edges.filter(edge => edge.target === nodeId);
@@ -24,13 +25,167 @@ export const getAvailableData = (nodeId, nodes, edges) => {
   incomingEdges.forEach(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
     if (sourceNode && sourceNode.data.properties) {
-      Object.keys(sourceNode.data.properties).forEach(key => {
-        availableData[`${sourceNode.data.type}.${key}`] = sourceNode.data.properties[key];
-      });
+      const nodeType = sourceNode.data.type;
+      const properties = sourceNode.data.properties;
+      
+      switch (nodeType) {
+        case NODE_TYPES.USER_FORM:
+        case NODE_TYPES.LOCATION_FORM:
+          // Datos de formularios
+          Object.keys(properties).forEach(key => {
+            if (key !== 'status' && key !== 'createdAt') {
+              availableData[`${nodeType}.${key}`] = properties[key];
+            }
+          });
+          break;
+          
+        case NODE_TYPES.HTTP_INPUT:
+          // Datos de HTTP Input
+          if (properties.endpoint) {
+            availableData[`${nodeType}.endpoint`] = properties.endpoint;
+            availableData[`${nodeType}.method`] = properties.method;
+            availableData[`${nodeType}.path`] = properties.path;
+          }
+          break;
+          
+                  case NODE_TYPES.DATA_MAPPER:
+          // NUEVO: Datos mapeados del Data Mapper
+          if (properties.outputVariables) {
+            Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+              // Crear una representación segura del valor
+              let safeValue;
+              if (typeof varData.sourceValue === 'object') {
+                safeValue = `[${varData.type}] ${JSON.stringify(varData.sourceValue).substring(0, 30)}...`;
+              } else {
+                safeValue = String(varData.sourceValue || `[${varData.type}] from ${varData.jsonPath}`);
+              }
+              
+              availableData[`mapper.${varName}`] = safeValue;
+            });
+          }
+          
+          // También agregar información del mapeo
+          if (properties.mappings && properties.mappings.length > 0) {
+            availableData[`${nodeType}.mappingsCount`] = properties.mappings.length;
+          }
+          break;
+          
+        case NODE_TYPES.SCRIPT_PROCESSOR:
+          // NUEVO: Variables generadas por Script Processor
+          if (properties.outputVariables) {
+            Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+              // Crear una representación segura del valor
+              let safeValue;
+              if (typeof varData.value === 'object') {
+                safeValue = `[${varData.type}] ${JSON.stringify(varData.value).substring(0, 30)}...`;
+              } else {
+                safeValue = String(varData.value || `[${varData.type}] processed`);
+              }
+              
+              availableData[`script.${varName}`] = safeValue;
+            });
+          }
+          
+          // También agregar información del script
+          if (properties.executionResult) {
+            availableData[`${nodeType}.executed`] = 'true';
+            availableData[`${nodeType}.outputCount`] = Object.keys(properties.outputVariables || {}).length;
+          }
+          break;
+          
+        case NODE_TYPES.LAYOUT_DESIGNER:
+          // Datos del layout
+          if (properties.layout && properties.layout.elements) {
+            availableData[`${nodeType}.elementsCount`] = properties.layout.elements.length;
+          }
+          break;
+          
+        default:
+          // Fallback para otros tipos
+          Object.keys(properties).forEach(key => {
+            if (key !== 'status' && key !== 'createdAt') {
+              const value = properties[key];
+              // Asegurar que el valor sea una representación string segura
+              if (typeof value === 'object') {
+                availableData[`${nodeType}.${key}`] = `[Object] ${JSON.stringify(value).substring(0, 20)}...`;
+              } else {
+                availableData[`${nodeType}.${key}`] = String(value);
+              }
+            }
+          });
+      }
+    }
+  });
+  
+  // También incluir datos de Script Processor
+  incomingEdges.forEach(edge => {
+    const sourceNode = nodes.find(node => node.id === edge.source);
+    if (sourceNode && sourceNode.data.type === NODE_TYPES.SCRIPT_PROCESSOR) {
+      const properties = sourceNode.data.properties;
+      
+      if (properties.outputVariables) {
+        Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+          mappedVariables[varName] = {
+            type: varData.type,
+            jsonPath: '',
+            value: varData.value,
+            displayValue: varData.displayValue || String(varData.value)
+          };
+        });
+      }
     }
   });
   
   return availableData;
+};
+
+// NUEVA: Función específica para obtener variables mapeadas para el Layout Designer
+export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
+  const mappedVariables = {};
+  const incomingEdges = edges.filter(edge => edge.target === nodeId);
+  
+  incomingEdges.forEach(edge => {
+    const sourceNode = nodes.find(node => node.id === edge.source);
+    if (sourceNode && sourceNode.data.type === NODE_TYPES.DATA_MAPPER) {
+      const properties = sourceNode.data.properties;
+      
+      if (properties.outputVariables) {
+        Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+          mappedVariables[varName] = {
+            type: varData.type,
+            jsonPath: varData.jsonPath,
+            value: varData.sourceValue,
+            displayValue: typeof varData.sourceValue === 'object' 
+              ? `[${varData.type}] Complex Object`
+              : String(varData.sourceValue)
+          };
+        });
+      }
+    }
+  });
+  
+  // También incluir datos de otros nodos como antes
+  incomingEdges.forEach(edge => {
+    const sourceNode = nodes.find(node => node.id === edge.source);
+    if (sourceNode && sourceNode.data.properties && sourceNode.data.type !== NODE_TYPES.DATA_MAPPER) {
+      const nodeType = sourceNode.data.type;
+      const properties = sourceNode.data.properties;
+      
+      Object.keys(properties).forEach(key => {
+        if (key !== 'status' && key !== 'createdAt') {
+          const fullKey = `${nodeType}.${key}`;
+          mappedVariables[fullKey] = {
+            type: 'string',
+            jsonPath: '',
+            value: properties[key],
+            displayValue: String(properties[key])
+          };
+        }
+      });
+    }
+  });
+  
+  return mappedVariables;
 };
 
 // Validate node data

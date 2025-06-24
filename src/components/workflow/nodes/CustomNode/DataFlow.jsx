@@ -1,3 +1,4 @@
+// src/components/workflow/nodes/CustomNode/DataFlow.jsx - CORREGIDO
 import React from 'react';
 import { getAvailableData } from '../../../../utils/nodeHelpers';
 
@@ -47,9 +48,12 @@ const DataFlow = ({ nodeId, nodes, edges }) => {
           }}>
             <span style={{ fontWeight: '500' }}>{key}:</span> 
             <span style={{ marginLeft: '4px' }}>
-              {typeof value === 'string' && value.length > 20 
-                ? `${value.substring(0, 20)}...` 
-                : value
+              {/* CORREGIDO: Convertir valores a string */}
+              {typeof value === 'object' 
+                ? JSON.stringify(value).substring(0, 20) + '...'
+                : typeof value === 'string' && value.length > 20 
+                  ? `${value.substring(0, 20)}...` 
+                  : String(value)
               }
             </span>
           </div>
