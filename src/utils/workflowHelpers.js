@@ -1,3 +1,6 @@
+// src/utils/workflowHelpers.js
+import { getNodeConfig } from './nodeHelpers';
+
 // Workflow execution and processing utilities
 
 /**
@@ -58,48 +61,200 @@ export const executeWorkflow = (nodes, edges) => {
   };
   
   /**
-   * Validate workflow before execution
+   * Validate workflow before execution or import
    */
   export const validateWorkflow = (nodes, edges) => {
     const errors = [];
     const warnings = [];
-  
+
+    // Basic structure validation
+    if (!Array.isArray(nodes)) {
+      errors.push('Los nodos deben ser un array válido');
+      return { isValid: false, errors, warnings };
+    }
+
+    if (!Array.isArray(edges)) {
+      errors.push('Las conexiones deben ser un array válido');
+      return { isValid: false, errors, warnings };
+    }
+
+    // Validate nodes
+    nodes.forEach((node, index) => {
+      // Required properties
+      if (!node.id) {
+        errors.push(`Nodo en posición ${index} no tiene ID`);
+      }
+      
+      if (!node.type && !node.data?.type) {
+        errors.push(`Nodo ${node.id || index} no tiene tipo definido`);
+      }
+
+      // Position validation
+      if (!node.position || typeof node.position.x !== 'number' || typeof node.position.y !== 'number') {
+        warnings.push(`Nodo ${node.id || index} no tiene posición válida`);
+      }
+
+      // Check for valid node type
+      const nodeType = node.data?.type || node.type;
+      if (nodeType) {
+        const config = getNodeConfig(nodeType);
+        if (!config || config.title === 'Nodo Desconocido') {
+          warnings.push(`Tipo de nodo desconocido: ${nodeType}`);
+        }
+      }
+    });
+
+    // Validate edges
+    edges.forEach((edge, index) => {
+      if (!edge.id) {
+        errors.push(`Conexión en posición ${index} no tiene ID`);
+      }
+      
+      if (!edge.source) {
+        errors.push(`Conexión ${edge.id || index} no tiene nodo origen`);
+      }
+      
+      if (!edge.target) {
+        errors.push(`Conexión ${edge.id || index} no tiene nodo destino`);
+      }
+
+      // Check if referenced nodes exist
+      const sourceExists = nodes.some(node => node.id === edge.source);
+      const targetExists = nodes.some(node => node.id === edge.target);
+      
+      if (!sourceExists) {
+        errors.push(`Conexión ${edge.id || index} hace referencia a un nodo origen inexistente: ${edge.source}`);
+      }
+      
+      if (!targetExists) {
+        errors.push(`Conexión ${edge.id || index} hace referencia a un nodo destino inexistente: ${edge.target}`);
+      }
+    });
+
     // Check for isolated nodes
     const connectedNodes = new Set();
     edges.forEach(edge => {
       connectedNodes.add(edge.source);
       connectedNodes.add(edge.target);
     });
-  
+
     const isolatedNodes = nodes.filter(node => !connectedNodes.has(node.id));
     if (isolatedNodes.length > 0) {
-      warnings.push(`Found ${isolatedNodes.length} isolated node(s)`);
+      warnings.push(`${isolatedNodes.length} nodo(s) aislado(s) encontrado(s)`);
     }
-  
+
     // Check for circular dependencies
     try {
       getExecutionOrder(nodes, edges);
     } catch (error) {
       errors.push(error.message);
     }
-  
+
     // Check for nodes without required properties
     nodes.forEach(node => {
-      const config = getNodeConfig(node.data.type);
-      const missing = config.fields.filter(field => 
-        !node.data.properties || !node.data.properties[field]
-      );
-      
-      if (missing.length > 0) {
-        warnings.push(`Node ${node.id} missing required fields: ${missing.join(', ')}`);
+      const nodeType = node.data?.type || node.type;
+      if (nodeType) {
+        const config = getNodeConfig(nodeType);
+        const properties = node.data?.properties || node.properties || {};
+        
+        const missing = config.fields?.filter(field => 
+          !properties[field] || properties[field].toString().trim() === ''
+        ) || [];
+        
+        if (missing.length > 0) {
+          warnings.push(`Nodo ${node.id} tiene campos requeridos vacíos: ${missing.join(', ')}`);
+        }
       }
     });
-  
+
+    // Check for duplicate IDs
+    const nodeIds = nodes.map(node => node.id);
+    const duplicateNodeIds = nodeIds.filter((id, index) => nodeIds.indexOf(id) !== index);
+    if (duplicateNodeIds.length > 0) {
+      errors.push(`IDs de nodos duplicados encontrados: ${duplicateNodeIds.join(', ')}`);
+    }
+
+    const edgeIds = edges.map(edge => edge.id);
+    const duplicateEdgeIds = edgeIds.filter((id, index) => edgeIds.indexOf(id) !== index);
+    if (duplicateEdgeIds.length > 0) {
+      errors.push(`IDs de conexiones duplicados encontrados: ${duplicateEdgeIds.join(', ')}`);
+    }
+
     return {
       isValid: errors.length === 0,
       errors,
       warnings
     };
+  };
+
+  /**
+   * Import workflow from file
+   */
+  export const importWorkflow = async (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const workflowData = JSON.parse(e.target.result);
+          
+          // Validate basic structure
+          if (!workflowData || typeof workflowData !== 'object') {
+            throw new Error('El archivo no contiene un objeto JSON válido');
+          }
+
+          // Ensure required properties exist
+          if (!workflowData.nodes) {
+            workflowData.nodes = [];
+          }
+          
+          if (!workflowData.edges) {
+            workflowData.edges = [];
+          }
+
+          // Normalize node structure for ReactFlow
+          workflowData.nodes = workflowData.nodes.map(node => ({
+            id: node.id,
+            type: 'customNode',
+            position: node.position || { x: 100, y: 100 },
+            data: {
+              type: node.type,
+              properties: node.properties || {}
+            }
+          }));
+
+          // Normalize edge structure
+          workflowData.edges = workflowData.edges.map(edge => ({
+            id: edge.id,
+            source: edge.source,
+            target: edge.target
+          }));
+
+          // Add metadata if missing
+          if (!workflowData.metadata) {
+            workflowData.metadata = {
+              version: '1.0',
+              importedAt: new Date().toISOString()
+            };
+          }
+
+          // Add timestamp if missing
+          if (!workflowData.timestamp) {
+            workflowData.timestamp = new Date().toISOString();
+          }
+          
+          resolve(workflowData);
+        } catch (error) {
+          reject(new Error(`Error al procesar archivo JSON: ${error.message}`));
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Error al leer el archivo'));
+      };
+      
+      reader.readAsText(file);
+    });
   };
   
   /**
@@ -114,7 +269,7 @@ export const executeWorkflow = (nodes, edges) => {
       case 'csv':
         return exportAsCSV(workflowData);
       default:
-        throw new Error(`Unsupported export format: ${format}`);
+        throw new Error(`Formato de exportación no soportado: ${format}`);
     }
   };
   
@@ -195,45 +350,12 @@ export const executeWorkflow = (nodes, edges) => {
   };
   
   /**
-   * Import workflow from JSON
-   */
-  export const importWorkflow = async (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        try {
-          const workflowData = JSON.parse(e.target.result);
-          
-          // Validate structure
-          if (!workflowData.nodes || !Array.isArray(workflowData.nodes)) {
-            throw new Error('Invalid workflow format: missing nodes array');
-          }
-          
-          if (!workflowData.edges || !Array.isArray(workflowData.edges)) {
-            throw new Error('Invalid workflow format: missing edges array');
-          }
-          
-          resolve(workflowData);
-        } catch (error) {
-          reject(new Error(`Failed to parse workflow file: ${error.message}`));
-        }
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-      
-      reader.readAsText(file);
-    });
-  };
-  
-  /**
    * Generate workflow summary
    */
   export const generateWorkflowSummary = (nodes, edges) => {
     const nodeTypes = nodes.reduce((acc, node) => {
-      acc[node.data.type] = (acc[node.data.type] || 0) + 1;
+      const nodeType = node.data?.type || node.type;
+      acc[nodeType] = (acc[nodeType] || 0) + 1;
       return acc;
     }, {});
   

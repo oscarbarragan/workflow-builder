@@ -1,6 +1,8 @@
+// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx
 import React, { useState } from 'react';
-import { User, MapPin, FileText, Play, Download, Save } from 'lucide-react';
+import { User, MapPin, FileText, Play, Download, Save, Upload } from 'lucide-react';
 import Button from '../../../common/Button/Button';
+import ImportWorkflow from '../../../common/ImportWorkflow/ImportWorkflow';
 import { NODE_TYPES, STYLES } from '../../../../utils/constants';
 
 const AddNodesPanel = ({ 
@@ -8,9 +10,11 @@ const AddNodesPanel = ({
   onExecuteWorkflow, 
   onExportWorkflow,
   onSaveWorkflow,
+  onImportWorkflow,
   workflowStats = {} 
 }) => {
   const [isSaving, setIsSaving] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const nodeButtons = [
     {
@@ -49,6 +53,12 @@ const AddNodesPanel = ({
     }
   };
 
+  const handleImportWorkflow = (workflowData) => {
+    if (onImportWorkflow) {
+      onImportWorkflow(workflowData);
+    }
+  };
+
   const actionButtons = [
     {
       label: 'Ejecutar',
@@ -58,7 +68,14 @@ const AddNodesPanel = ({
       description: 'Ejecutar el workflow completo'
     },
     {
-      label: 'Descargar',
+      label: 'Importar',
+      icon: <Upload size={16} />,
+      variant: 'secondary',
+      onClick: () => setIsImportModalOpen(true),
+      description: 'Importar workflow desde JSON'
+    },
+    {
+      label: 'Exportar',
       icon: <Download size={16} />,
       variant: 'danger',
       onClick: onExportWorkflow,
@@ -87,158 +104,168 @@ const AddNodesPanel = ({
   };
 
   return (
-    <div style={{
-      ...STYLES.panel,
-      minWidth: '220px',
-      maxWidth: '280px'
-    }}>
-      <h3 style={{
-        margin: '0 0 16px 0',
-        fontSize: '16px',
-        fontWeight: '600',
-        color: '#374151'
+    <>
+      <div style={{
+        ...STYLES.panel,
+        minWidth: '220px',
+        maxWidth: '280px'
       }}>
-        Workflow Builder
-      </h3>
-
-      {/* Statistics */}
-      {workflowStats.totalNodes > 0 && (
-        <div style={{
-          background: '#f3f4f6',
-          padding: '12px',
-          borderRadius: '6px',
-          marginBottom: '16px'
+        <h3 style={{
+          margin: '0 0 16px 0',
+          fontSize: '16px',
+          fontWeight: '600',
+          color: '#374151'
         }}>
-          <div style={{ fontSize: '12px', color: '#374151', marginBottom: '4px' }}>
-            <strong>Nodos:</strong> {workflowStats.totalNodes}
-          </div>
-          <div style={{ fontSize: '12px', color: '#374151', marginBottom: '4px' }}>
-            <strong>Conexiones:</strong> {workflowStats.totalEdges || 0}
-          </div>
-          {workflowStats.nodeTypes && (
-            <div style={{ fontSize: '11px', color: '#6b7280' }}>
-              {Object.entries(workflowStats.nodeTypes).map(([type, count]) => (
-                <div key={type}>
-                  {type}: {count}
-                </div>
-              ))}
+          Workflow Builder
+        </h3>
+
+        {/* Statistics */}
+        {workflowStats.totalNodes > 0 && (
+          <div style={{
+            background: '#f3f4f6',
+            padding: '12px',
+            borderRadius: '6px',
+            marginBottom: '16px'
+          }}>
+            <div style={{ fontSize: '12px', color: '#374151', marginBottom: '4px' }}>
+              <strong>Nodos:</strong> {workflowStats.totalNodes}
             </div>
-          )}
+            <div style={{ fontSize: '12px', color: '#374151', marginBottom: '4px' }}>
+              <strong>Conexiones:</strong> {workflowStats.totalEdges || 0}
+            </div>
+            {workflowStats.nodeTypes && (
+              <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                {Object.entries(workflowStats.nodeTypes).map(([type, count]) => (
+                  <div key={type}>
+                    {type}: {count}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Add Nodes Section */}
+        <div style={{ marginBottom: '20px' }}>
+          <h4 style={{
+            margin: '0 0 12px 0',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#374151'
+          }}>
+            Agregar Nodos
+          </h4>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {nodeButtons.map((button) => (
+              <Button
+                key={button.type}
+                variant={button.variant}
+                onClick={() => onAddNode(button.type)}
+                icon={button.icon}
+                iconPosition="left"
+                fullWidth
+                style={getButtonStyle(button.variant)}
+                title={button.description}
+              >
+                {button.label}
+              </Button>
+            ))}
+          </div>
         </div>
-      )}
 
-      {/* Add Nodes Section */}
-      <div style={{ marginBottom: '20px' }}>
-        <h4 style={{
-          margin: '0 0 12px 0',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#374151'
-        }}>
-          Agregar Nodos
-        </h4>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {nodeButtons.map((button) => (
-            <Button
-              key={button.type}
-              variant={button.variant}
-              onClick={() => onAddNode(button.type)}
-              icon={button.icon}
-              iconPosition="left"
-              fullWidth
-              style={getButtonStyle(button.variant)}
-              title={button.description}
-            >
-              {button.label}
-            </Button>
-          ))}
+        <hr style={{
+          margin: '16px 0',
+          border: 'none',
+          borderTop: '1px solid #e5e7eb'
+        }} />
+
+        {/* Actions Section */}
+        <div>
+          <h4 style={{
+            margin: '0 0 12px 0',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#374151'
+          }}>
+            Acciones
+          </h4>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {actionButtons.map((button, index) => (
+              <Button
+                key={index}
+                variant={button.variant}
+                onClick={button.onClick}
+                icon={button.icon}
+                iconPosition="left"
+                fullWidth
+                loading={button.loading}
+                disabled={button.disabled}
+                title={button.description}
+                style={getButtonStyle(button.variant)}
+              >
+                {button.label}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      <hr style={{
-        margin: '16px 0',
-        border: 'none',
-        borderTop: '1px solid #e5e7eb'
-      }} />
+        {/* Status de guardado */}
+        {isSaving && (
+          <div style={{
+            marginTop: '12px',
+            padding: '8px 12px',
+            background: '#eff6ff',
+            borderRadius: '6px',
+            fontSize: '12px',
+            color: '#1e40af',
+            textAlign: 'center',
+            border: '1px solid #bfdbfe'
+          }}>
+            💾 Guardando workflow...
+          </div>
+        )}
 
-      {/* Actions Section */}
-      <div>
-        <h4 style={{
-          margin: '0 0 12px 0',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#374151'
-        }}>
-          Acciones
-        </h4>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {actionButtons.map((button, index) => (
-            <Button
-              key={index}
-              variant={button.variant}
-              onClick={button.onClick}
-              icon={button.icon}
-              iconPosition="left"
-              fullWidth
-              loading={button.loading}
-              disabled={button.disabled}
-              title={button.description}
-              style={getButtonStyle(button.variant)}
-            >
-              {button.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Status de guardado */}
-      {isSaving && (
+        {/* Help Section */}
         <div style={{
-          marginTop: '12px',
-          padding: '8px 12px',
+          marginTop: '20px',
+          padding: '12px',
           background: '#eff6ff',
           borderRadius: '6px',
-          fontSize: '12px',
-          color: '#1e40af',
-          textAlign: 'center',
           border: '1px solid #bfdbfe'
         }}>
-          💾 Guardando workflow...
+          <div style={{
+            fontSize: '12px',
+            color: '#1e40af',
+            fontWeight: '500',
+            marginBottom: '6px'
+          }}>
+            💡 Cómo usar:
+          </div>
+          <ul style={{
+            fontSize: '11px',
+            color: '#1e40af',
+            margin: 0,
+            paddingLeft: '16px'
+          }}>
+            <li>Agrega nodos desde los botones</li>
+            <li>Conecta nodos arrastrando desde los círculos</li>
+            <li>Haz clic en los nodos para configurarlos</li>
+            <li><strong>Importa</strong> workflows desde JSON</li>
+            <li>Ejecuta para procesar el workflow</li>
+            <li><strong>Guarda</strong> para persistir en servidor</li>
+          </ul>
         </div>
-      )}
-
-      {/* Help Section */}
-      <div style={{
-        marginTop: '20px',
-        padding: '12px',
-        background: '#eff6ff',
-        borderRadius: '6px',
-        border: '1px solid #bfdbfe'
-      }}>
-        <div style={{
-          fontSize: '12px',
-          color: '#1e40af',
-          fontWeight: '500',
-          marginBottom: '6px'
-        }}>
-          💡 Cómo usar:
-        </div>
-        <ul style={{
-          fontSize: '11px',
-          color: '#1e40af',
-          margin: 0,
-          paddingLeft: '16px'
-        }}>
-          <li>Agrega nodos desde los botones</li>
-          <li>Conecta nodos arrastrando desde los círculos</li>
-          <li>Haz clic en los nodos para configurarlos</li>
-          <li>Ejecuta para procesar el workflow</li>
-          <li><strong>Guarda</strong> para persistir en servidor</li>
-        </ul>
       </div>
-    </div>
+
+      {/* Import Modal */}
+      <ImportWorkflow
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleImportWorkflow}
+      />
+    </>
   );
 };
 

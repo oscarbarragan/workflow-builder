@@ -1,3 +1,4 @@
+// src/components/workflow/WorkflowCanvas/WorkflowCanvas.jsx
 import React, { useMemo } from 'react';
 import ReactFlow, {
   Background,
@@ -20,6 +21,7 @@ const WorkflowCanvas = ({
   onAddNode,
   onExecuteWorkflow,
   onExportWorkflow,
+  onImportWorkflow,
   onSaveWorkflow,
   workflowData
 }) => {
@@ -126,6 +128,7 @@ const WorkflowCanvas = ({
             onAddNode={onAddNode}
             onExecuteWorkflow={onExecuteWorkflow}
             onExportWorkflow={onExportWorkflow}
+            onImportWorkflow={onImportWorkflow}
             onSaveWorkflow={onSaveWorkflow}
             workflowStats={workflowStats}
           />
@@ -168,7 +171,7 @@ const WorkflowCanvas = ({
                 color: '#6b7280',
                 lineHeight: '1.5'
               }}>
-                Comienza agregando nodos desde el panel izquierdo para crear tu flujo de trabajo.
+                Comienza agregando nodos desde el panel izquierdo o importa un workflow existente.
               </p>
             </div>
           </Panel>
@@ -188,6 +191,28 @@ const WorkflowCanvas = ({
             💡 <strong>Atajos:</strong> Seleccionar múltiple (Ctrl/Cmd), Eliminar (Del/Backspace), Zoom (rueda del mouse)
           </div>
         </Panel>
+
+        {/* Import Success Panel */}
+        {nodes.length > 0 && edges.length > 0 && (
+          <Panel position="top-center" style={{ zIndex: 1000 }}>
+            <div style={{
+              background: 'rgba(34, 197, 94, 0.95)',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}>
+              <span>✅</span>
+              <span>Workflow activo: {nodes.length} nodos, {edges.length} conexiones</span>
+            </div>
+          </Panel>
+        )}
       </ReactFlow>
     </div>
   );

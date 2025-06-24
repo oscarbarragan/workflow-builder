@@ -1,3 +1,4 @@
+// src/App.jsx
 import React from 'react';
 import WorkflowCanvas from './components/workflow/WorkflowCanvas/WorkflowCanvas';
 import { useWorkflow } from './hooks/useWorkflow';
@@ -11,6 +12,7 @@ function App() {
     addNode,
     executeWorkflow,
     exportWorkflow,
+    importWorkflow,
     onNodesChange,
     onEdgesChange,
     onConnect
@@ -29,6 +31,21 @@ function App() {
       `Nodos procesados: ${Object.keys(processedData).length}\n\n` +
       `Datos procesados:\n${JSON.stringify(processedData, null, 2)}`
     );
+  };
+
+  const handleImportWorkflow = (workflowData) => {
+    console.log('📥 Importing workflow from UI...');
+    console.log('🔍 Workflow data to import:', workflowData);
+    
+    const result = importWorkflow(workflowData);
+    
+    if (result.success) {
+      alert(`✅ ${result.message}`);
+      console.log('✅ Workflow imported successfully');
+    } else {
+      alert(`❌ ${result.message}`);
+      console.error('❌ Failed to import workflow');
+    }
   };
 
   const handleSaveWorkflow = async () => {
@@ -97,6 +114,7 @@ function App() {
       onAddNode={addNode}
       onExecuteWorkflow={handleExecuteWorkflow}
       onExportWorkflow={exportWorkflow}
+      onImportWorkflow={handleImportWorkflow}
       onSaveWorkflow={handleSaveWorkflow}
       workflowData={workflowData}
     />
