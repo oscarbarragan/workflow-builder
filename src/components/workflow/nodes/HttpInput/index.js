@@ -8,3 +8,7 @@ export { default as BodyTab } from './HttpInputBodyTab';
 
 // Export the tabs collection
 export * from './HttpInputTabs';
+
+
+// Export testing
+export * from './HttpInputTester';

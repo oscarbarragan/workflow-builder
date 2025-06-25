@@ -1,10 +1,252 @@
-// src/components/workflow/nodes/HttpInput/HttpInput.jsx - ACTUALIZADO Y SIMPLIFICADO
+// src/components/workflow/nodes/HttpInput/HttpInput.jsx - MEJORADO CON TESTER
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Globe, Settings, Database } from 'lucide-react';
+import { Globe, Settings, Database, TestTube, HelpCircle } from 'lucide-react';
 import Button from '../../../common/Button/Button';
 import { BasicTab, HeadersTab, BodyTab } from './HttpInputTabs';
+import HttpInputTester from './HttpInputTester';
 import { validateHttpInputConfig } from '../../../../utils/httpInputHelpers';
+
+// NUEVO: Componente TestingFlowGuide inline para evitar imports
+const TestingFlowGuide = ({ 
+  isOpen, 
+  onClose,
+  httpInputConfig = {},
+  testResult = null 
+}) => {
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 999999,
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        width: '90vw',
+        maxWidth: '700px',
+        maxHeight: '80vh',
+        overflow: 'auto',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        padding: '24px'
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '20px',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '16px'
+        }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: '20px',
+            fontWeight: '700',
+            color: '#1f2937'
+          }}>
+            🔄 ¿Cómo funciona el Testing?
+          </h2>
+          
+          <button 
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '6px',
+              color: '#6b7280',
+              fontSize: '18px'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Explanation */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          
+          {/* Step 1 */}
+          <div style={{
+            padding: '16px',
+            border: '2px solid #3b82f6',
+            borderRadius: '8px',
+            background: '#eff6ff'
+          }}>
+            <h3 style={{
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              color: '#1e40af',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Globe size={20} />
+              1. HTTP Input - Configuración
+            </h3>
+            <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#1e40af' }}>
+              Configuras el endpoint, headers y body que recibirá datos del exterior.
+            </p>
+            <div style={{ fontSize: '12px', color: '#3730a3' }}>
+              • Endpoint: {httpInputConfig.method || 'GET'} {httpInputConfig.path || '/no-configurado'}<br/>
+              • Headers: {httpInputConfig.headers?.length || 0} configurados<br/>
+              • Body: {httpInputConfig.enableBodyCapture ? 'Habilitado' : 'Deshabilitado'}
+            </div>
+          </div>
+
+          {/* Step 2 */}
+          <div style={{
+            padding: '16px',
+            border: '2px solid #16a34a',
+            borderRadius: '8px',
+            background: '#f0fdf4'
+          }}>
+            <h3 style={{
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              color: '#15803d',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <TestTube size={20} />
+              2. Testing - Simulación
+            </h3>
+            <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#15803d' }}>
+              El botón "🧪 Probar Endpoint" simula un request con datos de ejemplo.
+            </p>
+            <div style={{ fontSize: '12px', color: '#14532d' }}>
+              • <strong>NO envía datos reales</strong> - es simulación local<br/>
+              • Genera headers y body según tu configuración<br/>
+              • Muestra qué variables se crearían<br/>
+              • Permite validar el flujo antes de usar datos reales
+            </div>
+          </div>
+
+          {/* Step 3 */}
+          <div style={{
+            padding: '16px',
+            border: '2px solid #7c3aed',
+            borderRadius: '8px',
+            background: '#f3e8ff'
+          }}>
+            <h3 style={{
+              margin: '0 0 8px 0',
+              fontSize: '16px',
+              color: '#6b21a8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Database size={20} />
+              3. Data Mapper - Procesamiento
+            </h3>
+            <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#6b21a8' }}>
+              El Data Mapper recibe la estructura y la convierte en variables utilizables.
+            </p>
+            <div style={{ fontSize: '12px', color: '#581c87' }}>
+              • Detecta automáticamente la estructura del HTTP Input<br/>
+              • Genera mapeos para cada campo<br/>
+              • Valida tipos de datos<br/>
+              • Crea variables con prefijo "mapper."
+            </div>
+          </div>
+
+          {/* Key Points */}
+          <div style={{
+            padding: '16px',
+            background: '#fefbf3',
+            border: '1px solid #fed7aa',
+            borderRadius: '8px'
+          }}>
+            <h4 style={{
+              margin: '0 0 8px 0',
+              fontSize: '14px',
+              color: '#c2410c',
+              fontWeight: '600'
+            }}>
+              🎯 Puntos Clave:
+            </h4>
+            
+            <ul style={{
+              fontSize: '12px',
+              color: '#c2410c',
+              margin: 0,
+              paddingLeft: '16px'
+            }}>
+              <li><strong>Testing Local:</strong> No se conecta a servidores reales</li>
+              <li><strong>Datos de Ejemplo:</strong> Se generan automáticamente según tu configuración</li>
+              <li><strong>Validación del Flujo:</strong> Verifica que HTTP Input → Data Mapper funcione</li>
+              <li><strong>Variables Resultantes:</strong> Estarán disponibles como "mapper.nombreVariable"</li>
+            </ul>
+          </div>
+
+          {/* Test Result Preview */}
+          {testResult && (
+            <div style={{
+              padding: '12px',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '6px'
+            }}>
+              <h4 style={{
+                margin: '0 0 6px 0',
+                fontSize: '12px',
+                color: '#15803d',
+                fontWeight: '600'
+              }}>
+                ✅ Último Test Realizado:
+              </h4>
+              
+              <div style={{ fontSize: '11px', color: '#15803d', fontFamily: 'monospace' }}>
+                <div>Status: {testResult.status} {testResult.statusText}</div>
+                <div>Variables: {Object.keys(testResult.data.processedVariables || {}).length}</div>
+                <div>Hora: {new Date(testResult.data.timestamp).toLocaleTimeString()}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: '20px',
+          paddingTop: '16px',
+          borderTop: '1px solid #e5e7eb'
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 24px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              background: '#3b82f6',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+          >
+            ¡Entendido!
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 const HttpInput = ({ 
   isOpen, 
@@ -34,6 +276,11 @@ const HttpInput = ({
   const [isValidating, setIsValidating] = useState(false);
   const [pathValidation, setPathValidation] = useState(null);
   const [activeTab, setActiveTab] = useState('basic');
+  
+  // NUEVO: Estado del tester
+  const [isTesterOpen, setIsTesterOpen] = useState(false);
+  const [testResults, setTestResults] = useState([]);
+  const [isFlowGuideOpen, setIsFlowGuideOpen] = useState(false);
 
   // Disable ReactFlow when modal is open
   useEffect(() => {
@@ -118,6 +365,10 @@ const HttpInput = ({
         createdAt: new Date().toISOString(),
         configured: true, // IMPORTANT: Mark as configured for Data Mapper detection
         
+        // NUEVO: Incluir datos de prueba si existen
+        testResults: testResults.length > 0 ? testResults : undefined,
+        lastTested: testResults.length > 0 ? new Date().toISOString() : undefined,
+        
         // Generate simplified output structure
         outputStructure: generateSimplifiedOutputStructure(formData)
       };
@@ -159,6 +410,33 @@ const HttpInput = ({
     return structure;
   };
 
+  // NUEVO: Manejar resultado del test
+  const handleTestResult = (result) => {
+    setTestResults(prev => [result, ...prev.slice(0, 4)]); // Mantener últimos 5 resultados
+    console.log('🧪 Test result received:', result);
+  };
+
+  // NUEVO: Abrir tester - CORREGIDO para que funcione siempre
+  const handleOpenTester = () => {
+    console.log('🧪 Opening tester with data:', formData);
+    console.log('🧪 Path validation:', pathValidation);
+    
+    // Verificar condiciones mínimas
+    if (!formData.path || formData.path.trim() === '') {
+      alert('Por favor configura un path antes de hacer pruebas (ej: /test)');
+      return;
+    }
+    
+    // Si no hay validación de path o está validando, permitir de todas formas
+    if (pathValidation && !pathValidation.isValid) {
+      const proceed = confirm('El path tiene problemas de validación. ¿Continuar con la prueba de todas formas?');
+      if (!proceed) return;
+    }
+    
+    console.log('✅ Opening tester...');
+    setIsTesterOpen(true);
+  };
+
   const handleClose = () => {
     setFormData({
       path: '',
@@ -174,6 +452,7 @@ const HttpInput = ({
     setErrors({});
     setPathValidation(null);
     setActiveTab('basic');
+    setTestResults([]); // NUEVO: Limpiar resultados
     onClose();
   };
 
@@ -250,6 +529,9 @@ const HttpInput = ({
             <div><strong>Método:</strong> {formData.method}</div>
             <div><strong>Headers:</strong> {formData.headers.length}</div>
             <div><strong>Body:</strong> {formData.enableBodyCapture ? 'Habilitado' : 'Deshabilitado'}</div>
+            {testResults.length > 0 && (
+              <div><strong>Pruebas:</strong> {testResults.length}</div>
+            )}
           </div>
           
           <button 
@@ -302,6 +584,53 @@ const HttpInput = ({
               {tab.label}
             </button>
           ))}
+          
+          {/* NUEVO: Botón de Testing - CORREGIDO */}
+          <button
+            onClick={handleOpenTester}
+            disabled={!formData.path || formData.path.trim() === ''}
+            style={{
+              marginLeft: 'auto',
+              padding: '12px 20px',
+              border: 'none',
+              background: formData.path && formData.path.trim() !== '' ? '#16a34a' : '#9ca3af',
+              color: 'white',
+              cursor: formData.path && formData.path.trim() !== '' ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              fontWeight: '500',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+              opacity: formData.path && formData.path.trim() !== '' ? 1 : 0.5
+            }}
+          >
+            <TestTube size={14} />
+            🧪 Probar Endpoint
+          </button>
+          
+          {/* NUEVO: Botón de Ayuda del Flujo */}
+          <button
+            onClick={() => setIsFlowGuideOpen(true)}
+            style={{
+              padding: '12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              background: 'white',
+              color: '#6b7280',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s'
+            }}
+            title="¿Cómo funciona el testing?"
+          >
+            <HelpCircle size={14} />
+          </button>
         </div>
 
         {/* Tab Content */}
@@ -332,6 +661,61 @@ const HttpInput = ({
             />
           )}
         </div>
+
+        {/* NUEVO: Test Results Summary */}
+        {testResults.length > 0 && (
+          <div style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            padding: '12px',
+            marginTop: '16px'
+          }}>
+            <div style={{
+              fontSize: '13px',
+              color: '#15803d',
+              fontWeight: '600',
+              marginBottom: '6px'
+            }}>
+              🧪 Últimas Pruebas ({testResults.length})
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              gap: '8px',
+              flexWrap: 'wrap'
+            }}>
+              {testResults.slice(0, 3).map((result, index) => (
+                <div
+                  key={index}
+                  style={{
+                    fontSize: '11px',
+                    padding: '4px 8px',
+                    background: result.status === 200 ? '#dcfce7' : '#fef2f2',
+                    color: result.status === 200 ? '#166534' : '#dc2626',
+                    borderRadius: '4px',
+                    border: `1px solid ${result.status === 200 ? '#bbf7d0' : '#fecaca'}`,
+                    fontFamily: 'monospace'
+                  }}
+                >
+                  {result.status} - {new Date(result.data.timestamp).toLocaleTimeString()}
+                </div>
+              ))}
+              {testResults.length > 3 && (
+                <div style={{
+                  fontSize: '11px',
+                  padding: '4px 8px',
+                  background: '#f3f4f6',
+                  color: '#6b7280',
+                  borderRadius: '4px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  +{testResults.length - 3} más
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Generated Endpoint Preview */}
         {formData.path && pathValidation?.isValid && (
@@ -402,6 +786,23 @@ const HttpInput = ({
                 </div>
               </div>
             </div>
+            
+            {/* NUEVO: Guía de uso */}
+            <div style={{
+              marginTop: '12px',
+              padding: '8px',
+              background: '#ecfdf5',
+              borderRadius: '4px',
+              fontSize: '11px',
+              color: '#15803d'
+            }}>
+              <strong>💡 Próximos pasos:</strong>
+              <ol style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                <li>Usa el botón "🧪 Probar Endpoint" para simular requests</li>
+                <li>Conecta este HTTP Input con un Data Mapper</li>
+                <li>El Data Mapper procesará los datos y creará variables</li>
+              </ol>
+            </div>
           </div>
         )}
 
@@ -450,6 +851,25 @@ const HttpInput = ({
           `}
         </style>
       </div>
+      
+      {/* NUEVO: HTTP Input Tester Modal */}
+      <HttpInputTester
+        isOpen={isTesterOpen}
+        onClose={() => setIsTesterOpen(false)}
+        httpInputConfig={{
+          ...formData,
+          endpoint: `http://localhost:3000/api${formData.path}`
+        }}
+        onTestResult={handleTestResult}
+      />
+      
+      {/* NUEVO: Testing Flow Guide */}
+      <TestingFlowGuide
+        isOpen={isFlowGuideOpen}
+        onClose={() => setIsFlowGuideOpen(false)}
+        httpInputConfig={formData}
+        testResult={testResults.length > 0 ? testResults[0] : null}
+      />
     </div>
   );
 

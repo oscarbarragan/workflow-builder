@@ -1,10 +1,11 @@
-// src/components/workflow/nodes/DataMapper/DataMapper.jsx - REFACTORIZADO Y DIVIDIDO
+// src/components/workflow/nodes/DataMapper/DataMapper.jsx - CORREGIDO
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Database, 
   FileText, 
-  Link2
+  Link2,
+  AlertTriangle
 } from 'lucide-react';
 import Button from '../../../common/Button/Button';
 import { SourceTab, MappingTab, PreviewTab } from './DataMapperTabs';
@@ -35,6 +36,8 @@ const DataMapper = ({
   const [parsedJson, setParsedJson] = useState(initialData.parsedJson || null);
   const [mappings, setMappings] = useState(initialData.mappings || []);
   const [jsonError, setJsonError] = useState(null);
+  
+  // FIXED: Flujo exclusivo de fuentes
   const [selectedSource, setSelectedSource] = useState(initialData.selectedSource || 'manual');
   const [connectedHttpInput, setConnectedHttpInput] = useState(initialData.connectedHttpInput || null);
   
@@ -46,6 +49,22 @@ const DataMapper = ({
 
   // Get available HTTP Inputs
   const availableHttpInputs = getAvailableHttpInputs(availableData);
+  const hasHttpInputsAvailable = availableHttpInputs.length > 0;
+
+  // FIXED: Determinar fuente inicial automáticamente
+  useEffect(() => {
+    if (!initialData.selectedSource) {
+      if (hasHttpInputsAvailable) {
+        setSelectedSource('http-input');
+        // Auto-conectar al primer HTTP Input si solo hay uno
+        if (availableHttpInputs.length === 1) {
+          connectToHttpInput(availableHttpInputs[0]);
+        }
+      } else {
+        setSelectedSource('manual');
+      }
+    }
+  }, [hasHttpInputsAvailable, availableHttpInputs, initialData.selectedSource]);
 
   // Disable ReactFlow when modal is open
   useEffect(() => {
@@ -70,6 +89,45 @@ const DataMapper = ({
     }
   }, [isOpen]);
 
+  // FIXED: Cambio de fuente exclusivo
+  const handleSourceChange = (newSource) => {
+    console.log(`🔄 Changing source from ${selectedSource} to ${newSource}`);
+    
+    // CRÍTICO: Solo limpiar si realmente cambia la fuente
+    if (selectedSource === newSource) {
+      console.log('🔄 Same source selected, no change needed');
+      return;
+    }
+    
+    // Limpiar estado anterior
+    setJsonInput('');
+    setParsedJson(null);
+    setMappings([]);
+    setJsonError(null);
+    setUploadedFile(null);
+    setConnectedHttpInput(null);
+    
+    setSelectedSource(newSource);
+    
+    // Auto-setup para la nueva fuente
+    switch (newSource) {
+      case 'http-input':
+        if (availableHttpInputs.length === 1) {
+          // Auto-conectar si solo hay un HTTP Input
+          connectToHttpInput(availableHttpInputs[0]);
+        }
+        break;
+      case 'manual':
+        // Cargar ejemplo por defecto
+        loadSampleJson();
+        break;
+      case 'file':
+        // Usuario debe cargar archivo manualmente - NO hacer nada aquí
+        console.log('📁 File source selected, waiting for user to upload file');
+        break;
+    }
+  };
+
   // Handle file upload
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
@@ -88,8 +146,6 @@ const DataMapper = ({
       const fileContent = await readFileAsText(file);
       console.log('📁 File loaded:', file.name, 'Size:', file.size, 'bytes');
       
-      setSelectedSource('file');
-      setConnectedHttpInput(null);
       handleJsonInput(fileContent);
       
     } catch (error) {
@@ -104,12 +160,9 @@ const DataMapper = ({
   // Clear file selection
   const clearFile = () => {
     setUploadedFile(null);
-    if (selectedSource === 'file') {
-      setSelectedSource('manual');
-      setJsonInput('');
-      setParsedJson(null);
-      setMappings([]);
-    }
+    setJsonInput('');
+    setParsedJson(null);
+    setMappings([]);
   };
 
   // Handle JSON input
@@ -119,6 +172,7 @@ const DataMapper = ({
     
     if (!value.trim()) {
       setParsedJson(null);
+      setMappings([]);
       return;
     }
 
@@ -131,25 +185,167 @@ const DataMapper = ({
     } else {
       setJsonError(validation.error);
       setParsedJson(null);
+      setMappings([]);
     }
   };
 
-  // Connect to HTTP Input
+  // FIXED: Connect to HTTP Input con datos reales
   const connectToHttpInput = (httpInputData) => {
     console.log('🔗 Connecting to HTTP Input:', httpInputData);
     
     setConnectedHttpInput(httpInputData);
-    setSelectedSource('http-input');
-    setUploadedFile(null);
     
-    // Generate realistic structure based on HTTP Input
-    const exampleStructure = generateHttpInputStructure(httpInputData);
+    // FIXED: Generar estructura basada en datos reales del HTTP Input
+    const httpInputStructure = generateHttpInputStructureFromReal(httpInputData, availableData);
     
-    const jsonString = JSON.stringify(exampleStructure, null, 2);
+    const jsonString = JSON.stringify(httpInputStructure, null, 2);
     console.log('📋 Generated HTTP Input structure:', jsonString);
     
     setJsonInput(jsonString);
     handleJsonInput(jsonString);
+  };
+
+  // FIXED: Generar estructura realista del HTTP Input
+  const generateHttpInputStructureFromReal = (httpInputData, availableData) => {
+    const structure = {
+      metadata: {
+        endpoint: httpInputData.endpoint,
+        method: httpInputData.method,
+        path: httpInputData.path,
+        timestamp: new Date().toISOString(),
+        contentType: httpInputData.contentType || 'application/json',
+        requestId: "req_example_12345"
+      }
+    };
+
+    // FIXED: Agregar headers reales si existen
+    if (httpInputData.headers && httpInputData.headers.length > 0) {
+      structure.headers = {};
+      httpInputData.headers.forEach(header => {
+        if (header.variable) {
+          // Usar valor por defecto o generar ejemplo
+          structure.headers[header.variable] = header.defaultValue || 
+            generateExampleValueForHeader(header);
+        }
+      });
+    }
+
+    // FIXED: Agregar body real si está habilitado
+    if (httpInputData.enableBodyCapture && httpInputData.bodyVariable && 
+        ['POST', 'PUT', 'PATCH'].includes(httpInputData.method)) {
+      
+      structure[httpInputData.bodyVariable] = generateExampleBodyForContentType(
+        httpInputData.contentType || 'application/json', 
+        httpInputData.path
+      );
+    }
+
+    // FIXED: Incluir variables adicionales del HTTP Input en availableData
+    Object.entries(availableData).forEach(([key, value]) => {
+      if (key.startsWith(`httpInput_${httpInputData.nodeId}`) || 
+          key.startsWith('headers.') ||
+          key === httpInputData.bodyVariable) {
+        
+        // Agregar como campos adicionales del HTTP Input
+        if (!structure.httpInputVariables) {
+          structure.httpInputVariables = {};
+        }
+        
+        structure.httpInputVariables[key] = typeof value === 'object' 
+          ? value 
+          : { value, type: typeof value };
+      }
+    });
+
+    return structure;
+  };
+
+  // Helper para generar valores de ejemplo para headers
+  const generateExampleValueForHeader = (header) => {
+    const headerName = header.name.toLowerCase();
+    
+    if (headerName.includes('authorization')) {
+      return 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+    }
+    if (headerName.includes('api') && headerName.includes('key')) {
+      return 'sk_live_abcd1234567890';
+    }
+    if (headerName.includes('content-type')) {
+      return 'application/json';
+    }
+    if (headerName.includes('user-agent')) {
+      return 'WorkflowApp/1.0';
+    }
+    if (headerName.includes('accept')) {
+      return 'application/json';
+    }
+    
+    return `example_${header.variable || header.name}`;
+  };
+
+  // Helper para generar ejemplos de body
+  const generateExampleBodyForContentType = (contentType, path) => {
+    const pathLower = path.toLowerCase();
+    
+    switch (contentType) {
+      case 'application/json':
+        if (pathLower.includes('user') || pathLower.includes('profile')) {
+          return {
+            id: 12345,
+            name: "Juan Pérez",
+            email: "juan.perez@ejemplo.com",
+            age: 30,
+            active: true,
+            profile: {
+              bio: "Desarrollador Full Stack",
+              location: "Bogotá, Colombia",
+              skills: ["JavaScript", "React", "Node.js"]
+            }
+          };
+        }
+        
+        if (pathLower.includes('order') || pathLower.includes('purchase')) {
+          return {
+            orderId: "ORD-2024-001",
+            customerId: 12345,
+            items: [
+              {
+                productId: "PROD-001",
+                name: "Laptop Dell XPS 13",
+                quantity: 1,
+                price: 2500000
+              }
+            ],
+            total: 2500000,
+            currency: "COP"
+          };
+        }
+        
+        return {
+          id: 123,
+          name: "Elemento de Ejemplo",
+          description: "Descripción del elemento",
+          value: 1000,
+          active: true,
+          data: {
+            field1: "valor1",
+            field2: 42,
+            field3: true
+          }
+        };
+        
+      case 'application/x-www-form-urlencoded':
+      case 'multipart/form-data':
+        return {
+          nombre: "Juan Pérez",
+          email: "juan@ejemplo.com",
+          telefono: "+57 300 123 4567",
+          edad: 30
+        };
+        
+      default:
+        return `Contenido del body en formato ${contentType}`;
+    }
   };
 
   // Update mapping
@@ -192,10 +388,6 @@ const DataMapper = ({
   // Load sample JSON
   const loadSampleJson = () => {
     const sampleJson = getSampleJson();
-    
-    setSelectedSource('manual');
-    setConnectedHttpInput(null);
-    setUploadedFile(null);
     handleJsonInput(JSON.stringify(sampleJson, null, 2));
   };
 
@@ -285,7 +477,7 @@ const DataMapper = ({
             fontWeight: '700',
             color: '#1f2937'
           }}>
-            🗂️ Data Mapper Avanzado
+            🗂️ Data Mapper Mejorado
           </h2>
           
           <div style={{
@@ -302,6 +494,7 @@ const DataMapper = ({
               selectedSource === 'file' ? '📁 Archivo' : 
               '📝 Manual'
             }</div>
+            <div><strong>HTTP Inputs:</strong> {availableHttpInputs.length}</div>
             <div><strong>Mappings:</strong> {mappings.length}</div>
             <div><strong>Válidos:</strong> {mappings.filter(m => m.isValid && m.variableName).length}</div>
           </div>
@@ -322,6 +515,26 @@ const DataMapper = ({
             ✕
           </button>
         </div>
+
+        {/* FIXED: Alerta si no hay HTTP Inputs disponibles */}
+        {!hasHttpInputsAvailable && (
+          <div style={{
+            background: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <AlertTriangle size={16} color="#f59e0b" />
+            <div style={{ fontSize: '14px', color: '#92400e' }}>
+              <strong>Sin HTTP Inputs:</strong> No hay nodos HTTP Input conectados. 
+              Conecta un HTTP Input a este Data Mapper para procesar datos dinámicos.
+            </div>
+          </div>
+        )}
 
         {/* Tabs Navigation */}
         <div style={{
@@ -363,7 +576,7 @@ const DataMapper = ({
           {activeTab === 'source' && (
             <SourceTab
               selectedSource={selectedSource}
-              setSelectedSource={setSelectedSource}
+              setSelectedSource={handleSourceChange} // FIXED: Usar función exclusiva
               availableHttpInputs={availableHttpInputs}
               connectedHttpInput={connectedHttpInput}
               connectToHttpInput={connectToHttpInput}
@@ -378,6 +591,7 @@ const DataMapper = ({
               parsedJson={parsedJson}
               mappings={mappings}
               loadSampleJson={loadSampleJson}
+              hasHttpInputsAvailable={hasHttpInputsAvailable} // FIXED: Nueva prop
             />
           )}
           
