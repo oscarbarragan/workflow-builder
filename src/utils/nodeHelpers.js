@@ -1,4 +1,4 @@
-// src/utils/nodeHelpers.js - REFACTORIZADO Y CORREGIDO
+// src/utils/nodeHelpers.js - CORREGIDO PARA HTTP INPUT
 import { NODE_CONFIG, NODE_TYPES } from './constants';
 
 // Generate unique node ID
@@ -17,35 +17,13 @@ export const getNodeConfig = (nodeType) => {
   };
 };
 
-// Helper function to generate body examples based on content type
-const getBodyExample = (contentType) => {
-  switch (contentType) {
-    case 'application/json':
-      return {
-        id: 123,
-        name: "Ejemplo Usuario",
-        email: "usuario@ejemplo.com",
-        data: {
-          field1: "valor1",
-          field2: 42,
-          field3: true
-        }
-      };
-    case 'application/xml':
-      return '<?xml version="1.0"?><data><id>123</id><name>Ejemplo</name></data>';
-    case 'text/plain':
-      return 'Contenido de texto plano';
-    case 'application/x-www-form-urlencoded':
-      return 'field1=value1&field2=value2&field3=value3';
-    default:
-      return 'Contenido del body';
-  }
-};
-
-// ENHANCED: Get available data from incoming nodes with HTTP Input support
+// FIXED: Get available data from incoming nodes with improved HTTP Input detection
 export const getAvailableData = (nodeId, nodes, edges) => {
   const availableData = {};
   const incomingEdges = edges.filter(edge => edge.target === nodeId);
+  
+  console.log(`🔍 Getting available data for node: ${nodeId}`);
+  console.log(`📥 Incoming edges: ${incomingEdges.length}`, incomingEdges);
   
   incomingEdges.forEach(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
@@ -53,79 +31,105 @@ export const getAvailableData = (nodeId, nodes, edges) => {
       const nodeType = sourceNode.data.type;
       const properties = sourceNode.data.properties;
       
+      console.log(`📊 Processing source node: ${sourceNode.id}, type: ${nodeType}`, properties);
+      
       switch (nodeType) {
         case NODE_TYPES.USER_FORM:
         case NODE_TYPES.LOCATION_FORM:
           // Datos de formularios
           Object.keys(properties).forEach(key => {
             if (key !== 'status' && key !== 'createdAt') {
-              availableData[`${nodeType}.${key}`] = properties[key];
+              const fullKey = `${nodeType.replace('-', '_')}.${key}`;
+              availableData[fullKey] = properties[key];
+              console.log(`✅ Added form data: ${fullKey} = ${properties[key]}`);
             }
           });
           break;
           
         case NODE_TYPES.HTTP_INPUT:
-          // ENHANCED: Datos del HTTP Input con headers y body
-          if (properties.endpoint) {
-            availableData[`${nodeType}.endpoint`] = properties.endpoint;
-            availableData[`${nodeType}.method`] = properties.method;
-            availableData[`${nodeType}.path`] = properties.path;
+          // CRITICAL FIX: Mejorar la detección de HTTP Input
+          console.log('🌐 Processing HTTP Input node:', properties);
+          
+          // Generar una clave única y descriptiva para el HTTP Input
+          const httpInputKey = `httpInput_${sourceNode.id}`;
+          
+          // FIXED: Crear estructura completa del HTTP Input
+          const httpInputData = {
+            // Información básica del endpoint
+            endpoint: properties.endpoint || `http://localhost:3000/api${properties.path || '/unknown'}`,
+            method: properties.method || 'GET',
+            path: properties.path || '/unknown',
             
-            // Headers variables
-            if (properties.headers && properties.headers.length > 0) {
-              properties.headers.forEach(header => {
-                if (header.variable) {
-                  availableData[`headers.${header.variable}`] = {
-                    type: 'string',
-                    source: 'header',
-                    headerName: header.name,
-                    required: header.required,
-                    defaultValue: header.defaultValue || `example_${header.variable}`,
-                    description: header.description
-                  };
-                }
-              });
-            }
+            // Configuración del body
+            bodyVariable: properties.bodyVariable || 'requestBody',
+            enableBodyCapture: properties.enableBodyCapture !== undefined ? properties.enableBodyCapture : false,
+            contentType: properties.contentType || 'application/json',
             
-            // Body variable
-            if (properties.enableBodyCapture && properties.bodyVariable) {
-              availableData[properties.bodyVariable] = {
-                type: 'object',
-                source: 'body',
-                contentType: properties.contentType,
-                validation: properties.bodyValidation,
-                description: 'Request body content',
-                example: getBodyExample(properties.contentType)
-              };
-            }
+            // Headers
+            headers: properties.headers || [],
             
-            // Output structure for Data Mapper connection
-            if (properties.outputStructure) {
-              Object.entries(properties.outputStructure).forEach(([key, value]) => {
-                availableData[key] = value;
-              });
-            }
+            // Configuración adicional
+            authentication: properties.authentication || 'none',
+            description: properties.description || `${properties.method || 'GET'} endpoint`,
+            
+            // Metadata para debugging
+            nodeId: sourceNode.id,
+            configured: !!(properties.path && properties.method)
+          };
+          
+          // Agregar el HTTP Input completo con clave específica
+          availableData[httpInputKey] = httpInputData;
+          console.log(`✅ Added HTTP Input: ${httpInputKey}`, httpInputData);
+          
+          // ADDITIONAL: Agregar también las variables individuales para compatibilidad
+          if (httpInputData.headers && httpInputData.headers.length > 0) {
+            httpInputData.headers.forEach(header => {
+              if (header.variable) {
+                const headerKey = `headers.${header.variable}`;
+                availableData[headerKey] = {
+                  type: 'string',
+                  source: 'http-header',
+                  headerName: header.name,
+                  required: header.required,
+                  defaultValue: header.defaultValue || `example_${header.variable}`,
+                  description: header.description,
+                  httpInputNodeId: sourceNode.id
+                };
+                console.log(`✅ Added header variable: ${headerKey}`);
+              }
+            });
           }
+          
+          // Agregar variable del body si está habilitada
+          if (httpInputData.enableBodyCapture && httpInputData.bodyVariable) {
+            availableData[httpInputData.bodyVariable] = {
+              type: 'object',
+              source: 'http-body',
+              contentType: httpInputData.contentType,
+              description: 'Request body content',
+              httpInputNodeId: sourceNode.id,
+              example: getBodyExampleForContentType(httpInputData.contentType)
+            };
+            console.log(`✅ Added body variable: ${httpInputData.bodyVariable}`);
+          }
+          
           break;
           
         case NODE_TYPES.DATA_MAPPER:
-          // ENHANCED: Datos mapeados del Data Mapper con conexión HTTP Input
+          // Variables mapeadas del Data Mapper
           if (properties.outputVariables) {
             Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
-              let safeValue;
-              if (typeof varData.sourceValue === 'object') {
-                safeValue = `[${varData.type}] ${JSON.stringify(varData.sourceValue).substring(0, 30)}...`;
-              } else {
-                safeValue = String(varData.sourceValue || `[${varData.type}] from ${varData.jsonPath}`);
-              }
-              
-              availableData[`mapper.${varName}`] = {
+              const fullKey = `mapper.${varName}`;
+              availableData[fullKey] = {
                 type: varData.type,
-                value: safeValue,
+                value: typeof varData.sourceValue === 'object' 
+                  ? `[${varData.type}] ${JSON.stringify(varData.sourceValue).substring(0, 30)}...`
+                  : String(varData.sourceValue || `[${varData.type}] from ${varData.jsonPath}`),
                 jsonPath: varData.jsonPath,
                 source: varData.source || 'manual',
                 httpInputConnected: varData.httpInputConnected || null
               };
+              console.log(`✅ Added mapper variable: ${fullKey}`);
             });
           }
           
@@ -146,14 +150,11 @@ export const getAvailableData = (nodeId, nodes, edges) => {
           // Variables generadas por Script Processor
           if (properties.outputVariables) {
             Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
-              let safeValue;
-              if (typeof varData.value === 'object') {
-                safeValue = `[${varData.type}] ${JSON.stringify(varData.value).substring(0, 30)}...`;
-              } else {
-                safeValue = String(varData.value || `[${varData.type}] processed`);
-              }
-              
-              availableData[`script.${varName}`] = safeValue;
+              const fullKey = `script.${varName}`;
+              availableData[fullKey] = typeof varData.value === 'object' 
+                ? `[${varData.type}] ${JSON.stringify(varData.value).substring(0, 30)}...`
+                : String(varData.value || `[${varData.type}] processed`);
+              console.log(`✅ Added script variable: ${fullKey}`);
             });
           }
           
@@ -174,19 +175,46 @@ export const getAvailableData = (nodeId, nodes, edges) => {
           // Fallback para otros tipos
           Object.keys(properties).forEach(key => {
             if (key !== 'status' && key !== 'createdAt') {
+              const fullKey = `${nodeType}.${key}`;
               const value = properties[key];
               if (typeof value === 'object') {
-                availableData[`${nodeType}.${key}`] = `[Object] ${JSON.stringify(value).substring(0, 20)}...`;
+                availableData[fullKey] = `[Object] ${JSON.stringify(value).substring(0, 20)}...`;
               } else {
-                availableData[`${nodeType}.${key}`] = String(value);
+                availableData[fullKey] = String(value);
               }
+              console.log(`✅ Added generic data: ${fullKey}`);
             }
           });
       }
     }
   });
   
+  console.log(`📋 Final available data for node ${nodeId}:`, Object.keys(availableData));
   return availableData;
+};
+
+// Helper function to generate body examples based on content type
+const getBodyExampleForContentType = (contentType) => {
+  switch (contentType) {
+    case 'application/json':
+      return {
+        id: 123,
+        name: "Ejemplo Usuario",
+        email: "usuario@ejemplo.com",
+        data: { field1: "valor1", field2: 42 }
+      };
+    case 'application/x-www-form-urlencoded':
+    case 'multipart/form-data':
+      return {
+        nombre: "Juan Pérez",
+        email: "juan@ejemplo.com",
+        edad: 30
+      };
+    case 'text/plain':
+      return "Contenido de texto plano";
+    default:
+      return "Contenido del body";
+  }
 };
 
 // ENHANCED: Get mapped variables specifically for Layout Designer with HTTP Input support
@@ -221,7 +249,7 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
             mappedVariables[properties.bodyVariable] = {
               type: 'object',
               source: 'http-body',
-              value: getBodyExample(properties.contentType),
+              value: getBodyExampleForContentType(properties.contentType),
               displayValue: `Body (${properties.contentType})`,
               description: 'Request body content'
             };
@@ -282,7 +310,7 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
   return mappedVariables;
 };
 
-// Validate node data (existing function)
+// Validate node data
 export const validateNodeData = (nodeType, data) => {
   const config = getNodeConfig(nodeType);
   const errors = [];
@@ -299,7 +327,7 @@ export const validateNodeData = (nodeType, data) => {
   };
 };
 
-// Get node position within bounds (existing function)
+// Get node position within bounds
 export const getValidNodePosition = (x, y, canvasWidth = 800, canvasHeight = 600, nodeWidth = 120, nodeHeight = 80) => {
   return {
     x: Math.max(0, Math.min(canvasWidth - nodeWidth, x)),
@@ -307,7 +335,7 @@ export const getValidNodePosition = (x, y, canvasWidth = 800, canvasHeight = 600
   };
 };
 
-// Check if nodes can be connected (existing function)
+// Check if nodes can be connected
 export const canConnect = (sourceNode, targetNode, edges) => {
   if (sourceNode.id === targetNode.id) return false;
   
@@ -318,7 +346,7 @@ export const canConnect = (sourceNode, targetNode, edges) => {
   return !existingConnection;
 };
 
-// Get node depth in workflow (existing function)
+// Get node depth in workflow
 export const getNodeDepth = (nodeId, edges, visited = new Set()) => {
   if (visited.has(nodeId)) return 0;
   
@@ -335,7 +363,7 @@ export const getNodeDepth = (nodeId, edges, visited = new Set()) => {
   return Math.max(...depths) + 1;
 };
 
-// Sort nodes by execution order (existing function)
+// Sort nodes by execution order
 export const sortNodesByExecutionOrder = (nodes, edges) => {
   return nodes
     .map(node => ({
@@ -345,7 +373,7 @@ export const sortNodesByExecutionOrder = (nodes, edges) => {
     .sort((a, b) => a.depth - b.depth);
 };
 
-// Find nodes without incoming connections (existing function)
+// Find nodes without incoming connections
 export const findEntryNodes = (nodes, edges) => {
   return nodes.filter(node => {
     const hasIncoming = edges.some(edge => edge.target === node.id);
@@ -353,7 +381,7 @@ export const findEntryNodes = (nodes, edges) => {
   });
 };
 
-// Find nodes without outgoing connections (existing function)
+// Find nodes without outgoing connections
 export const findExitNodes = (nodes, edges) => {
   return nodes.filter(node => {
     const hasOutgoing = edges.some(edge => edge.source === node.id);
@@ -361,7 +389,7 @@ export const findExitNodes = (nodes, edges) => {
   });
 };
 
-// Get node statistics (enhanced but simplified)
+// Get node statistics
 export const getWorkflowStats = (nodes, edges) => {
   const httpInputsCount = nodes.filter(n => n.data.type === NODE_TYPES.HTTP_INPUT).length;
   const dataMappersCount = nodes.filter(n => n.data.type === NODE_TYPES.DATA_MAPPER).length;
@@ -376,7 +404,6 @@ export const getWorkflowStats = (nodes, edges) => {
       acc[node.data.type] = (acc[node.data.type] || 0) + 1;
       return acc;
     }, {}),
-    // Enhanced stats
     httpInputs: httpInputsCount,
     dataMappers: dataMappersCount
   };

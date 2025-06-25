@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/HttpInput/HttpInput.jsx - SIMPLIFICADO
+// src/components/workflow/nodes/HttpInput/HttpInput.jsx - ACTUALIZADO Y SIMPLIFICADO
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Globe, Settings, Database } from 'lucide-react';
@@ -22,17 +22,10 @@ const HttpInput = ({
     // Headers
     headers: initialData.headers || [],
     
-    // Body
+    // Body - SIMPLIFICADO
     bodyVariable: initialData.bodyVariable || 'requestBody',
     enableBodyCapture: initialData.enableBodyCapture !== undefined ? initialData.enableBodyCapture : true,
-    bodyValidation: initialData.bodyValidation || 'none',
     contentType: initialData.contentType || 'application/json',
-    
-    // NEW: Form fields for different content types
-    formFields: initialData.formFields || [],
-    
-    // NEW: Validation configuration
-    validationConfig: initialData.validationConfig || {},
     
     ...initialData
   });
@@ -123,17 +116,20 @@ const HttpInput = ({
         endpoint: fullEndpoint,
         status: 'configured',
         createdAt: new Date().toISOString(),
+        configured: true, // IMPORTANT: Mark as configured for Data Mapper detection
         
-        // Generate output structure for Data Mapper connection
-        outputStructure: generateOutputStructure(formData)
+        // Generate simplified output structure
+        outputStructure: generateSimplifiedOutputStructure(formData)
       };
       
+      console.log('💾 Saving HTTP Input configuration:', savedData);
       onSave(savedData);
       onClose();
     }
   };
 
-  const generateOutputStructure = (data) => {
+  // SIMPLIFIED: Generate output structure without complex validation
+  const generateSimplifiedOutputStructure = (data) => {
     const structure = {};
     
     // Headers variables
@@ -150,15 +146,13 @@ const HttpInput = ({
       }
     });
     
-    // Body variable
+    // Body variable (simplified)
     if (data.enableBodyCapture && data.bodyVariable) {
       structure[data.bodyVariable] = {
         type: 'object',
         source: 'body',
         contentType: data.contentType,
-        validation: data.bodyValidation,
-        description: 'Request body content',
-        fields: data.formFields || []
+        description: 'Raw request body content - use Data Mapper for validation and field mapping'
       };
     }
     
@@ -175,10 +169,7 @@ const HttpInput = ({
       headers: [],
       bodyVariable: 'requestBody',
       enableBodyCapture: true,
-      bodyValidation: 'none',
-      contentType: 'application/json',
-      formFields: [],
-      validationConfig: {}
+      contentType: 'application/json'
     });
     setErrors({});
     setPathValidation(null);
@@ -207,7 +198,7 @@ const HttpInput = ({
     borderRadius: '12px',
     width: '95vw',
     height: '90vh',
-    maxWidth: '1400px',
+    maxWidth: '1200px',
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -247,7 +238,6 @@ const HttpInput = ({
             🌐 Configurar HTTP Input
           </h2>
           
-          {/* Debug info en el header */}
           <div style={{
             fontSize: '12px',
             color: '#6b7280',
@@ -393,15 +383,22 @@ const HttpInput = ({
                   marginTop: '2px',
                   fontSize: '11px'
                 }}>
-                  {formData.headers.length > 0 && (
-                    <div>Headers: {formData.headers.filter(h => h.variable).map(h => h.variable).join(', ')}</div>
-                  )}
-                  {formData.enableBodyCapture && (
-                    <div>Body: {formData.bodyVariable}</div>
-                  )}
-                  {formData.headers.length === 0 && !formData.enableBodyCapture && (
-                    <div style={{ color: '#6b7280', fontStyle: 'italic' }}>No hay variables configuradas</div>
-                  )}
+                  {(() => {
+                    const parts = [];
+                    if (formData.headers.length > 0) {
+                      const headerVars = formData.headers.filter(h => h.variable).map(h => h.variable);
+                      if (headerVars.length > 0) {
+                        parts.push(`Headers: ${headerVars.join(', ')}`);
+                      }
+                    }
+                    if (formData.enableBodyCapture) {
+                      parts.push(`Body: ${formData.bodyVariable} (para Data Mapper)`);
+                    }
+                    if (parts.length === 0) {
+                      return <span style={{ color: '#6b7280', fontStyle: 'italic' }}>No hay variables configuradas</span>;
+                    }
+                    return parts.map((part, index) => <div key={index}>{part}</div>);
+                  })()}
                 </div>
               </div>
             </div>
@@ -421,7 +418,7 @@ const HttpInput = ({
             fontSize: '12px',
             color: '#6b7280'
           }}>
-            💡 <strong>Tip:</strong> Las variables configuradas estarán disponibles para conectar con Data Mapper
+            💡 <strong>Simplificado:</strong> Solo captura datos. Usa Data Mapper para validación y mapeo detallado.
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -439,7 +436,7 @@ const HttpInput = ({
               disabled={isValidating || (pathValidation && !pathValidation.isValid)}
               size="large"
             >
-              💾 Guardar Configuración
+              💾 Guardar HTTP Input
             </Button>
           </div>
         </div>
