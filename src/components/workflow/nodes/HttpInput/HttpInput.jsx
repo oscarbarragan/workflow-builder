@@ -363,7 +363,9 @@ const HttpInput = ({
         endpoint: fullEndpoint,
         status: 'configured',
         createdAt: new Date().toISOString(),
-        configured: true, // IMPORTANT: Mark as configured for Data Mapper detection
+        
+        // CRITICAL FIX: Asegurar que se marca como configurado
+        configured: true,
         
         // NUEVO: Incluir datos de prueba si existen
         testResults: testResults.length > 0 ? testResults : undefined,
@@ -373,7 +375,7 @@ const HttpInput = ({
         outputStructure: generateSimplifiedOutputStructure(formData)
       };
       
-      console.log('💾 Saving HTTP Input configuration:', savedData);
+      console.log('💾 FIXED: Saving HTTP Input configuration with configured=true:', savedData);
       onSave(savedData);
       onClose();
     }

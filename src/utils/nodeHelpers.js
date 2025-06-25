@@ -1,4 +1,4 @@
-// src/utils/nodeHelpers.js - CORREGIDO PARA HTTP INPUT
+// src/utils/nodeHelpers.js - CORREGIDO PARA HTTP INPUT CON DEBUGGING
 import { NODE_CONFIG, NODE_TYPES } from './constants';
 
 // Generate unique node ID
@@ -17,13 +17,35 @@ export const getNodeConfig = (nodeType) => {
   };
 };
 
+// DEBUGGING: Función para imprimir el estado de conexiones
+export const debugNodeConnections = (nodeId, nodes, edges) => {
+  console.log(`🔧 DEBUG: Analizando nodo ${nodeId}`);
+  console.log(`📊 Total nodos:`, nodes.length);
+  console.log(`🔗 Total edges:`, edges.length);
+  
+  const incomingEdges = edges.filter(edge => edge.target === nodeId);
+  console.log(`📥 Incoming edges para ${nodeId}:`, incomingEdges);
+  
+  incomingEdges.forEach(edge => {
+    const sourceNode = nodes.find(node => node.id === edge.source);
+    console.log(`📍 Source node ${edge.source}:`, sourceNode);
+    if (sourceNode) {
+      console.log(`📋 Properties:`, sourceNode.data.properties);
+      console.log(`🏷️ Type:`, sourceNode.data.type);
+    }
+  });
+};
+
 // FIXED: Get available data from incoming nodes with improved HTTP Input detection
 export const getAvailableData = (nodeId, nodes, edges) => {
   const availableData = {};
   const incomingEdges = edges.filter(edge => edge.target === nodeId);
   
-  console.log(`🔍 Getting available data for node: ${nodeId}`);
-  console.log(`📥 Incoming edges: ${incomingEdges.length}`, incomingEdges);
+  console.log(`🔍 FIXED: Getting available data for node: ${nodeId}`);
+  console.log(`📥 FIXED: Incoming edges: ${incomingEdges.length}`, incomingEdges);
+  
+  // DEBUGGING: Imprimir estado completo
+  debugNodeConnections(nodeId, nodes, edges);
   
   incomingEdges.forEach(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
@@ -31,7 +53,7 @@ export const getAvailableData = (nodeId, nodes, edges) => {
       const nodeType = sourceNode.data.type;
       const properties = sourceNode.data.properties;
       
-      console.log(`📊 Processing source node: ${sourceNode.id}, type: ${nodeType}`, properties);
+      console.log(`📊 FIXED: Processing source node: ${sourceNode.id}, type: ${nodeType}`, properties);
       
       switch (nodeType) {
         case NODE_TYPES.USER_FORM:
@@ -41,14 +63,24 @@ export const getAvailableData = (nodeId, nodes, edges) => {
             if (key !== 'status' && key !== 'createdAt') {
               const fullKey = `${nodeType.replace('-', '_')}.${key}`;
               availableData[fullKey] = properties[key];
-              console.log(`✅ Added form data: ${fullKey} = ${properties[key]}`);
+              console.log(`✅ FIXED: Added form data: ${fullKey} = ${properties[key]}`);
             }
           });
           break;
           
         case NODE_TYPES.HTTP_INPUT:
           // CRITICAL FIX: Mejorar la detección de HTTP Input
-          console.log('🌐 Processing HTTP Input node:', properties);
+          console.log('🌐 FIXED: Processing HTTP Input node:', properties);
+          
+          // VERIFICAR que el HTTP Input esté configurado correctamente
+          if (!properties.configured || !properties.path || properties.path === '') {
+            console.log('⚠️ FIXED: HTTP Input not properly configured:', {
+              configured: properties.configured,
+              path: properties.path,
+              method: properties.method
+            });
+            break; // Skip this HTTP Input if not configured
+          }
           
           // Generar una clave única y descriptiva para el HTTP Input
           const httpInputKey = `httpInput_${sourceNode.id}`;
@@ -56,9 +88,9 @@ export const getAvailableData = (nodeId, nodes, edges) => {
           // FIXED: Crear estructura completa del HTTP Input
           const httpInputData = {
             // Información básica del endpoint
-            endpoint: properties.endpoint || `http://localhost:3000/api${properties.path || '/unknown'}`,
+            endpoint: properties.endpoint || `http://localhost:3000/api${properties.path}`,
             method: properties.method || 'GET',
-            path: properties.path || '/unknown',
+            path: properties.path,
             
             // Configuración del body
             bodyVariable: properties.bodyVariable || 'requestBody',
@@ -70,16 +102,19 @@ export const getAvailableData = (nodeId, nodes, edges) => {
             
             // Configuración adicional
             authentication: properties.authentication || 'none',
-            description: properties.description || `${properties.method || 'GET'} endpoint`,
+            description: properties.description || `${properties.method} endpoint`,
             
             // Metadata para debugging
             nodeId: sourceNode.id,
-            configured: !!(properties.path && properties.method)
+            configured: properties.configured,
+            
+            // DEBUGGING: Agregar información extra
+            debug_properties: properties
           };
           
           // Agregar el HTTP Input completo con clave específica
           availableData[httpInputKey] = httpInputData;
-          console.log(`✅ Added HTTP Input: ${httpInputKey}`, httpInputData);
+          console.log(`✅ FIXED: Added HTTP Input: ${httpInputKey}`, httpInputData);
           
           // ADDITIONAL: Agregar también las variables individuales para compatibilidad
           if (httpInputData.headers && httpInputData.headers.length > 0) {
@@ -95,7 +130,7 @@ export const getAvailableData = (nodeId, nodes, edges) => {
                   description: header.description,
                   httpInputNodeId: sourceNode.id
                 };
-                console.log(`✅ Added header variable: ${headerKey}`);
+                console.log(`✅ FIXED: Added header variable: ${headerKey}`);
               }
             });
           }
@@ -110,7 +145,7 @@ export const getAvailableData = (nodeId, nodes, edges) => {
               httpInputNodeId: sourceNode.id,
               example: getBodyExampleForContentType(httpInputData.contentType)
             };
-            console.log(`✅ Added body variable: ${httpInputData.bodyVariable}`);
+            console.log(`✅ FIXED: Added body variable: ${httpInputData.bodyVariable}`);
           }
           
           break;
@@ -129,7 +164,7 @@ export const getAvailableData = (nodeId, nodes, edges) => {
                 source: varData.source || 'manual',
                 httpInputConnected: varData.httpInputConnected || null
               };
-              console.log(`✅ Added mapper variable: ${fullKey}`);
+              console.log(`✅ FIXED: Added mapper variable: ${fullKey}`);
             });
           }
           
@@ -154,7 +189,7 @@ export const getAvailableData = (nodeId, nodes, edges) => {
               availableData[fullKey] = typeof varData.value === 'object' 
                 ? `[${varData.type}] ${JSON.stringify(varData.value).substring(0, 30)}...`
                 : String(varData.value || `[${varData.type}] processed`);
-              console.log(`✅ Added script variable: ${fullKey}`);
+              console.log(`✅ FIXED: Added script variable: ${fullKey}`);
             });
           }
           
@@ -182,14 +217,16 @@ export const getAvailableData = (nodeId, nodes, edges) => {
               } else {
                 availableData[fullKey] = String(value);
               }
-              console.log(`✅ Added generic data: ${fullKey}`);
+              console.log(`✅ FIXED: Added generic data: ${fullKey}`);
             }
           });
       }
     }
   });
   
-  console.log(`📋 Final available data for node ${nodeId}:`, Object.keys(availableData));
+  console.log(`📋 FIXED: Final available data for node ${nodeId}:`, Object.keys(availableData));
+  console.log(`🔍 FIXED: HTTP Input keys found:`, Object.keys(availableData).filter(k => k.startsWith('httpInput_')));
+  
   return availableData;
 };
 
@@ -222,14 +259,24 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
   const mappedVariables = {};
   const incomingEdges = edges.filter(edge => edge.target === nodeId);
   
+  console.log(`🎨 FIXED: Getting mapped variables for Layout Designer: ${nodeId}`);
+  
   incomingEdges.forEach(edge => {
     const sourceNode = nodes.find(node => node.id === edge.source);
     if (sourceNode && sourceNode.data.properties) {
       const nodeType = sourceNode.data.type;
       const properties = sourceNode.data.properties;
       
+      console.log(`🎨 FIXED: Processing source for layout: ${nodeType}`, properties);
+      
       switch (nodeType) {
         case NODE_TYPES.HTTP_INPUT:
+          // VERIFICAR que esté configurado
+          if (!properties.configured || !properties.path) {
+            console.log('⚠️ FIXED: Skipping unconfigured HTTP Input for layout');
+            break;
+          }
+          
           // Variables del HTTP Input
           if (properties.headers && properties.headers.length > 0) {
             properties.headers.forEach(header => {
@@ -307,6 +354,7 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
     }
   });
   
+  console.log(`🎨 FIXED: Final mapped variables for layout:`, Object.keys(mappedVariables));
   return mappedVariables;
 };
 

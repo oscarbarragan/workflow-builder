@@ -1,7 +1,7 @@
 // src/components/workflow/nodes/DataMapper/DataMapperUtils.js
-// Utilidades para el Data Mapper
+// Utilidades mejoradas para el Data Mapper con mejor detección de HTTP Input
 
-// Data types para el selector
+// Data types para el selector - ASEGURAR EXPORT
 export const dataTypes = [
   { value: 'string', label: 'String', color: '#16a34a' },
   { value: 'number', label: 'Number', color: '#3b82f6' },
@@ -11,7 +11,7 @@ export const dataTypes = [
   { value: 'date', label: 'Date', color: '#14b8a6' }
 ];
 
-// Helper function to get type color
+// Helper function to get type color - ASEGURAR EXPORT
 export const getTypeColor = (type) => {
   return dataTypes.find(dt => dt.value === type)?.color || '#6b7280';
 };
@@ -28,20 +28,6 @@ export const inferDataType = (value) => {
   if (Array.isArray(value)) return 'array';
   if (typeof value === 'object') return 'object';
   return 'string';
-};
-
-// Validate type compatibility for mappings
-export const validateTypeCompatibility = (jsonType, targetType) => {
-  const compatibilityMatrix = {
-    'string': ['string', 'date'],
-    'number': ['number', 'string'],
-    'boolean': ['boolean', 'string'],
-    'array': ['array'],
-    'object': ['object'],
-    'null': ['string', 'number', 'boolean']
-  };
-  
-  return compatibilityMatrix[jsonType]?.includes(targetType) ?? false;
 };
 
 // Generate mappings from JSON structure
@@ -111,107 +97,250 @@ export const readFileAsText = (file) => {
   });
 };
 
-// FIXED: Detectar HTTP Inputs disponibles con mejor lógica
+// SUPER IMPROVED: Detectar HTTP Inputs con logging exhaustivo
 export const getAvailableHttpInputs = (availableData) => {
   const httpInputs = [];
   
-  console.log('🔍 Checking available data for HTTP Inputs:', Object.keys(availableData));
+  console.log('🔍 SUPER DEBUG: Starting HTTP Input detection...');
+  console.log('🔍 SUPER DEBUG: Available data keys:', Object.keys(availableData));
+  console.log('🔍 SUPER DEBUG: Available data length:', Object.keys(availableData).length);
+  console.log('🔍 SUPER DEBUG: Full available data:', availableData);
+  
+  // ANÁLISIS DETALLADO
+  const httpInputKeys = Object.keys(availableData).filter(k => k.startsWith('httpInput_'));
+  const headerKeys = Object.keys(availableData).filter(k => k.startsWith('headers.'));
+  const hasRequestBody = !!availableData.requestBody;
+  
+  console.log('🔍 SUPER DEBUG: HTTP Input keys found:', httpInputKeys);
+  console.log('🔍 SUPER DEBUG: Header keys found:', headerKeys);  
+  console.log('🔍 SUPER DEBUG: Has request body:', hasRequestBody);
+  
+  // Si no hay nada, retornar inmediatamente
+  if (Object.keys(availableData).length === 0) {
+    console.log('❌ SUPER DEBUG: No available data at all');
+    return [];
+  }
   
   Object.entries(availableData).forEach(([key, value]) => {
-    console.log(`📊 Analyzing key: ${key}, type: ${typeof value}`, value);
+    console.log(`📊 SUPER DEBUG: Processing key: ${key}`);
+    console.log(`📊 SUPER DEBUG: Value type: ${typeof value}`);
+    console.log(`📊 SUPER DEBUG: Value:`, value);
     
-    // CRITICAL FIX: Buscar específicamente las claves que empiecen con "httpInput_"
-    const isHttpInputKey = key.startsWith('httpInput_') && typeof value === 'object' && value !== null;
+    // PATTERN 1: Claves que empiecen con "httpInput_"
+    const isHttpInputKey = key.startsWith('httpInput_');
     
     if (isHttpInputKey) {
-      console.log('✅ Found HTTP Input with new pattern:', key, value);
+      console.log('✅ SUPER DEBUG: Found HTTP Input key:', key);
       
-      // Verificar que tenga la estructura correcta de HTTP Input
-      if (value.endpoint || value.path) {
-        const httpInputData = {
+      try {
+        let httpInputData;
+        
+        // Manejar diferentes tipos de datos
+        if (typeof value === 'string') {
+          try {
+            httpInputData = JSON.parse(value);
+            console.log('✅ SUPER DEBUG: Parsed JSON string:', httpInputData);
+          } catch (e) {
+            console.log('⚠️ SUPER DEBUG: Failed to parse as JSON, treating as string');
+            httpInputData = { rawValue: value, path: '/string-value' };
+          }
+        } else if (typeof value === 'object' && value !== null) {
+          httpInputData = value;
+          console.log('✅ SUPER DEBUG: Using object directly:', httpInputData);
+        } else {
+          console.log('⚠️ SUPER DEBUG: Unexpected value type, creating fallback');
+          httpInputData = { rawValue: value, path: '/fallback' };
+        }
+        
+        // Crear HTTP Input con datos mínimos
+        const processedHttpInput = {
           key,
-          endpoint: value.endpoint || `http://localhost:3000/api${value.path || '/unknown'}`,
-          method: value.method || 'GET',
-          path: value.path || '/unknown',
-          bodyVariable: value.bodyVariable || 'requestBody',
-          headers: value.headers || [],
-          contentType: value.contentType || 'application/json',
-          enableBodyCapture: value.enableBodyCapture !== undefined ? value.enableBodyCapture : false,
-          authentication: value.authentication || 'none',
-          description: value.description || `${value.method || 'HTTP'} endpoint`,
-          nodeId: value.nodeId,
-          configured: value.configured || false
+          endpoint: httpInputData.endpoint || 
+                   `http://localhost:3000/api${httpInputData.path || '/detected'}`,
+          method: httpInputData.method || 'GET',
+          path: httpInputData.path || '/detected',
+          bodyVariable: httpInputData.bodyVariable || 'requestBody',
+          headers: Array.isArray(httpInputData.headers) ? httpInputData.headers : [],
+          contentType: httpInputData.contentType || 'application/json',
+          enableBodyCapture: httpInputData.enableBodyCapture !== undefined ? 
+                            httpInputData.enableBodyCapture : hasRequestBody,
+          authentication: httpInputData.authentication || 'none',
+          description: httpInputData.description || `HTTP Input detected from ${key}`,
+          nodeId: httpInputData.nodeId || key.replace('httpInput_', ''),
+          configured: true, // Si está en availableData, lo consideramos configurado
+          
+          // DEBUGGING: Info completa
+          debug_original: httpInputData,
+          debug_key: key,
+          debug_hasRequestBody: hasRequestBody,
+          debug_headerKeys: headerKeys
         };
         
-        // Solo agregar si está configurado correctamente
-        if (httpInputData.configured && httpInputData.path !== '/unknown') {
-          httpInputs.push(httpInputData);
-          console.log(`✅ Added HTTP Input: ${key}`, httpInputData);
-        } else {
-          console.log(`⚠️ HTTP Input not properly configured: ${key}`);
-        }
+        console.log('✅ SUPER DEBUG: Created HTTP Input:', processedHttpInput);
+        httpInputs.push(processedHttpInput);
+        
+      } catch (error) {
+        console.error(`❌ SUPER DEBUG: Error processing HTTP Input ${key}:`, error);
       }
-    }
-    
-    // FALLBACK: También buscar por patrones antiguos para compatibilidad
-    else if ((key.includes('http-input') || key.includes('endpoint')) && 
-             typeof value === 'object' && value !== null && 
-             (value.endpoint || value.path)) {
-      
-      console.log('📡 Found HTTP Input with legacy pattern:', key, value);
-      
-      const httpInputData = {
-        key,
-        endpoint: value.endpoint || `http://localhost:3000/api${value.path || '/unknown'}`,
-        method: value.method || 'GET',
-        path: value.path || '/unknown',
-        bodyVariable: value.bodyVariable || 'requestBody',
-        headers: value.headers || [],
-        contentType: value.contentType || 'application/json',
-        enableBodyCapture: value.enableBodyCapture !== undefined ? value.enableBodyCapture : false,
-        authentication: value.authentication || 'none',
-        description: value.description || `${value.method || 'HTTP'} endpoint (legacy)`
-      };
-      
-      httpInputs.push(httpInputData);
-      console.log(`✅ Added legacy HTTP Input: ${key}`, httpInputData);
     }
   });
   
-  console.log('📡 Total HTTP Inputs found:', httpInputs.length, httpInputs);
+  // FALLBACK: Si no encontramos httpInput_ pero hay headers o requestBody
+  if (httpInputs.length === 0 && (headerKeys.length > 0 || hasRequestBody)) {
+    console.log('🔧 SUPER DEBUG: No HTTP Input found, but headers/body exist, creating fallback');
+    
+    const fallbackHttpInput = {
+      key: 'fallback_detected',
+      endpoint: 'http://localhost:3000/api/detected',
+      method: hasRequestBody ? 'POST' : 'GET',
+      path: '/detected',
+      bodyVariable: 'requestBody',
+      headers: extractHeadersFromAvailableData(availableData),
+      contentType: 'application/json',
+      enableBodyCapture: hasRequestBody,
+      authentication: 'none',
+      description: 'HTTP Input reconstructed from detected headers/body',
+      nodeId: 'detected',
+      configured: true,
+      
+      // DEBUGGING
+      debug_fallback: true,
+      debug_headerKeys: headerKeys,
+      debug_hasRequestBody: hasRequestBody,
+      debug_availableDataKeys: Object.keys(availableData)
+    };
+    
+    console.log('✅ SUPER DEBUG: Created fallback HTTP Input:', fallbackHttpInput);
+    httpInputs.push(fallbackHttpInput);
+  }
+  
+  // SUPER FALLBACK: Si absolutamente no hay nada pero hay datos
+  if (httpInputs.length === 0 && Object.keys(availableData).length > 0) {
+    console.log('🔧 SUPER DEBUG: Creating emergency fallback from any available data');
+    
+    const emergencyHttpInput = {
+      key: 'emergency_fallback',
+      endpoint: 'http://localhost:3000/api/emergency',
+      method: 'GET',
+      path: '/emergency',
+      bodyVariable: 'requestBody',
+      headers: [],
+      contentType: 'application/json',
+      enableBodyCapture: false,
+      authentication: 'none',
+      description: 'Emergency HTTP Input - Check your HTTP Input configuration',
+      nodeId: 'emergency',
+      configured: true,
+      
+      // DEBUGGING
+      debug_emergency: true,
+      debug_availableData: availableData
+    };
+    
+    console.log('⚠️ SUPER DEBUG: Created emergency HTTP Input:', emergencyHttpInput);
+    httpInputs.push(emergencyHttpInput);
+  }
+  
+  console.log('📡 SUPER DEBUG: Final HTTP Inputs found:', httpInputs.length);
+  console.log('📡 SUPER DEBUG: Final HTTP Inputs:', httpInputs);
+  
   return httpInputs;
 };
 
-// Generate example header values
+// Helper function to extract headers from available data
+const extractHeadersFromAvailableData = (availableData) => {
+  const headers = [];
+  
+  Object.entries(availableData).forEach(([key, value]) => {
+    if (key.startsWith('headers.')) {
+      const headerVariable = key.replace('headers.', '');
+      
+      headers.push({
+        name: headerVariable,
+        variable: headerVariable,
+        required: false,
+        defaultValue: typeof value === 'object' ? value.defaultValue : String(value),
+        description: `Header detected: ${headerVariable}`
+      });
+    }
+  });
+  
+  return headers;
+};
+
+// TAMBIÉN ACTUALIZAR esta función para ser más permisiva
+export const generateHttpInputStructureFromReal = (httpInputData, availableData) => {
+  console.log('🏗️ STRUCTURE FIX: Generating HTTP Input structure from:', httpInputData);
+  
+  const structure = {
+    metadata: {
+      endpoint: httpInputData.endpoint,
+      method: httpInputData.method,
+      path: httpInputData.path,
+      timestamp: new Date().toISOString(),
+      contentType: httpInputData.contentType || 'application/json',
+      requestId: "req_example_12345",
+      
+      // DEBUGGING
+      debug_source: 'generateHttpInputStructureFromReal',
+      debug_httpInputData: httpInputData
+    }
+  };
+
+  // Agregar headers desde los datos disponibles
+  const headerKeys = Object.keys(availableData).filter(k => k.startsWith('headers.'));
+  if (headerKeys.length > 0) {
+    structure.headers = {};
+    headerKeys.forEach(headerKey => {
+      const headerVariable = headerKey.replace('headers.', '');
+      const headerValue = availableData[headerKey];
+      
+      structure.headers[headerVariable] = typeof headerValue === 'object' 
+        ? headerValue.defaultValue || `example_${headerVariable}`
+        : String(headerValue);
+    });
+  }
+
+  // Agregar body si existe
+  if (availableData.requestBody) {
+    structure.requestBody = typeof availableData.requestBody === 'object'
+      ? availableData.requestBody.example || generateExampleBodyForContentType(httpInputData.contentType, httpInputData.path)
+      : availableData.requestBody;
+  }
+
+  console.log('✅ STRUCTURE FIX: Generated structure:', structure);
+  return structure;
+};
+
+// Helper para generar valores de ejemplo para headers
 export const generateExampleValueForHeader = (header) => {
   const headerName = header.name.toLowerCase();
   
   if (headerName.includes('authorization')) {
-    return header.defaultValue || 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+    return 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
   }
   if (headerName.includes('api') && headerName.includes('key')) {
-    return header.defaultValue || 'sk_live_abcd1234567890';
+    return 'sk_live_abcd1234567890';
   }
   if (headerName.includes('content-type')) {
-    return header.defaultValue || 'application/json';
+    return 'application/json';
   }
   if (headerName.includes('user-agent')) {
-    return header.defaultValue || 'WorkflowApp/1.0';
+    return 'WorkflowApp/1.0';
   }
   if (headerName.includes('accept')) {
-    return header.defaultValue || 'application/json';
+    return 'application/json';
   }
   
-  return header.defaultValue || `example_${header.variable || header.name}`;
+  return `example_${header.variable || header.name}`;
 };
 
-// Generate realistic body examples based on content type and path
+// Helper para generar ejemplos de body
 export const generateExampleBodyForContentType = (contentType, path) => {
   const pathLower = path.toLowerCase();
   
   switch (contentType) {
     case 'application/json':
-      // Generate different examples based on the endpoint path
       if (pathLower.includes('user') || pathLower.includes('profile')) {
         return {
           id: 12345,
@@ -222,13 +351,7 @@ export const generateExampleBodyForContentType = (contentType, path) => {
           profile: {
             bio: "Desarrollador Full Stack",
             location: "Bogotá, Colombia",
-            skills: ["JavaScript", "React", "Node.js"],
-            joinedAt: "2023-01-15T10:30:00Z"
-          },
-          preferences: {
-            language: "es",
-            timezone: "America/Bogota",
-            notifications: true
+            skills: ["JavaScript", "React", "Node.js"]
           }
         };
       }
@@ -242,55 +365,14 @@ export const generateExampleBodyForContentType = (contentType, path) => {
               productId: "PROD-001",
               name: "Laptop Dell XPS 13",
               quantity: 1,
-              price: 2500000,
-              category: "electronics"
-            },
-            {
-              productId: "PROD-002", 
-              name: "Mouse Inalámbrico",
-              quantity: 2,
-              price: 75000,
-              category: "accessories"
+              price: 2500000
             }
           ],
-          total: 2650000,
-          currency: "COP",
-          status: "pending",
-          shipping: {
-            address: "Calle 123 #45-67",
-            city: "Bogotá",
-            country: "Colombia",
-            zipCode: "110111"
-          },
-          createdAt: "2024-06-25T14:30:00Z"
+          total: 2500000,
+          currency: "COP"
         };
       }
       
-      if (pathLower.includes('product') || pathLower.includes('catalog')) {
-        return {
-          id: "PROD-12345",
-          name: "Smartphone Galaxy S24",
-          description: "Último modelo con cámara profesional",
-          price: 1800000,
-          currency: "COP",
-          category: "electronics",
-          brand: "Samsung",
-          inStock: true,
-          quantity: 150,
-          specifications: {
-            screen: "6.2 pulgadas",
-            memory: "128GB",
-            ram: "8GB",
-            camera: "50MP + 12MP + 10MP",
-            battery: "4000mAh"
-          },
-          tags: ["smartphone", "android", "5g"],
-          createdAt: "2024-06-25T09:00:00Z",
-          updatedAt: "2024-06-25T14:30:00Z"
-        };
-      }
-      
-      // Generic structure for other endpoints
       return {
         id: 123,
         name: "Elemento de Ejemplo",
@@ -300,20 +382,7 @@ export const generateExampleBodyForContentType = (contentType, path) => {
         data: {
           field1: "valor1",
           field2: 42,
-          field3: true,
-          nested: {
-            subfield: "sub-valor",
-            array: ["item1", "item2", "item3"]
-          }
-        },
-        metadata: {
-          version: "1.0",
-          createdBy: "sistema",
-          tags: ["ejemplo", "test"]
-        },
-        timestamps: {
-          createdAt: "2024-06-25T10:30:00Z",
-          updatedAt: "2024-06-25T14:30:00Z"
+          field3: true
         }
       };
       
@@ -323,73 +392,12 @@ export const generateExampleBodyForContentType = (contentType, path) => {
         nombre: "Juan Pérez",
         email: "juan@ejemplo.com",
         telefono: "+57 300 123 4567",
-        edad: 30,
-        activo: "true",
-        categoria: "cliente_premium",
-        comentarios: "Información adicional del formulario"
+        edad: 30
       };
       
-    case 'application/xml':
-      return `<?xml version="1.0" encoding="UTF-8"?>
-<data>
-  <usuario>
-    <id>123</id>
-    <nombre>Juan Pérez</nombre>
-    <email>juan@ejemplo.com</email>
-    <activo>true</activo>
-    <perfil>
-      <edad>30</edad>
-      <ciudad>Bogotá</ciudad>
-      <intereses>
-        <interes>tecnología</interes>
-        <interes>desarrollo</interes>
-      </intereses>
-    </perfil>
-  </usuario>
-</data>`;
-      
-    case 'text/plain':
-      return "Contenido de texto plano del cuerpo de la petición.\nPuede contener múltiples líneas.\nEjemplo de datos enviados por el cliente.";
-      
     default:
-      return "Contenido del body en formato " + contentType;
+      return `Contenido del body en formato ${contentType}`;
   }
-};
-
-// Generate more realistic HTTP Input structure
-export const generateHttpInputStructure = (httpInputData) => {
-  const structure = {
-    metadata: {
-      endpoint: httpInputData.endpoint,
-      method: httpInputData.method,
-      path: httpInputData.path,
-      timestamp: new Date().toISOString(),
-      contentType: httpInputData.contentType,
-      requestId: "req_" + Math.random().toString(36).substr(2, 9)
-    }
-  };
-
-  // Agregar headers si existen
-  if (httpInputData.headers && httpInputData.headers.length > 0) {
-    structure.headers = {};
-    httpInputData.headers.forEach(header => {
-      if (header.variable) {
-        structure.headers[header.variable] = generateExampleValueForHeader(header);
-      }
-    });
-  }
-
-  // Generar estructura del body según el tipo de contenido y método
-  if (httpInputData.enableBodyCapture && httpInputData.bodyVariable && 
-      ['POST', 'PUT', 'PATCH'].includes(httpInputData.method)) {
-    
-    structure[httpInputData.bodyVariable] = generateExampleBodyForContentType(
-      httpInputData.contentType, 
-      httpInputData.path
-    );
-  }
-
-  return structure;
 };
 
 // Get sample JSON structure
