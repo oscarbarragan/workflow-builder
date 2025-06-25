@@ -1,8 +1,10 @@
-// src/components/workflow/nodes/HttpInput/HttpInput.jsx - FIXED
-import React, { useState } from 'react';
-import { Globe, Link, CheckCircle, AlertCircle } from 'lucide-react';
-import Modal from '../../../common/Modal/Modal';
+// src/components/workflow/nodes/HttpInput/HttpInput.jsx - SIMPLIFICADO
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Globe, Settings, Database } from 'lucide-react';
 import Button from '../../../common/Button/Button';
+import { BasicTab, HeadersTab, BodyTab } from './HttpInputTabs';
+import { validateHttpInputConfig } from '../../../../utils/httpInputHelpers';
 
 const HttpInput = ({ 
   isOpen, 
@@ -16,12 +18,52 @@ const HttpInput = ({
     description: initialData.description || '',
     enableCors: initialData.enableCors !== undefined ? initialData.enableCors : true,
     authentication: initialData.authentication || 'none',
+    
+    // Headers
+    headers: initialData.headers || [],
+    
+    // Body
+    bodyVariable: initialData.bodyVariable || 'requestBody',
+    enableBodyCapture: initialData.enableBodyCapture !== undefined ? initialData.enableBodyCapture : true,
+    bodyValidation: initialData.bodyValidation || 'none',
+    contentType: initialData.contentType || 'application/json',
+    
+    // NEW: Form fields for different content types
+    formFields: initialData.formFields || [],
+    
+    // NEW: Validation configuration
+    validationConfig: initialData.validationConfig || {},
+    
     ...initialData
   });
   
   const [errors, setErrors] = useState({});
   const [isValidating, setIsValidating] = useState(false);
   const [pathValidation, setPathValidation] = useState(null);
+  const [activeTab, setActiveTab] = useState('basic');
+
+  // Disable ReactFlow when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      console.log('🌐 HTTP Input opened - disabling ReactFlow');
+      
+      const reactFlowWrapper = document.querySelector('.react-flow');
+      if (reactFlowWrapper) {
+        reactFlowWrapper.style.pointerEvents = 'none';
+        reactFlowWrapper.style.userSelect = 'none';
+      }
+      
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        if (reactFlowWrapper) {
+          reactFlowWrapper.style.pointerEvents = 'auto';
+          reactFlowWrapper.style.userSelect = 'auto';
+        }
+        document.body.style.overflow = 'unset';
+      };
+    }
+  }, [isOpen]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -29,7 +71,6 @@ const HttpInput = ({
       [field]: value
     }));
     
-    // Clear error when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -37,7 +78,6 @@ const HttpInput = ({
       }));
     }
 
-    // Validate path in real-time
     if (field === 'path') {
       validatePath(value);
     }
@@ -51,7 +91,6 @@ const HttpInput = ({
 
     setIsValidating(true);
     
-    // Simulate path validation
     setTimeout(() => {
       const isValid = /^\/[a-zA-Z0-9\-_\/]*$/.test(path) && !path.includes('//');
       setPathValidation({
@@ -65,25 +104,17 @@ const HttpInput = ({
   };
 
   const validateForm = () => {
-    const newErrors = {};
+    const validation = validateHttpInputConfig(formData);
+    setErrors(validation.errors.reduce((acc, error, index) => {
+      acc[`error_${index}`] = error;
+      return acc;
+    }, {}));
     
-    if (!formData.path || formData.path.trim() === '') {
-      newErrors.path = 'El path es requerido';
-    } else if (!formData.path.startsWith('/')) {
-      newErrors.path = 'El path debe comenzar con /';
-    }
-    
-    if (!formData.method) {
-      newErrors.method = 'El método HTTP es requerido';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return validation.isValid;
   };
 
   const handleSave = () => {
     if (validateForm() && pathValidation?.isValid !== false) {
-      // Generate endpoint URL
       const baseUrl = 'http://localhost:3000/api';
       const fullEndpoint = `${baseUrl}${formData.path}`;
       
@@ -91,12 +122,47 @@ const HttpInput = ({
         ...formData,
         endpoint: fullEndpoint,
         status: 'configured',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        
+        // Generate output structure for Data Mapper connection
+        outputStructure: generateOutputStructure(formData)
       };
       
       onSave(savedData);
       onClose();
     }
+  };
+
+  const generateOutputStructure = (data) => {
+    const structure = {};
+    
+    // Headers variables
+    data.headers.forEach(header => {
+      if (header.variable) {
+        structure[`headers.${header.variable}`] = {
+          type: 'string',
+          source: 'header',
+          headerName: header.name,
+          required: header.required,
+          defaultValue: header.defaultValue,
+          description: header.description
+        };
+      }
+    });
+    
+    // Body variable
+    if (data.enableBodyCapture && data.bodyVariable) {
+      structure[data.bodyVariable] = {
+        type: 'object',
+        source: 'body',
+        contentType: data.contentType,
+        validation: data.bodyValidation,
+        description: 'Request body content',
+        fields: data.formFields || []
+      };
+    }
+    
+    return structure;
   };
 
   const handleClose = () => {
@@ -105,382 +171,292 @@ const HttpInput = ({
       method: 'GET',
       description: '',
       enableCors: true,
-      authentication: 'none'
+      authentication: 'none',
+      headers: [],
+      bodyVariable: 'requestBody',
+      enableBodyCapture: true,
+      bodyValidation: 'none',
+      contentType: 'application/json',
+      formFields: [],
+      validationConfig: {}
     });
     setErrors({});
     setPathValidation(null);
+    setActiveTab('basic');
     onClose();
   };
 
-  const methods = [
-    { value: 'GET', label: 'GET', color: '#16a34a' },
-    { value: 'POST', label: 'POST', color: '#3b82f6' },
-    { value: 'PUT', label: 'PUT', color: '#f59e0b' },
-    { value: 'DELETE', label: 'DELETE', color: '#dc2626' },
-    { value: 'PATCH', label: 'PATCH', color: '#7c3aed' }
-  ];
+  if (!isOpen) return null;
 
-  const authOptions = [
-    { value: 'none', label: 'Sin autenticación' },
-    { value: 'basic', label: 'Basic Auth' },
-    { value: 'bearer', label: 'Bearer Token' },
-    { value: 'apikey', label: 'API Key' }
-  ];
+  const modalOverlayStyle = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.8)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999999,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
+  };
 
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="Configurar HTTP Input"
-      size="medium"
-      style={{ maxWidth: '580px', width: '85vw' }} // FIXED: Narrower and better responsive
+  const modalContentStyle = {
+    background: 'white',
+    borderRadius: '12px',
+    width: '95vw',
+    height: '90vh',
+    maxWidth: '1400px',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    padding: '24px',
+    position: 'relative'
+  };
+
+  const modalContent = (
+    <div 
+      style={modalOverlayStyle}
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
     >
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '18px', // FIXED: Increased gap for better spacing
-        fontSize: '14px', // FIXED: Slightly larger base font
-        maxWidth: '100%',
-        overflow: 'hidden'
-      }}>
-        
-        {/* Header Info */}
-        <div style={{
-          background: '#eff6ff',
-          padding: '12px 16px', // FIXED: More padding for better look
-          borderRadius: '8px',
-          border: '1px solid #bfdbfe'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '4px'
-          }}>
-            <Globe size={16} color="#3b82f6" /> {/* FIXED: Larger icon */}
-            <span style={{ 
-              fontWeight: '600', 
-              color: '#1e40af',
-              fontSize: '15px' // FIXED: Better font size
-            }}>
-              HTTP Endpoint
-            </span>
-          </div>
-          <div style={{ 
-            fontSize: '13px', // FIXED: Better readability
-            color: '#3730a3' 
-          }}>
-            Configure un endpoint HTTP que será expuesto por el servidor
-          </div>
-        </div>
-
-        {/* Path Configuration */}
-        <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '6px', // FIXED: Better spacing
-            fontWeight: '500',
-            color: '#374151',
-            fontSize: '14px' // FIXED: Standard label size
-          }}>
-            Path del Endpoint *
-          </label>
-          
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              display: 'flex',
-              border: `1px solid ${errors.path ? '#dc2626' : '#d1d5db'}`,
-              borderRadius: '6px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                background: '#f3f4f6',
-                padding: '8px 10px', // FIXED: Better padding
-                borderRight: '1px solid #d1d5db',
-                fontSize: '13px', // FIXED: Readable font size
-                color: '#6b7280',
-                fontFamily: 'monospace',
-                whiteSpace: 'nowrap',
-                minWidth: 'fit-content'
-              }}>
-                /api
-              </div>
-              <input
-                type="text"
-                value={formData.path}
-                onChange={(e) => handleInputChange('path', e.target.value)}
-                placeholder="/mi-endpoint"
-                style={{
-                  flex: 1,
-                  padding: '8px 10px', // FIXED: Better padding
-                  border: 'none',
-                  fontSize: '13px', // FIXED: Readable font size
-                  fontFamily: 'monospace',
-                  outline: 'none',
-                  minWidth: 0
-                }}
-              />
-            </div>
-            
-            {/* Path validation indicator */}
-            {isValidating && (
-              <div style={{
-                position: 'absolute',
-                right: '8px',
-                top: '50%',
-                transform: 'translateY(-50%)'
-              }}>
-                <div style={{
-                  width: '16px',
-                  height: '16px',
-                  border: '2px solid #e5e7eb',
-                  borderTop: '2px solid #3b82f6',
-                  borderRadius: '50%',
-                  animation: 'spin 1s linear infinite'
-                }} />
-              </div>
-            )}
-            
-            {pathValidation && !isValidating && (
-              <div style={{
-                position: 'absolute',
-                right: '8px',
-                top: '50%',
-                transform: 'translateY(-50%)'
-              }}>
-                {pathValidation.isValid ? (
-                  <CheckCircle size={16} color="#16a34a" />
-                ) : (
-                  <AlertCircle size={16} color="#dc2626" />
-                )}
-              </div>
-            )}
-          </div>
-          
-          {errors.path && (
-            <div style={{
-              color: '#dc2626',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
-              {errors.path}
-            </div>
-          )}
-          
-          {pathValidation && (
-            <div style={{
-              color: pathValidation.isValid ? '#16a34a' : '#dc2626',
-              fontSize: '12px',
-              marginTop: '4px'
-            }}>
-              {pathValidation.message}
-            </div>
-          )}
-          
-          {formData.path && pathValidation?.isValid && (
-            <div style={{
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '4px',
-              padding: '8px 12px',
-              marginTop: '8px'
-            }}>
-              <div style={{ 
-                fontSize: '12px', 
-                color: '#15803d', 
-                marginBottom: '4px' 
-              }}>
-                <strong>Endpoint generado:</strong>
-              </div>
-              <div style={{
-                fontFamily: 'monospace',
-                fontSize: '12px', // FIXED: Better font size for URLs
-                color: '#166534',
-                background: 'white',
-                padding: '6px 8px', // FIXED: Better padding
-                borderRadius: '4px', // FIXED: Standard border radius
-                border: '1px solid #bbf7d0',
-                wordBreak: 'break-all',
-                lineHeight: '1.3' // FIXED: Better line height
-              }}>
-                http://localhost:3000/api{formData.path}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* HTTP Method */}
-        <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '6px',
-            fontWeight: '500',
-            color: '#374151',
-            fontSize: '14px'
-          }}>
-            Método HTTP *
-          </label>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))', // FIXED: Slightly smaller minimum
-            gap: '8px',
-            maxWidth: '100%' // FIXED: Ensure buttons don't overflow
-          }}>
-            {methods.map(method => (
-              <button
-                key={method.value}
-                type="button"
-                onClick={() => handleInputChange('method', method.value)}
-                style={{
-                  padding: '8px 10px', // FIXED: Slightly reduced padding
-                  border: `2px solid ${formData.method === method.value ? method.color : '#e5e7eb'}`,
-                  borderRadius: '6px',
-                  background: formData.method === method.value ? method.color : 'white',
-                  color: formData.method === method.value ? 'white' : method.color,
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap',
-                  minWidth: '65px', // FIXED: Slightly smaller minimum width
-                  textAlign: 'center' // FIXED: Center text in buttons
-                }}
-              >
-                {method.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '6px',
-            fontWeight: '500',
-            color: '#374151',
-            fontSize: '14px'
-          }}>
-            Descripción
-          </label>
-          
-          <textarea
-            value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            placeholder="Describe el propósito de este endpoint..."
-            rows={3}
-            style={{
-              width: '100%',
-              padding: '10px 12px', // FIXED: Better padding for textarea visibility
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '13px',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              minHeight: '100px', // FIXED: Increased minimum height
-              boxSizing: 'border-box' // FIXED: Ensure proper sizing
-            }}
-          />
-        </div>
-
-        {/* Authentication */}
-        <div>
-          <label style={{
-            display: 'block',
-            marginBottom: '6px',
-            fontWeight: '500',
-            color: '#374151',
-            fontSize: '14px'
-          }}>
-            Autenticación
-          </label>
-          
-          <select
-            value={formData.authentication}
-            onChange={(e) => handleInputChange('authentication', e.target.value)}
-            style={{
-              width: '100%',
-              padding: '6px 8px', // FIXED: Reduced padding
-              border: '1px solid #d1d5db',
-              borderRadius: '4px', // FIXED: Smaller border radius
-              fontSize: '11px', // FIXED: Much smaller font
-              background: 'white'
-            }}
-          >
-            {authOptions.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* CORS Configuration */}
+      <div 
+        style={modalContentStyle}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
         <div style={{
           display: 'flex',
+          justifyContent: 'space-between',
           alignItems: 'center',
-          gap: '8px'
+          marginBottom: '20px',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '16px'
         }}>
-          <input
-            type="checkbox"
-            id="enableCors"
-            checked={formData.enableCors}
-            onChange={(e) => handleInputChange('enableCors', e.target.checked)}
+          <h2 style={{
+            margin: 0,
+            fontSize: '24px',
+            fontWeight: '700',
+            color: '#1f2937'
+          }}>
+            🌐 Configurar HTTP Input
+          </h2>
+          
+          {/* Debug info en el header */}
+          <div style={{
+            fontSize: '12px',
+            color: '#6b7280',
+            fontFamily: 'monospace',
+            textAlign: 'center',
+            background: '#f3f4f6',
+            padding: '6px 12px',
+            borderRadius: '6px'
+          }}>
+            <div><strong>Método:</strong> {formData.method}</div>
+            <div><strong>Headers:</strong> {formData.headers.length}</div>
+            <div><strong>Body:</strong> {formData.enableBodyCapture ? 'Habilitado' : 'Deshabilitado'}</div>
+          </div>
+          
+          <button 
+            onClick={handleClose}
             style={{
-              width: '16px',
-              height: '16px',
-              cursor: 'pointer'
-            }}
-          />
-          <label 
-            htmlFor="enableCors"
-            style={{
-              fontSize: '14px', // FIXED: Standard font size
-              color: '#374151',
-              cursor: 'pointer'
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              borderRadius: '6px',
+              color: '#6b7280',
+              fontSize: '24px',
+              fontWeight: 'bold'
             }}
           >
-            Habilitar CORS
-          </label>
+            ✕
+          </button>
         </div>
 
-        {/* Actions */}
+        {/* Tabs Navigation */}
         <div style={{
           display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '12px',
-          paddingTop: '16px',
-          borderTop: '1px solid #e5e7eb',
-          marginTop: '8px' // FIXED: Add some margin to ensure visibility
+          borderBottom: '2px solid #e5e7eb',
+          marginBottom: '20px'
         }}>
-          <Button
-            variant="secondary"
-            onClick={handleClose}
-          >
-            Cancelar
-          </Button>
-          
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            disabled={isValidating || (pathValidation && !pathValidation.isValid)}
-          >
-            Guardar Endpoint
-          </Button>
+          {[
+            { id: 'basic', label: '⚙️ Básico', icon: <Settings size={14} /> },
+            { id: 'headers', label: '📋 Headers', icon: <Settings size={14} /> },
+            { id: 'body', label: '📦 Body', icon: <Database size={14} /> }
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: '12px 20px',
+                border: 'none',
+                background: activeTab === tab.id ? '#3b82f6' : 'transparent',
+                color: activeTab === tab.id ? 'white' : '#6b7280',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                borderRadius: '6px 6px 0 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s'
+              }}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </div>
 
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
-    </Modal>
+        {/* Tab Content */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          {activeTab === 'basic' && (
+            <BasicTab
+              formData={formData}
+              errors={errors}
+              isValidating={isValidating}
+              pathValidation={pathValidation}
+              onInputChange={handleInputChange}
+            />
+          )}
+          
+          {activeTab === 'headers' && (
+            <HeadersTab
+              formData={formData}
+              errors={errors}
+              onInputChange={handleInputChange}
+            />
+          )}
+          
+          {activeTab === 'body' && (
+            <BodyTab
+              formData={formData}
+              errors={errors}
+              onInputChange={handleInputChange}
+            />
+          )}
+        </div>
+
+        {/* Generated Endpoint Preview */}
+        {formData.path && pathValidation?.isValid && (
+          <div style={{
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: '8px',
+            padding: '16px',
+            marginTop: '16px'
+          }}>
+            <div style={{
+              fontSize: '14px',
+              color: '#15803d',
+              fontWeight: '600',
+              marginBottom: '8px'
+            }}>
+              🚀 Endpoint Generado
+            </div>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px',
+              fontSize: '12px'
+            }}>
+              <div>
+                <strong>URL:</strong>
+                <div style={{
+                  fontFamily: 'monospace',
+                  background: 'white',
+                  padding: '6px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #bbf7d0',
+                  marginTop: '2px',
+                  wordBreak: 'break-all'
+                }}>
+                  {formData.method} http://localhost:3000/api{formData.path}
+                </div>
+              </div>
+              
+              <div>
+                <strong>Variables de Salida:</strong>
+                <div style={{
+                  fontFamily: 'monospace',
+                  background: 'white',
+                  padding: '6px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #bbf7d0',
+                  marginTop: '2px',
+                  fontSize: '11px'
+                }}>
+                  {formData.headers.length > 0 && (
+                    <div>Headers: {formData.headers.filter(h => h.variable).map(h => h.variable).join(', ')}</div>
+                  )}
+                  {formData.enableBodyCapture && (
+                    <div>Body: {formData.bodyVariable}</div>
+                  )}
+                  {formData.headers.length === 0 && !formData.enableBodyCapture && (
+                    <div style={{ color: '#6b7280', fontStyle: 'italic' }}>No hay variables configuradas</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingTop: '20px',
+          borderTop: '1px solid #e5e7eb',
+          marginTop: '20px'
+        }}>
+          <div style={{
+            fontSize: '12px',
+            color: '#6b7280'
+          }}>
+            💡 <strong>Tip:</strong> Las variables configuradas estarán disponibles para conectar con Data Mapper
+          </div>
+          
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <Button
+              variant="secondary"
+              onClick={handleClose}
+              size="large"
+            >
+              Cancelar
+            </Button>
+            
+            <Button
+              variant="primary"
+              onClick={handleSave}
+              disabled={isValidating || (pathValidation && !pathValidation.isValid)}
+              size="large"
+            >
+              💾 Guardar Configuración
+            </Button>
+          </div>
+        </div>
+
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}
+        </style>
+      </div>
+    </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default HttpInput;
