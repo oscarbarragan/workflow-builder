@@ -1,14 +1,15 @@
-// src/components/workflow/nodes/DataMapper/tabs/SourceTab.jsx
+// src/components/workflow/nodes/DataMapper/tabs/SourceTab.jsx - SIMPLIFICADO
 import React, { useRef } from 'react';
 import { 
   Code, 
   File, 
-  Globe, 
   Upload, 
   CheckCircle, 
   X, 
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Globe,
+  Database
 } from 'lucide-react';
 import Button from '../../../../common/Button/Button';
 import AvailableDataViewer from '../AvailableDataViewer';
@@ -16,56 +17,139 @@ import AvailableDataViewer from '../AvailableDataViewer';
 const SourceTab = ({ state, actions, availableData = {} }) => {
   const fileInputRef = useRef(null);
 
-  // DEBUGGING: Agregar logging detallado
-  console.log('🔧 SOURCE TAB DEBUG:', {
-    selectedSource: state.selectedSource,
-    hasHttpInputsAvailable: state.hasHttpInputsAvailable,
-    availableHttpInputsCount: state.availableHttpInputs.length,
-    connectedHttpInput: state.connectedHttpInput,
-    availableHttpInputs: state.availableHttpInputs
-  });
+  // Extraer información de HTTP Input conectado
+  const httpInputInfo = React.useMemo(() => {
+    const httpInputKeys = Object.keys(availableData).filter(k => k.startsWith('httpInput_'));
+    
+    if (httpInputKeys.length === 0) return null;
+    
+    const httpInputData = availableData[httpInputKeys[0]];
+    const headerKeys = Object.keys(availableData).filter(k => k.startsWith('headers.'));
+    const hasRequestBody = !!availableData.requestBody;
+    
+    return {
+      endpoint: httpInputData.endpoint,
+      method: httpInputData.method,
+      path: httpInputData.path,
+      headers: headerKeys.map(key => ({
+        key: key.replace('headers.', ''),
+        variable: key,
+        value: availableData[key]
+      })),
+      hasBody: hasRequestBody,
+      bodyVariable: httpInputData.bodyVariable || 'requestBody'
+    };
+  }, [availableData]);
 
-  // FIXED: Handle file selection properly
   const handleFileSelect = () => {
-    console.log('📁 Opening file selector...');
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  // Función para manejar la detección forzada
-  const handleForceDetection = (availableData) => {
-    console.log('🔧 FORCE DETECTION: Starting manual detection...');
-    
-    // Importar dinámicamente las utilidades
-    import('../DataMapperUtils').then(utils => {
-      const detectedHttpInputs = utils.getAvailableHttpInputs(availableData);
-      console.log('🔧 FORCE DETECTION: Result:', detectedHttpInputs);
-      
-      if (detectedHttpInputs.length > 0) {
-        // Forzar cambio a http-input y conectar
-        actions.handleSourceChange('http-input');
-        setTimeout(() => {
-          actions.connectToHttpInput(detectedHttpInputs[0]);
-        }, 200);
-        
-        alert(`✅ HTTP Input detectado y conectado: ${detectedHttpInputs[0].method} ${detectedHttpInputs[0].path}`);
-      } else {
-        alert('❌ No se pudo detectar ningún HTTP Input válido en los datos disponibles');
-      }
-    });
-  };
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      {/* NUEVO: Visualizador de datos disponibles */}
-      <AvailableDataViewer 
-        availableData={availableData}
-        onForceDetection={handleForceDetection}
-      />
+      {/* HTTP Input Connection Status - SOLO SI ESTÁ CONECTADO */}
+      {httpInputInfo && (
+        <div style={{
+          background: '#f0fdf4',
+          border: '2px solid #16a34a',
+          borderRadius: '8px',
+          padding: '16px'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px'
+          }}>
+            <Globe size={20} color="#15803d" />
+            <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600', color: '#15803d' }}>
+              HTTP Input Detectado
+            </h4>
+            <CheckCircle size={16} color="#16a34a" />
+          </div>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+            <div>
+              <div style={{ fontSize: '12px', color: '#15803d', fontWeight: '600' }}>Endpoint:</div>
+              <div style={{ 
+                fontFamily: 'monospace', 
+                fontSize: '11px', 
+                background: 'white',
+                padding: '4px 8px',
+                border: '1px solid #bbf7d0',
+                borderRadius: '4px',
+                color: '#166534'
+              }}>
+                {httpInputInfo.method} {httpInputInfo.path}
+              </div>
+            </div>
+            
+            <div>
+              <div style={{ fontSize: '12px', color: '#15803d', fontWeight: '600' }}>Body Variable:</div>
+              <div style={{ 
+                fontFamily: 'monospace', 
+                fontSize: '11px', 
+                background: 'white',
+                padding: '4px 8px',
+                border: '1px solid #bbf7d0',
+                borderRadius: '4px',
+                color: '#166534'
+              }}>
+                {httpInputInfo.bodyVariable}
+              </div>
+            </div>
+          </div>
+          
+          {/* Headers disponibles */}
+          {httpInputInfo.headers.length > 0 && (
+            <div>
+              <div style={{ fontSize: '12px', color: '#15803d', fontWeight: '600', marginBottom: '6px' }}>
+                Headers Disponibles ({httpInputInfo.headers.length}):
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {httpInputInfo.headers.map(header => (
+                  <span
+                    key={header.key}
+                    style={{
+                      fontSize: '10px',
+                      padding: '2px 6px',
+                      background: '#dcfce7',
+                      color: '#166534',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '4px',
+                      fontFamily: 'monospace'
+                    }}
+                  >
+                    {header.key}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div style={{
+            marginTop: '12px',
+            padding: '8px',
+            background: '#ecfdf5',
+            borderRadius: '4px',
+            fontSize: '11px',
+            color: '#15803d'
+          }}>
+            <strong>📋 Flujo:</strong>             El body de este HTTP Input se parseará usando la estructura JSON que definas abajo.
+            Los headers estarán disponibles como variables adicionales en el mapeo final.
+          </div>
+        </div>
+      )}
 
-      {/* Source Selection - FLUJO EXCLUSIVO */}
+      {/* Source Selection */}
       <div style={{
         background: '#f0f9ff',
         padding: '16px',
@@ -73,37 +157,10 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
         border: '1px solid #bae6fd'
       }}>
         <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600', color: '#0c4a6e' }}>
-          🔗 Seleccionar Fuente de Datos (Solo una opción activa)
+          📋 Definir Estructura del Body JSON
         </h4>
         
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          {/* HTTP Input Option */}
-          <button
-            onClick={() => actions.handleSourceChange('http-input')}
-            disabled={!state.hasHttpInputsAvailable}
-            style={{
-              padding: '12px 16px',
-              border: `2px solid ${state.selectedSource === 'http-input' ? '#3b82f6' : '#e5e7eb'}`,
-              borderRadius: '8px',
-              background: state.selectedSource === 'http-input' ? '#eff6ff' : 
-                          !state.hasHttpInputsAvailable ? '#f3f4f6' : 'white',
-              color: state.selectedSource === 'http-input' ? '#1e40af' : 
-                     !state.hasHttpInputsAvailable ? '#9ca3af' : '#374151',
-              cursor: !state.hasHttpInputsAvailable ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              transition: 'all 0.2s',
-              opacity: !state.hasHttpInputsAvailable ? 0.5 : 1
-            }}
-          >
-            <Globe size={16} />
-            Desde HTTP Input ({state.availableHttpInputs.length})
-            {state.selectedSource === 'http-input' && <CheckCircle size={14} color="#16a34a" />}
-          </button>
-          
           {/* Manual JSON Option */}
           <button
             onClick={() => actions.handleSourceChange('manual')}
@@ -123,11 +180,11 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             }}
           >
             <Code size={16} />
-            Entrada Manual JSON
+            Escribir JSON Manualmente
             {state.selectedSource === 'manual' && <CheckCircle size={14} color="#16a34a" />}
           </button>
           
-          {/* File Upload Option - FIXED */}
+          {/* File Upload Option */}
           <button
             onClick={() => actions.handleSourceChange('file')}
             style={{
@@ -146,197 +203,37 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             }}
           >
             <File size={16} />
-            Cargar Archivo JSON
+            Cargar desde Archivo JSON
             {state.selectedSource === 'file' && <CheckCircle size={14} color="#16a34a" />}
           </button>
         </div>
 
-        {/* Warning when no HTTP Inputs available */}
-        {!state.hasHttpInputsAvailable && (
-          <div style={{
-            marginTop: '12px',
-            padding: '8px 12px',
-            background: '#fef3c7',
-            border: '1px solid #f59e0b',
-            borderRadius: '6px',
-            fontSize: '12px',
-            color: '#92400e',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            <AlertTriangle size={14} />
-            Sin HTTP Inputs conectados. Conecta un HTTP Input primero o usa entrada manual.
-            
-            {/* DEBUGGING: Botón temporal para forzar re-detección */}
-            <button
-              onClick={() => {
-                console.log('🔧 FORCE DEBUG: Current state:', state);
-                console.log('🔧 FORCE DEBUG: Available HTTP Inputs:', state.availableHttpInputs);
-                
-                // Llamar directamente a la función de detección
-                const { getAvailableHttpInputs } = require('../DataMapperUtils');
-                const debugHttpInputs = getAvailableHttpInputs(window.lastAvailableData || {});
-                console.log('🔧 FORCE DEBUG: Manual detection result:', debugHttpInputs);
-                
-                // Forzar la selección de HTTP Input si hay datos disponibles
-                if (state.availableHttpInputs.length > 0) {
-                  actions.handleSourceChange('http-input');
-                  if (state.availableHttpInputs.length === 1) {
-                    setTimeout(() => actions.connectToHttpInput(state.availableHttpInputs[0]), 100);
-                  }
-                } else if (debugHttpInputs.length > 0) {
-                  console.log('🔧 FORCE DEBUG: Found HTTP Inputs manually, trying to connect...');
-                  actions.handleSourceChange('http-input');
-                  setTimeout(() => actions.connectToHttpInput(debugHttpInputs[0]), 100);
-                }
-              }}
-              style={{
-                marginLeft: '8px',
-                padding: '4px 8px',
-                background: '#3b82f6',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '10px',
-                cursor: 'pointer'
-              }}
-            >
-              🔧 Force Detect
-            </button>
-            
-            {/* SUPER DEBUG: Botón para logging completo */}
-            <button
-              onClick={() => {
-                // Guardar datos para debugging
-                window.lastAvailableData = window.lastAvailableData || {};
-                
-                console.log('🚨 SUPER DEBUG: Full debugging session');
-                console.log('🚨 SUPER DEBUG: State:', state);
-                console.log('🚨 SUPER DEBUG: Actions:', Object.keys(actions));
-                console.log('🚨 SUPER DEBUG: Available data from window:', window.lastAvailableData);
-                
-                // Intentar importar y ejecutar detección directamente
-                import('../DataMapperUtils').then(utils => {
-                  console.log('🚨 SUPER DEBUG: Utils loaded:', Object.keys(utils));
-                  const result = utils.getAvailableHttpInputs(window.lastAvailableData || {});
-                  console.log('🚨 SUPER DEBUG: Direct detection result:', result);
-                  
-                  if (result.length > 0) {
-                    alert(`🚨 Found ${result.length} HTTP Inputs directly! Check console.`);
-                  } else {
-                    alert('🚨 No HTTP Inputs found even with direct detection. Check available data.');
-                  }
-                });
-              }}
-              style={{
-                marginLeft: '4px',
-                padding: '4px 8px',
-                background: '#dc2626',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '10px',
-                cursor: 'pointer'
-              }}
-            >
-              🚨 Super Debug
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* HTTP Input Selection - SOLO CUANDO ESTÁ SELECCIONADO */}
-      {state.selectedSource === 'http-input' && (
-        <div>
-          <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-            📡 HTTP Input Conectado
-          </h4>
-          
-          {state.availableHttpInputs.length === 0 ? (
-            <div style={{
-              padding: '40px 20px',
-              textAlign: 'center',
-              color: '#6b7280',
-              border: '2px dashed #e5e7eb',
-              borderRadius: '8px'
-            }}>
-              <Globe size={32} style={{ margin: '0 auto 12px', display: 'block' }} />
-              <div style={{ fontSize: '14px', marginBottom: '4px' }}>No hay HTTP Inputs configurados</div>
-              <div style={{ fontSize: '12px' }}>
-                Primero configura un nodo HTTP Input en el workflow y conéctalo a este Data Mapper
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {state.availableHttpInputs.map((httpInput, index) => (
-                <div
-                  key={index}
-                  style={{
-                    background: state.connectedHttpInput?.key === httpInput.key ? '#f0fdf4' : '#f9fafb',
-                    border: `2px solid ${state.connectedHttpInput?.key === httpInput.key ? '#16a34a' : '#e5e7eb'}`,
-                    borderRadius: '8px',
-                    padding: '16px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onClick={() => actions.connectToHttpInput(httpInput)}
-                >
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: '8px'
-                  }}>
-                    <div>
-                      <div style={{
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: '#374151',
-                        marginBottom: '4px'
-                      }}>
-                        {httpInput.method} {httpInput.path}
-                      </div>
-                      <div style={{
-                        fontSize: '12px',
-                        color: '#6b7280',
-                        fontFamily: 'monospace'
-                      }}>
-                        {httpInput.endpoint}
-                      </div>
-                    </div>
-                    
-                    {state.connectedHttpInput?.key === httpInput.key && (
-                      <CheckCircle size={20} color="#16a34a" />
-                    )}
-                  </div>
-                  
-                  <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                    <div style={{ marginBottom: '4px' }}>
-                      <strong>Headers:</strong> {httpInput.headers?.length || 0} configurados
-                    </div>
-                    <div style={{ marginBottom: '4px' }}>
-                      <strong>Body:</strong> {httpInput.enableBodyCapture ? `Sí (${httpInput.bodyVariable})` : 'No'}
-                    </div>
-                    <div>
-                      <strong>Tipo de contenido:</strong> {httpInput.contentType || 'application/json'}
-                    </div>
-                  </div>
-                </div>
-              ))}
+        <div style={{
+          marginTop: '12px',
+          padding: '8px 12px',
+          background: '#dbeafe',
+          border: '1px solid #bfdbfe',
+          borderRadius: '6px',
+          fontSize: '12px',
+          color: '#1e40af'
+        }}>
+          💡 <strong>Propósito:</strong> Define la estructura JSON que esperas recibir en el body.
+          El Data Mapper parseará automáticamente los datos entrantes contra esta estructura.
+          {httpInputInfo && (
+            <div style={{ marginTop: '4px' }}>
+              ✨ <strong>Bonus:</strong> Headers del HTTP Input detectado se incluirán automáticamente como variables.
             </div>
           )}
         </div>
-      )}
+      </div>
 
-      {/* File Upload Section - SOLO CUANDO ESTÁ SELECCIONADO Y CORREGIDO */}
+      {/* File Upload Section */}
       {state.selectedSource === 'file' && (
         <div>
           <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
-            📁 Cargar Archivo JSON
+            📁 Cargar Estructura desde Archivo
           </h4>
           
-          {/* Hidden file input - CRÍTICO */}
           <input
             ref={fileInputRef}
             type="file"
@@ -356,10 +253,10 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
               <div>
                 <Upload size={32} style={{ margin: '0 auto 12px', display: 'block', color: '#6b7280' }} />
                 <div style={{ fontSize: '14px', marginBottom: '8px', color: '#374151' }}>
-                  Selecciona un archivo JSON
+                  Cargar archivo JSON con la estructura esperada
                 </div>
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '16px' }}>
-                  Formatos soportados: .json (máx. 10MB)
+                  Ejemplo de estructura que el HTTP Input recibirá en el body
                 </div>
                 <Button
                   variant="primary"
@@ -377,34 +274,47 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
                   {state.uploadedFile.name}
                 </div>
                 <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
-                  {(state.uploadedFile.size / 1024).toFixed(1)} KB • {new Date(state.uploadedFile.lastModified).toLocaleString()}
+                  {(state.uploadedFile.size / 1024).toFixed(1)} KB
+                  {state.uploadedFile.lastModified && (
+                    <span> • {new Date(state.uploadedFile.lastModified).toLocaleString()}</span>
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                  <Button
-                    variant="secondary"
-                    size="small"
-                    onClick={handleFileSelect}
-                  >
+                  <Button variant="secondary" size="small" onClick={handleFileSelect}>
                     Cambiar
                   </Button>
-                  <Button
-                    variant="danger"
-                    size="small"
-                    icon={<X size={14} />}
-                    onClick={actions.clearFile}
-                  >
+                  <Button variant="danger" size="small" icon={<X size={14} />} onClick={actions.clearFile}>
                     Quitar
                   </Button>
                 </div>
               </div>
             )}
           </div>
+          
+          {/* NUEVO: Mostrar estado de archivo cargado desde datos guardados */}
+          {state.uploadedFile && state.jsonInput && (
+            <div style={{
+              marginTop: '12px',
+              padding: '8px 12px',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#15803d'
+            }}>
+              ✅ <strong>Archivo cargado:</strong> La estructura JSON se cargó correctamente desde este archivo.
+              {state.parsedJson && (
+                <div style={{ marginTop: '4px' }}>
+                  📊 <strong>Campos detectados:</strong> {state.mappings.length} variables para mapear
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* JSON Input (Manual, File y HTTP Input) - SOLO CUANDO CORRESPONDE */}
-      {(state.selectedSource === 'manual' || (state.selectedSource === 'file' && state.uploadedFile) || 
-        (state.selectedSource === 'http-input' && state.connectedHttpInput)) && (
+      {/* JSON Input */}
+      {(state.selectedSource === 'manual' || (state.selectedSource === 'file' && state.uploadedFile)) && (
         <div>
           <div style={{
             display: 'flex',
@@ -413,9 +323,20 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             marginBottom: '12px'
           }}>
             <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-              {state.selectedSource === 'file' ? '📁 JSON desde Archivo' : 
-               state.selectedSource === 'http-input' ? '📡 Estructura del HTTP Input' :
-               '📝 Estructura JSON Manual'}
+              {state.selectedSource === 'file' ? 
+                '📁 Estructura desde Archivo' : 
+                '📝 Estructura JSON del Body'
+              }
+              {state.selectedSource === 'file' && state.uploadedFile && (
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: '#16a34a', 
+                  fontWeight: 'normal',
+                  marginLeft: '8px'
+                }}>
+                  • {state.uploadedFile.name}
+                </span>
+              )}
             </h4>
             {state.selectedSource === 'manual' && (
               <Button
@@ -432,11 +353,11 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             value={state.jsonInput}
             onChange={(e) => state.selectedSource === 'manual' ? actions.handleJsonInput(e.target.value) : null}
             placeholder={
-              state.selectedSource === 'file' ? "El contenido del archivo aparecerá aquí..." : 
-              state.selectedSource === 'http-input' ? "La estructura del HTTP Input aparecerá aquí..." :
-              "Pega aquí tu estructura JSON..."
+              state.selectedSource === 'file' ? 
+                "El contenido del archivo aparecerá aquí..." : 
+                "Pega aquí la estructura JSON que esperas recibir en el body..."
             }
-            readOnly={state.selectedSource === 'file' || state.selectedSource === 'http-input'}
+            readOnly={state.selectedSource === 'file'}
             style={{
               width: '100%',
               minHeight: '300px',
@@ -476,129 +397,48 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
               gap: '4px'
             }}>
               <CheckCircle size={14} />
-              JSON válido - {state.mappings.length} campos detectados para mapeo
-              {state.selectedSource === 'file' && state.uploadedFile && (
+              Estructura válida - {state.mappings.length} campos detectados para mapeo
+              {state.uploadedFile && (
                 <span style={{ marginLeft: '8px', color: '#6b7280' }}>
                   • Desde: {state.uploadedFile.name}
                 </span>
               )}
-              {state.selectedSource === 'http-input' && state.connectedHttpInput && (
-                <span style={{ marginLeft: '8px', color: '#6b7280' }}>
-                  • Desde: {state.connectedHttpInput.method} {state.connectedHttpInput.path}
-                </span>
-              )}
             </div>
           )}
 
-          {/* Explicación específica para HTTP Input */}
-          {state.selectedSource === 'http-input' && state.connectedHttpInput && (
+          {/* Explicación del parsing */}
+          <div style={{
+            marginTop: '12px',
+            padding: '12px',
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '6px'
+          }}>
             <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              background: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              borderRadius: '6px'
+              fontSize: '13px',
+              color: '#1e40af',
+              fontWeight: '600',
+              marginBottom: '6px'
             }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#1e40af',
-                fontWeight: '600',
-                marginBottom: '6px'
-              }}>
-                💡 Estructura generada automáticamente:
-              </div>
-              <ul style={{
-                fontSize: '12px',
-                color: '#1e40af',
-                margin: 0,
-                paddingLeft: '16px'
-              }}>
-                <li><strong>Headers:</strong> Variables configuradas en el HTTP Input</li>
-                <li><strong>Body:</strong> Contenido del request body (si está habilitado)</li>
-                <li><strong>Metadata:</strong> Información del endpoint y timestamp</li>
-                <li>Esta estructura representa los datos que llegarán al Data Mapper</li>
-              </ul>
-              
-              <div style={{
-                marginTop: '8px',
-                padding: '8px',
-                background: '#dbeafe',
-                borderRadius: '4px',
-                fontSize: '11px',
-                color: '#1e40af'
-              }}>
-                <strong>🧪 Para probar:</strong> Ve al HTTP Input y usa el botón "🧪 Probar Endpoint" 
-                para simular datos de entrada y ver cómo se mapearían aquí.
-              </div>
+              🔄 Proceso de Parsing:
             </div>
-          )}
-
-          {/* Explicación del flujo de testing */}
-          {state.selectedSource === 'manual' && (
-            <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              background: '#fefbf3',
-              border: '1px solid #fed7aa',
-              borderRadius: '6px'
+            <ul style={{
+              fontSize: '12px',
+              color: '#1e40af',
+              margin: 0,
+              paddingLeft: '16px'
             }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#c2410c',
-                fontWeight: '600',
-                marginBottom: '6px'
-              }}>
-                📝 Entrada Manual:
-              </div>
-              <ul style={{
-                fontSize: '12px',
-                color: '#c2410c',
-                margin: 0,
-                paddingLeft: '16px'
-              }}>
-                <li>Pega o escribe tu estructura JSON aquí</li>
-                <li>Se generará el mapeo automáticamente</li>
-                <li>Perfecto para datos estáticos o pruebas</li>
-                <li>Usa "Cargar Ejemplo" para ver una estructura de muestra</li>
-              </ul>
-            </div>
-          )}
-
-          {/* Explicación para archivo */}
-          {state.selectedSource === 'file' && !state.uploadedFile && (
-            <div style={{
-              marginTop: '12px',
-              padding: '12px',
-              background: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              borderRadius: '6px'
-            }}>
-              <div style={{
-                fontSize: '13px',
-                color: '#15803d',
-                fontWeight: '600',
-                marginBottom: '6px'
-              }}>
-                📁 Carga desde Archivo:
-              </div>
-              <ul style={{
-                fontSize: '12px',
-                color: '#15803d',
-                margin: 0,
-                paddingLeft: '16px'
-              }}>
-                <li>Sube un archivo .json con tu estructura de datos</li>
-                <li>Ideal para estructuras complejas o grandes</li>
-                <li>El mapeo se genera automáticamente</li>
-                <li>Máximo 10MB por archivo</li>
-              </ul>
-            </div>
-          )}
+              <li><strong>1. HTTP Input recibe datos:</strong> Body + Headers</li>
+              <li><strong>2. Data Mapper parsea el body:</strong> Usando esta estructura JSON</li>
+              <li><strong>3. Variables finales:</strong> Campos del body + headers disponibles</li>
+              <li><strong>4. Salida:</strong> Todas las variables listas para siguientes nodos</li>
+            </ul>
+          </div>
         </div>
       )}
 
-      {/* Test Section para HTTP Input - MEJORADO */}
-      {state.selectedSource === 'http-input' && state.connectedHttpInput && (
+      {/* Quick Start Guide */}
+      {!state.parsedJson && (
         <div style={{
           background: '#fefbf3',
           border: '1px solid #fed7aa',
@@ -613,48 +453,19 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             alignItems: 'center',
             gap: '6px'
           }}>
-            🔄 Flujo Completo de Testing
+            <Database size={16} />
+            Inicio Rápido
           </h5>
           
           <div style={{ fontSize: '12px', color: '#c2410c', lineHeight: '1.5' }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              marginBottom: '12px'
-            }}>
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                  1️⃣ En HTTP Input:
-                </div>
-                <ul style={{ margin: 0, paddingLeft: '16px' }}>
-                  <li>Configura endpoint y headers</li>
-                  <li>Haz clic en "🧪 Probar Endpoint"</li>
-                  <li>Simula datos de entrada</li>
-                </ul>
-              </div>
-              
-              <div>
-                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
-                  2️⃣ En Data Mapper:
-                </div>
-                <ul style={{ margin: 0, paddingLeft: '16px' }}>
-                  <li>Ve estructura automática</li>
-                  <li>Mapea campos a variables</li>
-                  <li>Valida tipos de datos</li>
-                </ul>
-              </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>1.</strong> Define la estructura JSON que esperas en el body del HTTP Input
             </div>
-            
-            <div style={{
-              background: '#fff7ed',
-              padding: '8px',
-              borderRadius: '4px',
-              border: '1px solid #fed7aa'
-            }}>
-              <strong>💡 Importante:</strong> El testing es simulado localmente. 
-              No se envían datos reales a ningún servidor. Es para verificar 
-              que el mapeo funcione correctamente.
+            <div style={{ marginBottom: '8px' }}>
+              <strong>2.</strong> El sistema generará automáticamente los mapeos de campos
+            </div>
+            <div>
+              <strong>3.</strong> Headers del HTTP Input se incluirán como variables adicionales
             </div>
           </div>
         </div>

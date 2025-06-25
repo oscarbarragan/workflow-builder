@@ -1,11 +1,11 @@
-// src/components/workflow/nodes/DataMapper/DataMapperCore.jsx
+// src/components/workflow/nodes/DataMapper/DataMapperCore.jsx - CORREGIDO
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import Button from '../../../common/Button/Button';
 import DataMapperTabs from './DataMapperTabs';
 import useDataMapperState from './DataMapperState';
-import { validateDataMapperConfig } from './DataMapperValidation';
+import { validateDataMapperConfig } from './DataMapperUtils';
 import { createSavedData } from './DataMapperUtils';
 import DataMapperDebugPanel from './DataMapperDebugPanel';
 
@@ -45,14 +45,13 @@ const DataMapperCore = ({
     }
   }, [isOpen]);
 
-  // Handle save
+  // Handle save - CORREGIDO
   const handleSave = () => {
     const validation = validateDataMapperConfig({
       mappings: state.mappings,
-      selectedSource: state.selectedSource,
-      connectedHttpInput: state.connectedHttpInput,
       jsonInput: state.jsonInput,
-      parsedJson: state.parsedJson
+      parsedJson: state.parsedJson,
+      httpInputConnection: state.httpInputAnalysis
     });
 
     if (!validation.isValid) {
@@ -61,14 +60,7 @@ const DataMapperCore = ({
       return;
     }
 
-    const savedData = createSavedData({
-      jsonInput: state.jsonInput,
-      parsedJson: state.parsedJson,
-      mappings: state.mappings,
-      selectedSource: state.selectedSource,
-      connectedHttpInput: state.connectedHttpInput,
-      uploadedFile: state.uploadedFile
-    });
+    const savedData = createSavedData(state);
     
     console.log('💾 Saving Data Mapper:', savedData);
     onSave(savedData);
@@ -152,13 +144,11 @@ const DataMapperCore = ({
             borderRadius: '6px'
           }}>
             <div><strong>Fuente:</strong> {
-              state.selectedSource === 'http-input' ? '🌐 HTTP Input' : 
-              state.selectedSource === 'file' ? '📁 Archivo' : 
-              '📝 Manual'
+              state.selectedSource === 'file' ? '📁 Archivo' : '📝 Manual'
             }</div>
-            <div><strong>HTTP Inputs:</strong> {state.availableHttpInputs.length}</div>
-            <div><strong>Mappings:</strong> {state.mappings.length}</div>
-            <div><strong>Válidos:</strong> {state.mappings.filter(m => m.isValid && m.variableName).length}</div>
+            <div><strong>Estructura:</strong> {state.parsedJson ? 'Definida' : 'Pendiente'}</div>
+            <div><strong>Mappings:</strong> {state.mappings?.length || 0}</div>
+            <div><strong>Válidos:</strong> {(state.mappings || []).filter(m => m.isValid && m.variableName).length}</div>
           </div>
           
           <button 
@@ -177,26 +167,6 @@ const DataMapperCore = ({
             ✕
           </button>
         </div>
-
-        {/* Alert si no hay HTTP Inputs disponibles */}
-        {!state.hasHttpInputsAvailable && (
-          <div style={{
-            background: '#fef3c7',
-            border: '1px solid #f59e0b',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <AlertTriangle size={16} color="#f59e0b" />
-            <div style={{ fontSize: '14px', color: '#92400e' }}>
-              <strong>Sin HTTP Inputs:</strong> No hay nodos HTTP Input conectados. 
-              Conecta un HTTP Input a este Data Mapper para procesar datos dinámicos.
-            </div>
-          </div>
-        )}
 
         {/* Tabs Content */}
         <DataMapperTabs 
@@ -219,15 +189,18 @@ const DataMapperCore = ({
             color: '#6b7280',
             fontWeight: '500'
           }}>
-            🔄 <strong>Variables mapeadas:</strong> {state.mappings.filter(m => m.isValid && m.variableName).length}/{state.mappings.length}
-            {state.connectedHttpInput && (
+            🔄 <strong>Variables mapeadas:</strong> {(state.mappings || []).filter(m => m.isValid && m.variableName).length}/{(state.mappings || []).length}
+            {state.httpInputAnalysis?.hasHttpInput && (
               <span style={{ marginLeft: '20px', color: '#3b82f6' }}>
-                📡 <strong>Conectado a:</strong> {state.connectedHttpInput.method} {state.connectedHttpInput.path}
+                📡 <strong>HTTP Input:</strong> {state.httpInputAnalysis.method} {state.httpInputAnalysis.path}
               </span>
             )}
             {state.uploadedFile && (
               <span style={{ marginLeft: '20px', color: '#16a34a' }}>
                 📁 <strong>Archivo:</strong> {state.uploadedFile.name}
+                {state.selectedSource === 'file' && (
+                  <span style={{ color: '#15803d', marginLeft: '4px' }}>(cargado)</span>
+                )}
               </span>
             )}
           </div>
@@ -244,10 +217,10 @@ const DataMapperCore = ({
             <Button
               variant="primary"
               onClick={handleSave}
-              disabled={state.mappings.length === 0 || state.mappings.filter(m => m.isValid && m.variableName).length === 0}
+              disabled={(state.mappings || []).length === 0 || (state.mappings || []).filter(m => m.isValid && m.variableName).length === 0}
               size="large"
             >
-              💾 Guardar Mapeo ({state.mappings.filter(m => m.isValid && m.variableName).length} variables)
+              💾 Guardar Mapeo ({(state.mappings || []).filter(m => m.isValid && m.variableName).length} variables)
             </Button>
           </div>
         </div>

@@ -1,7 +1,7 @@
-// src/components/workflow/nodes/DataMapper/DataMapperUtils.js
-// Utilidades mejoradas para el Data Mapper con mejor detección de HTTP Input
+// src/components/workflow/nodes/DataMapper/DataMapperUtils.js - SIMPLIFICADO
+// Utilidades optimizadas para el Data Mapper simplificado
 
-// Data types para el selector - ASEGURAR EXPORT
+// Data types para el selector
 export const dataTypes = [
   { value: 'string', label: 'String', color: '#16a34a' },
   { value: 'number', label: 'Number', color: '#3b82f6' },
@@ -11,7 +11,7 @@ export const dataTypes = [
   { value: 'date', label: 'Date', color: '#14b8a6' }
 ];
 
-// Helper function to get type color - ASEGURAR EXPORT
+// Helper function to get type color
 export const getTypeColor = (type) => {
   return dataTypes.find(dt => dt.value === type)?.color || '#6b7280';
 };
@@ -97,309 +97,6 @@ export const readFileAsText = (file) => {
   });
 };
 
-// SUPER IMPROVED: Detectar HTTP Inputs con logging exhaustivo
-export const getAvailableHttpInputs = (availableData) => {
-  const httpInputs = [];
-  
-  console.log('🔍 SUPER DEBUG: Starting HTTP Input detection...');
-  console.log('🔍 SUPER DEBUG: Available data keys:', Object.keys(availableData));
-  console.log('🔍 SUPER DEBUG: Available data length:', Object.keys(availableData).length);
-  console.log('🔍 SUPER DEBUG: Full available data:', availableData);
-  
-  // ANÁLISIS DETALLADO
-  const httpInputKeys = Object.keys(availableData).filter(k => k.startsWith('httpInput_'));
-  const headerKeys = Object.keys(availableData).filter(k => k.startsWith('headers.'));
-  const hasRequestBody = !!availableData.requestBody;
-  
-  console.log('🔍 SUPER DEBUG: HTTP Input keys found:', httpInputKeys);
-  console.log('🔍 SUPER DEBUG: Header keys found:', headerKeys);  
-  console.log('🔍 SUPER DEBUG: Has request body:', hasRequestBody);
-  
-  // Si no hay nada, retornar inmediatamente
-  if (Object.keys(availableData).length === 0) {
-    console.log('❌ SUPER DEBUG: No available data at all');
-    return [];
-  }
-  
-  Object.entries(availableData).forEach(([key, value]) => {
-    console.log(`📊 SUPER DEBUG: Processing key: ${key}`);
-    console.log(`📊 SUPER DEBUG: Value type: ${typeof value}`);
-    console.log(`📊 SUPER DEBUG: Value:`, value);
-    
-    // PATTERN 1: Claves que empiecen con "httpInput_"
-    const isHttpInputKey = key.startsWith('httpInput_');
-    
-    if (isHttpInputKey) {
-      console.log('✅ SUPER DEBUG: Found HTTP Input key:', key);
-      
-      try {
-        let httpInputData;
-        
-        // Manejar diferentes tipos de datos
-        if (typeof value === 'string') {
-          try {
-            httpInputData = JSON.parse(value);
-            console.log('✅ SUPER DEBUG: Parsed JSON string:', httpInputData);
-          } catch (e) {
-            console.log('⚠️ SUPER DEBUG: Failed to parse as JSON, treating as string');
-            httpInputData = { rawValue: value, path: '/string-value' };
-          }
-        } else if (typeof value === 'object' && value !== null) {
-          httpInputData = value;
-          console.log('✅ SUPER DEBUG: Using object directly:', httpInputData);
-        } else {
-          console.log('⚠️ SUPER DEBUG: Unexpected value type, creating fallback');
-          httpInputData = { rawValue: value, path: '/fallback' };
-        }
-        
-        // Crear HTTP Input con datos mínimos
-        const processedHttpInput = {
-          key,
-          endpoint: httpInputData.endpoint || 
-                   `http://localhost:3000/api${httpInputData.path || '/detected'}`,
-          method: httpInputData.method || 'GET',
-          path: httpInputData.path || '/detected',
-          bodyVariable: httpInputData.bodyVariable || 'requestBody',
-          headers: Array.isArray(httpInputData.headers) ? httpInputData.headers : [],
-          contentType: httpInputData.contentType || 'application/json',
-          enableBodyCapture: httpInputData.enableBodyCapture !== undefined ? 
-                            httpInputData.enableBodyCapture : hasRequestBody,
-          authentication: httpInputData.authentication || 'none',
-          description: httpInputData.description || `HTTP Input detected from ${key}`,
-          nodeId: httpInputData.nodeId || key.replace('httpInput_', ''),
-          configured: true, // Si está en availableData, lo consideramos configurado
-          
-          // DEBUGGING: Info completa
-          debug_original: httpInputData,
-          debug_key: key,
-          debug_hasRequestBody: hasRequestBody,
-          debug_headerKeys: headerKeys
-        };
-        
-        console.log('✅ SUPER DEBUG: Created HTTP Input:', processedHttpInput);
-        httpInputs.push(processedHttpInput);
-        
-      } catch (error) {
-        console.error(`❌ SUPER DEBUG: Error processing HTTP Input ${key}:`, error);
-      }
-    }
-  });
-  
-  // FALLBACK: Si no encontramos httpInput_ pero hay headers o requestBody
-  if (httpInputs.length === 0 && (headerKeys.length > 0 || hasRequestBody)) {
-    console.log('🔧 SUPER DEBUG: No HTTP Input found, but headers/body exist, creating fallback');
-    
-    const fallbackHttpInput = {
-      key: 'fallback_detected',
-      endpoint: 'http://localhost:3000/api/detected',
-      method: hasRequestBody ? 'POST' : 'GET',
-      path: '/detected',
-      bodyVariable: 'requestBody',
-      headers: extractHeadersFromAvailableData(availableData),
-      contentType: 'application/json',
-      enableBodyCapture: hasRequestBody,
-      authentication: 'none',
-      description: 'HTTP Input reconstructed from detected headers/body',
-      nodeId: 'detected',
-      configured: true,
-      
-      // DEBUGGING
-      debug_fallback: true,
-      debug_headerKeys: headerKeys,
-      debug_hasRequestBody: hasRequestBody,
-      debug_availableDataKeys: Object.keys(availableData)
-    };
-    
-    console.log('✅ SUPER DEBUG: Created fallback HTTP Input:', fallbackHttpInput);
-    httpInputs.push(fallbackHttpInput);
-  }
-  
-  // SUPER FALLBACK: Si absolutamente no hay nada pero hay datos
-  if (httpInputs.length === 0 && Object.keys(availableData).length > 0) {
-    console.log('🔧 SUPER DEBUG: Creating emergency fallback from any available data');
-    
-    const emergencyHttpInput = {
-      key: 'emergency_fallback',
-      endpoint: 'http://localhost:3000/api/emergency',
-      method: 'GET',
-      path: '/emergency',
-      bodyVariable: 'requestBody',
-      headers: [],
-      contentType: 'application/json',
-      enableBodyCapture: false,
-      authentication: 'none',
-      description: 'Emergency HTTP Input - Check your HTTP Input configuration',
-      nodeId: 'emergency',
-      configured: true,
-      
-      // DEBUGGING
-      debug_emergency: true,
-      debug_availableData: availableData
-    };
-    
-    console.log('⚠️ SUPER DEBUG: Created emergency HTTP Input:', emergencyHttpInput);
-    httpInputs.push(emergencyHttpInput);
-  }
-  
-  console.log('📡 SUPER DEBUG: Final HTTP Inputs found:', httpInputs.length);
-  console.log('📡 SUPER DEBUG: Final HTTP Inputs:', httpInputs);
-  
-  return httpInputs;
-};
-
-// Helper function to extract headers from available data
-const extractHeadersFromAvailableData = (availableData) => {
-  const headers = [];
-  
-  Object.entries(availableData).forEach(([key, value]) => {
-    if (key.startsWith('headers.')) {
-      const headerVariable = key.replace('headers.', '');
-      
-      headers.push({
-        name: headerVariable,
-        variable: headerVariable,
-        required: false,
-        defaultValue: typeof value === 'object' ? value.defaultValue : String(value),
-        description: `Header detected: ${headerVariable}`
-      });
-    }
-  });
-  
-  return headers;
-};
-
-// TAMBIÉN ACTUALIZAR esta función para ser más permisiva
-export const generateHttpInputStructureFromReal = (httpInputData, availableData) => {
-  console.log('🏗️ STRUCTURE FIX: Generating HTTP Input structure from:', httpInputData);
-  
-  const structure = {
-    metadata: {
-      endpoint: httpInputData.endpoint,
-      method: httpInputData.method,
-      path: httpInputData.path,
-      timestamp: new Date().toISOString(),
-      contentType: httpInputData.contentType || 'application/json',
-      requestId: "req_example_12345",
-      
-      // DEBUGGING
-      debug_source: 'generateHttpInputStructureFromReal',
-      debug_httpInputData: httpInputData
-    }
-  };
-
-  // Agregar headers desde los datos disponibles
-  const headerKeys = Object.keys(availableData).filter(k => k.startsWith('headers.'));
-  if (headerKeys.length > 0) {
-    structure.headers = {};
-    headerKeys.forEach(headerKey => {
-      const headerVariable = headerKey.replace('headers.', '');
-      const headerValue = availableData[headerKey];
-      
-      structure.headers[headerVariable] = typeof headerValue === 'object' 
-        ? headerValue.defaultValue || `example_${headerVariable}`
-        : String(headerValue);
-    });
-  }
-
-  // Agregar body si existe
-  if (availableData.requestBody) {
-    structure.requestBody = typeof availableData.requestBody === 'object'
-      ? availableData.requestBody.example || generateExampleBodyForContentType(httpInputData.contentType, httpInputData.path)
-      : availableData.requestBody;
-  }
-
-  console.log('✅ STRUCTURE FIX: Generated structure:', structure);
-  return structure;
-};
-
-// Helper para generar valores de ejemplo para headers
-export const generateExampleValueForHeader = (header) => {
-  const headerName = header.name.toLowerCase();
-  
-  if (headerName.includes('authorization')) {
-    return 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
-  }
-  if (headerName.includes('api') && headerName.includes('key')) {
-    return 'sk_live_abcd1234567890';
-  }
-  if (headerName.includes('content-type')) {
-    return 'application/json';
-  }
-  if (headerName.includes('user-agent')) {
-    return 'WorkflowApp/1.0';
-  }
-  if (headerName.includes('accept')) {
-    return 'application/json';
-  }
-  
-  return `example_${header.variable || header.name}`;
-};
-
-// Helper para generar ejemplos de body
-export const generateExampleBodyForContentType = (contentType, path) => {
-  const pathLower = path.toLowerCase();
-  
-  switch (contentType) {
-    case 'application/json':
-      if (pathLower.includes('user') || pathLower.includes('profile')) {
-        return {
-          id: 12345,
-          name: "Juan Pérez",
-          email: "juan.perez@ejemplo.com",
-          age: 30,
-          active: true,
-          profile: {
-            bio: "Desarrollador Full Stack",
-            location: "Bogotá, Colombia",
-            skills: ["JavaScript", "React", "Node.js"]
-          }
-        };
-      }
-      
-      if (pathLower.includes('order') || pathLower.includes('purchase')) {
-        return {
-          orderId: "ORD-2024-001",
-          customerId: 12345,
-          items: [
-            {
-              productId: "PROD-001",
-              name: "Laptop Dell XPS 13",
-              quantity: 1,
-              price: 2500000
-            }
-          ],
-          total: 2500000,
-          currency: "COP"
-        };
-      }
-      
-      return {
-        id: 123,
-        name: "Elemento de Ejemplo",
-        description: "Descripción del elemento",
-        value: 1000,
-        active: true,
-        data: {
-          field1: "valor1",
-          field2: 42,
-          field3: true
-        }
-      };
-      
-    case 'application/x-www-form-urlencoded':
-    case 'multipart/form-data':
-      return {
-        nombre: "Juan Pérez",
-        email: "juan@ejemplo.com",
-        telefono: "+57 300 123 4567",
-        edad: 30
-      };
-      
-    default:
-      return `Contenido del body en formato ${contentType}`;
-  }
-};
-
 // Get sample JSON structure
 export const getSampleJson = () => {
   return {
@@ -408,19 +105,35 @@ export const getSampleJson = () => {
       name: "Juan Pérez",
       email: "juan@example.com",
       active: true,
-      created_at: "2023-01-15T10:30:00Z"
+      created_at: "2023-01-15T10:30:00Z",
+      profile: {
+        bio: "Desarrollador Full Stack",
+        location: "Bogotá, Colombia",
+        preferences: {
+          language: "es",
+          notifications: true
+        }
+      }
     },
     orders: [
       {
         id: 1001,
         amount: 99.99,
         status: "completed",
-        items: ["item1", "item2"]
+        items: [
+          {
+            productId: "PROD-001",
+            name: "Producto de ejemplo",
+            quantity: 2,
+            price: 49.99
+          }
+        ]
       }
     ],
     metadata: {
       version: "1.0",
-      processed: true
+      processed: true,
+      timestamp: new Date().toISOString()
     }
   };
 };
@@ -439,8 +152,8 @@ export const validateJsonInput = (jsonString) => {
   }
 };
 
-// Create output variables from mappings
-export const createOutputVariables = (mappings, selectedSource, connectedHttpInput) => {
+// NUEVO: Create output variables from mappings (incluye headers y body)
+export const createOutputVariables = (mappings, httpInputAnalysis) => {
   const validMappings = mappings.filter(m => m.isValid && m.variableName);
   
   return validMappings.reduce((acc, mapping) => {
@@ -449,39 +162,306 @@ export const createOutputVariables = (mappings, selectedSource, connectedHttpInp
       jsonPath: mapping.jsonPath,
       sourceValue: mapping.sourceValue,
       source: mapping.source,
-      httpInputConnected: selectedSource === 'http-input' ? connectedHttpInput?.key : null
+      isHeaderVariable: mapping.source === 'http-header',
+      isBodyVariable: mapping.source !== 'http-header',
+      httpInputConnected: httpInputAnalysis.hasHttpInput ? httpInputAnalysis.httpInputKey : null,
+      description: mapping.source === 'http-header' 
+        ? `Header variable from HTTP Input: ${mapping.jsonPath}`
+        : `Body field from JSON structure: ${mapping.jsonPath}`
     };
     return acc;
   }, {});
 };
 
-// Create saved data structure
+// NUEVO: Create saved data structure for simplified Data Mapper
 export const createSavedData = (state) => {
   const {
     jsonInput,
     parsedJson,
     mappings,
     selectedSource,
-    connectedHttpInput,
-    uploadedFile
+    uploadedFile,
+    httpInputAnalysis
   } = state;
   
   const validMappings = mappings.filter(m => m.isValid && m.variableName);
+  const headerVariables = validMappings.filter(m => m.source === 'http-header');
+  const bodyVariables = validMappings.filter(m => m.source !== 'http-header');
   
   return {
+    // Configuración básica
     jsonInput,
     parsedJson,
     mappings: validMappings,
     selectedSource,
-    connectedHttpInput,
+    
+    // Información del archivo (si se usó)
     uploadedFile: uploadedFile ? {
       name: uploadedFile.name,
       size: uploadedFile.size,
       type: uploadedFile.type,
       lastModified: uploadedFile.lastModified
     } : null,
-    outputVariables: createOutputVariables(validMappings, selectedSource, connectedHttpInput),
+    
+    // Variables de salida organizadas
+    outputVariables: createOutputVariables(validMappings, httpInputAnalysis),
+    
+    // Información de conexión HTTP Input
+    httpInputConnection: httpInputAnalysis.hasHttpInput ? {
+      connected: true,
+      httpInputKey: httpInputAnalysis.httpInputKey,
+      endpoint: httpInputAnalysis.endpoint,
+      method: httpInputAnalysis.method,
+      path: httpInputAnalysis.path,
+      bodyVariable: httpInputAnalysis.bodyVariable,
+      headersCount: httpInputAnalysis.headers.length
+    } : {
+      connected: false
+    },
+    
+    // Estadísticas del mapeo
+    statistics: {
+      totalMappings: validMappings.length,
+      headerVariables: headerVariables.length,
+      bodyVariables: bodyVariables.length,
+      dataTypes: validMappings.reduce((acc, m) => {
+        acc[m.dataType] = (acc[m.dataType] || 0) + 1;
+        return acc;
+      }, {})
+    },
+    
+    // Metadata
     status: 'configured',
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    version: '2.0', // Versión simplificada
+    
+    // Para compatibilidad con versiones anteriores
+    connectedHttpInput: httpInputAnalysis.hasHttpInput ? httpInputAnalysis.httpInputData : null
   };
+};
+
+// NUEVO: Generar documentación del Data Mapper
+export const generateDataMapperDocumentation = (savedData) => {
+  const doc = {
+    title: 'Data Mapper Configuration',
+    overview: {
+      purpose: 'Parse HTTP Input body against defined JSON structure and map headers to variables',
+      totalVariables: savedData.statistics.totalMappings,
+      httpInputConnected: savedData.httpInputConnection.connected
+    },
+    
+    structure: {
+      jsonStructure: savedData.parsedJson,
+      source: savedData.selectedSource,
+      file: savedData.uploadedFile?.name || null
+    },
+    
+    variables: {
+      headers: Object.entries(savedData.outputVariables)
+        .filter(([key, value]) => value.isHeaderVariable)
+        .map(([key, value]) => ({
+          name: key,
+          type: value.type,
+          source: value.jsonPath,
+          description: value.description
+        })),
+      
+      body: Object.entries(savedData.outputVariables)
+        .filter(([key, value]) => value.isBodyVariable)
+        .map(([key, value]) => ({
+          name: key,
+          type: value.type,
+          jsonPath: value.jsonPath,
+          sourceValue: value.sourceValue,
+          description: value.description
+        }))
+    },
+    
+    usage: {
+      prefix: 'mapper.',
+      examples: Object.keys(savedData.outputVariables).slice(0, 5).map(key => `mapper.${key}`),
+      totalAvailable: Object.keys(savedData.outputVariables).length
+    },
+    
+    httpInputIntegration: savedData.httpInputConnection.connected ? {
+      endpoint: savedData.httpInputConnection.endpoint,
+      method: savedData.httpInputConnection.method,
+      bodyVariable: savedData.httpInputConnection.bodyVariable,
+      headersProcessed: savedData.httpInputConnection.headersCount,
+      dataFlow: [
+        '1. HTTP Input receives request with headers and body',
+        '2. Headers are mapped to individual variables',
+        '3. Body is parsed against defined JSON structure',
+        '4. All variables are available with "mapper." prefix'
+      ]
+    } : {
+      standalone: true,
+      note: 'No HTTP Input connected - structure defined for manual testing'
+    }
+  };
+  
+  return doc;
+};
+
+// NUEVO: Validar configuración del Data Mapper simplificado
+export const validateDataMapperConfig = (properties) => {
+  const errors = [];
+  const warnings = [];
+  
+  // Asegurar que properties existe y tiene las propiedades necesarias
+  if (!properties || typeof properties !== 'object') {
+    errors.push('Configuración inválida');
+    return { isValid: false, errors, warnings };
+  }
+  
+  if (!properties.mappings || !Array.isArray(properties.mappings)) {
+    errors.push('No hay mapeos configurados');
+    return { isValid: false, errors, warnings };
+  }
+  
+  if (properties.mappings.length === 0) {
+    errors.push('Debe tener al menos un mapeo configurado');
+  }
+  
+  // Validate each mapping
+  properties.mappings.forEach((mapping, index) => {
+    if (!mapping.variableName || mapping.variableName.trim() === '') {
+      errors.push(`Mapeo ${index + 1}: nombre de variable requerido`);
+    }
+    
+    if (!mapping.isValid) {
+      errors.push(`Mapeo ${index + 1}: tipos incompatibles`);
+    }
+    
+    // Check for duplicate variable names
+    const duplicates = properties.mappings.filter(m => m.variableName === mapping.variableName);
+    if (duplicates.length > 1) {
+      warnings.push(`Variable duplicada: ${mapping.variableName}`);
+    }
+  });
+  
+  // Validate JSON structure
+  if (!properties.jsonInput || properties.jsonInput.trim() === '') {
+    errors.push('Estructura JSON requerida');
+  }
+  
+  if (!properties.parsedJson) {
+    errors.push('JSON inválido o no parseado');
+  }
+  
+  // Validaciones adicionales opcionales
+  if (properties.httpInputConnection?.connected) {
+    const headerVars = properties.mappings.filter(m => m.source === 'http-header');
+    const bodyVars = properties.mappings.filter(m => m.source !== 'http-header');
+    
+    if (bodyVars.length === 0) {
+      warnings.push('No hay campos del body mapeados');
+    }
+  } else {
+    // Si no hay HTTP Input, solo advertir
+    warnings.push('Data Mapper funcionará de forma independiente - ideal para testing');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings
+  };
+};
+
+// NUEVO: Generar ejemplo de uso para testing
+export const generateTestingExample = (outputVariables, httpInputConnection) => {
+  const example = {
+    purpose: 'Example of how the Data Mapper will process incoming data',
+    
+    input: {
+      note: 'This is what the HTTP Input would send to the Data Mapper'
+    },
+    
+    output: {
+      note: 'These variables will be available in subsequent nodes',
+      variables: {}
+    }
+  };
+  
+  if (httpInputConnection.connected) {
+    // Generar ejemplo de input HTTP
+    example.input.httpRequest = {
+      method: httpInputConnection.method,
+      url: httpInputConnection.endpoint,
+      headers: {},
+      body: {}
+    };
+    
+    // Headers de ejemplo
+    Object.entries(outputVariables)
+      .filter(([key, value]) => value.isHeaderVariable)
+      .forEach(([key, value]) => {
+        const headerName = value.jsonPath.replace('headers.', '');
+        example.input.httpRequest.headers[headerName] = `example_${headerName}_value`;
+      });
+    
+    // Body de ejemplo basado en la estructura JSON
+    const bodyVariables = Object.entries(outputVariables)
+      .filter(([key, value]) => value.isBodyVariable);
+    
+    if (bodyVariables.length > 0) {
+      example.input.httpRequest.body = generateExampleBodyFromMappings(bodyVariables);
+    }
+  }
+  
+  // Variables de salida
+  Object.entries(outputVariables).forEach(([key, value]) => {
+    example.output.variables[`mapper.${key}`] = {
+      type: value.type,
+      source: value.isHeaderVariable ? 'header' : 'body',
+      jsonPath: value.jsonPath,
+      exampleValue: generateExampleValue(value.type, value.sourceValue)
+    };
+  });
+  
+  return example;
+};
+
+// Helper: Generar valor de ejemplo basado en tipo
+const generateExampleValue = (type, sourceValue) => {
+  switch (type) {
+    case 'string':
+      return typeof sourceValue === 'string' ? sourceValue : 'ejemplo_string';
+    case 'number':
+      return typeof sourceValue === 'number' ? sourceValue : 123;
+    case 'boolean':
+      return typeof sourceValue === 'boolean' ? sourceValue : true;
+    case 'array':
+      return Array.isArray(sourceValue) ? sourceValue : ['item1', 'item2'];
+    case 'object':
+      return typeof sourceValue === 'object' ? sourceValue : { ejemplo: 'valor' };
+    case 'date':
+      return new Date().toISOString();
+    default:
+      return sourceValue || 'ejemplo_valor';
+  }
+};
+
+// Helper: Generar body de ejemplo desde mappings
+const generateExampleBodyFromMappings = (bodyVariables) => {
+  const body = {};
+  
+  bodyVariables.forEach(([key, value]) => {
+    const pathParts = value.jsonPath.split('.');
+    let current = body;
+    
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const part = pathParts[i];
+      if (!current[part]) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    
+    const finalKey = pathParts[pathParts.length - 1];
+    current[finalKey] = generateExampleValue(value.type, value.sourceValue);
+  });
+  
+  return body;
 };

@@ -1,21 +1,13 @@
-// src/components/workflow/nodes/DataMapper/DataMapperState.js
+// src/components/workflow/nodes/DataMapper/DataMapperState.js - SIMPLIFICADO
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  getAvailableHttpInputs,
   validateJsonInput,
   generateMappingsFromJson,
   readFileAsText,
-  getSampleJson,
-  generateHttpInputStructureFromReal
+  getSampleJson
 } from './DataMapperUtils';
 
 const useDataMapperState = (initialData, availableData) => {
-  // DEBUGGING: Guardar availableData en window para debugging
-  React.useEffect(() => {
-    window.lastAvailableData = availableData;
-    console.log('🔧 WINDOW DEBUG: Saved availableData to window.lastAvailableData');
-  }, [availableData]);
-
   // State management
   const [activeTab, setActiveTab] = useState('source');
   const [jsonInput, setJsonInput] = useState(initialData.jsonInput || '');
@@ -23,67 +15,87 @@ const useDataMapperState = (initialData, availableData) => {
   const [mappings, setMappings] = useState(initialData.mappings || []);
   const [jsonError, setJsonError] = useState(null);
   
-  // FIXED: Flujo exclusivo de fuentes
-  const [selectedSource, setSelectedSource] = useState(initialData.selectedSource || 'manual');
-  const [connectedHttpInput, setConnectedHttpInput] = useState(initialData.connectedHttpInput || null);
+  // CORREGIDO: Determinar selectedSource basado en si hay uploadedFile en initialData
+  const [selectedSource, setSelectedSource] = useState(() => {
+    if (initialData.uploadedFile) {
+      return 'file';
+    }
+    return initialData.selectedSource || 'manual';
+  });
   
-  // File upload state
-  const [uploadedFile, setUploadedFile] = useState(null);
+  // File upload state - CORREGIDO: Restaurar archivo si existe en initialData
+  const [uploadedFile, setUploadedFile] = useState(() => {
+    if (initialData.uploadedFile) {
+      // Crear un objeto File-like desde los datos guardados
+      return {
+        name: initialData.uploadedFile.name,
+        size: initialData.uploadedFile.size,
+        type: initialData.uploadedFile.type,
+        lastModified: initialData.uploadedFile.lastModified
+      };
+    }
+    return null;
+  });
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
-  console.log('🔍 DataMapper State - Available Data:', availableData);
-
-  // Get available HTTP Inputs - CORREGIDO CON NUEVA LÓGICA
-  const availableHttpInputs = useMemo(() => {
-    const httpInputs = getAvailableHttpInputs(availableData);
-    console.log('📡 DETECTION FIX: Available HTTP Inputs encontrados:', httpInputs);
+  // ANÁLISIS: Detectar HTTP Input conectado
+  const httpInputAnalysis = useMemo(() => {
+    console.log('🔍 Analyzing available data for HTTP Input:', availableData);
     
-    // DEBUGGING: Imprimir información detallada
-    console.log('🔍 DETECTION FIX: Available data keys:', Object.keys(availableData));
-    console.log('🔍 DETECTION FIX: HTTP Input keys found:', Object.keys(availableData).filter(k => k.startsWith('httpInput_')));
-    console.log('🔍 DETECTION FIX: Header keys found:', Object.keys(availableData).filter(k => k.startsWith('headers.')));
-    console.log('🔍 DETECTION FIX: Has requestBody:', !!availableData.requestBody);
+    // Asegurar que availableData existe
+    if (!availableData || typeof availableData !== 'object') {
+      return {
+        hasHttpInput: false,
+        headers: [],
+        bodyVariable: null
+      };
+    }
     
-    return httpInputs;
+    const httpInputKeys = Object.keys(availableData).filter(k => k.startsWith('httpInput_'));
+    const headerKeys = Object.keys(availableData).filter(k => k.startsWith('headers.'));
+    const hasRequestBody = !!availableData.requestBody;
+    
+    if (httpInputKeys.length === 0) {
+      return {
+        hasHttpInput: false,
+        headers: [],
+        bodyVariable: null
+      };
+    }
+    
+    const httpInputData = availableData[httpInputKeys[0]];
+    
+    // Asegurar que httpInputData existe
+    if (!httpInputData || typeof httpInputData !== 'object') {
+      return {
+        hasHttpInput: false,
+        headers: [],
+        bodyVariable: null
+      };
+    }
+    
+    return {
+      hasHttpInput: true,
+      httpInputKey: httpInputKeys[0],
+      httpInputData: httpInputData,
+      headers: headerKeys.map(key => ({
+        key: key.replace('headers.', ''),
+        variable: key,
+        value: availableData[key]
+      })),
+      bodyVariable: httpInputData.bodyVariable || 'requestBody',
+      hasRequestBody: hasRequestBody,
+      endpoint: httpInputData.endpoint,
+      method: httpInputData.method,
+      path: httpInputData.path
+    };
   }, [availableData]);
 
-  const hasHttpInputsAvailable = availableHttpInputs.length > 0;
-
-  // FIXED: Determinar fuente inicial automáticamente - MEJORADO
-  useEffect(() => {
-    console.log('🔄 AUTO-DETECTION: Determining initial source...');
-    console.log('🔄 AUTO-DETECTION: hasHttpInputsAvailable:', hasHttpInputsAvailable);
-    console.log('🔄 AUTO-DETECTION: availableHttpInputs.length:', availableHttpInputs.length);
-    console.log('🔄 AUTO-DETECTION: initialData.selectedSource:', initialData.selectedSource);
-    
-    if (!initialData.selectedSource) {
-      if (hasHttpInputsAvailable && availableHttpInputs.length > 0) {
-        console.log('✅ AUTO-DETECTION: Setting source to http-input');
-        setSelectedSource('http-input');
-        
-        // Auto-conectar al primer HTTP Input si solo hay uno
-        if (availableHttpInputs.length === 1) {
-          console.log('✅ AUTO-DETECTION: Auto-connecting to single HTTP Input');
-          setTimeout(() => connectToHttpInput(availableHttpInputs[0]), 100);
-        }
-      } else {
-        console.log('⚠️ AUTO-DETECTION: No HTTP Inputs found, setting to manual');
-        setSelectedSource('manual');
-      }
-    } else {
-      console.log('📋 AUTO-DETECTION: Using initial source:', initialData.selectedSource);
-    }
-  }, [hasHttpInputsAvailable, availableHttpInputs.length, initialData.selectedSource]);
-
-  // FIXED: Cambio de fuente exclusivo
+  // Handle source change - SIMPLIFICADO
   const handleSourceChange = (newSource) => {
-    console.log(`🔄 Changing source from ${selectedSource} to ${newSource}`);
+    console.log(`🔄 Changing source to: ${newSource}`);
     
-    // CRÍTICO: Solo limpiar si realmente cambia la fuente
-    if (selectedSource === newSource) {
-      console.log('🔄 Same source selected, no change needed');
-      return;
-    }
+    if (selectedSource === newSource) return;
     
     // Limpiar estado anterior
     setJsonInput('');
@@ -91,32 +103,16 @@ const useDataMapperState = (initialData, availableData) => {
     setMappings([]);
     setJsonError(null);
     setUploadedFile(null);
-    setConnectedHttpInput(null);
     
     setSelectedSource(newSource);
     
-    // Auto-setup para la nueva fuente
-    switch (newSource) {
-      case 'http-input':
-        if (availableHttpInputs.length === 1) {
-          // Auto-conectar si solo hay un HTTP Input
-          connectToHttpInput(availableHttpInputs[0]);
-        }
-        break;
-      case 'manual':
-        // Cargar ejemplo por defecto
-        loadSampleJson();
-        break;
-      case 'file':
-        // Usuario debe cargar archivo manualmente - NO hacer nada aquí
-        console.log('📁 File source selected, waiting for user to upload file');
-        break;
+    if (newSource === 'manual') {
+      loadSampleJson();
     }
   };
 
-  // Handle file upload - CORREGIDO
+  // Handle file upload
   const handleFileUpload = async (event) => {
-    console.log('📁 File upload triggered:', event.target.files);
     const file = event.target.files[0];
     if (!file) return;
 
@@ -131,10 +127,8 @@ const useDataMapperState = (initialData, availableData) => {
 
     try {
       const fileContent = await readFileAsText(file);
-      console.log('📁 File loaded:', file.name, 'Size:', file.size, 'bytes');
-      
+      console.log('📁 File loaded:', file.name);
       handleJsonInput(fileContent);
-      
     } catch (error) {
       console.error('❌ Error reading file:', error);
       setJsonError(`Error al leer el archivo: ${error.message}`);
@@ -150,7 +144,6 @@ const useDataMapperState = (initialData, availableData) => {
     setJsonInput('');
     setParsedJson(null);
     setMappings([]);
-    // Reset file input
     const fileInput = document.querySelector('input[type="file"][accept=".json"]');
     if (fileInput) {
       fileInput.value = '';
@@ -172,8 +165,19 @@ const useDataMapperState = (initialData, availableData) => {
     
     if (validation.isValid) {
       setParsedJson(validation.parsed);
-      const newMappings = generateMappingsFromJson(validation.parsed, selectedSource);
-      setMappings(newMappings);
+      
+      // MEJORADO: Generar mappings combinando JSON + Headers
+      const jsonMappings = generateMappingsFromJson(validation.parsed, selectedSource);
+      const headerMappings = generateHeaderMappings();
+      
+      const allMappings = [...jsonMappings, ...headerMappings];
+      setMappings(allMappings);
+      
+      console.log('✅ Generated mappings:', {
+        jsonMappings: jsonMappings.length,
+        headerMappings: headerMappings.length,
+        total: allMappings.length
+      });
     } else {
       setJsonError(validation.error);
       setParsedJson(null);
@@ -181,20 +185,23 @@ const useDataMapperState = (initialData, availableData) => {
     }
   };
 
-  // FIXED: Connect to HTTP Input con datos reales
-  const connectToHttpInput = (httpInputData) => {
-    console.log('🔗 Connecting to HTTP Input:', httpInputData);
+  // NUEVO: Generar mappings para headers
+  const generateHeaderMappings = () => {
+    if (!httpInputAnalysis || !httpInputAnalysis.hasHttpInput || !httpInputAnalysis.headers) {
+      return [];
+    }
     
-    setConnectedHttpInput(httpInputData);
-    
-    // FIXED: Generar estructura basada en datos reales del HTTP Input
-    const httpInputStructure = generateHttpInputStructureFromReal(httpInputData, availableData);
-    
-    const jsonString = JSON.stringify(httpInputStructure, null, 2);
-    console.log('📋 Generated HTTP Input structure:', jsonString);
-    
-    setJsonInput(jsonString);
-    handleJsonInput(jsonString);
+    return httpInputAnalysis.headers.map(header => ({
+      id: `header_${Date.now()}_${Math.random()}`,
+      jsonPath: `headers.${header.key}`,
+      variableName: `header_${header.key}`,
+      dataType: 'string',
+      jsonType: 'string',
+      isValid: true,
+      sourceValue: header.value?.defaultValue || `[Header: ${header.key}]`,
+      source: 'http-header',
+      httpInputConnected: true
+    }));
   };
 
   // Update mapping
@@ -204,7 +211,6 @@ const useDataMapperState = (initialData, availableData) => {
         const updated = { ...mapping, [field]: value };
         
         if (field === 'dataType') {
-          // Validate type compatibility
           const compatibilityMatrix = {
             'string': ['string', 'date'],
             'number': ['number', 'string'],
@@ -227,7 +233,7 @@ const useDataMapperState = (initialData, availableData) => {
     const newMapping = {
       id: Date.now(),
       jsonPath: '',
-      variableName: `variable_${mappings.length + 1}`,
+      variableName: `custom_variable_${mappings.length + 1}`,
       dataType: 'string',
       jsonType: 'custom',
       isValid: true,
@@ -256,7 +262,6 @@ const useDataMapperState = (initialData, availableData) => {
     setMappings([]);
     setJsonError(null);
     setSelectedSource('manual');
-    setConnectedHttpInput(null);
     setUploadedFile(null);
     setActiveTab('source');
     setIsProcessingFile(false);
@@ -270,11 +275,12 @@ const useDataMapperState = (initialData, availableData) => {
       mappings,
       jsonError,
       selectedSource,
-      connectedHttpInput,
       uploadedFile,
       isProcessingFile,
-      availableHttpInputs,
-      hasHttpInputsAvailable
+      
+      // NUEVO: HTTP Input analysis
+      httpInputAnalysis,
+      hasHttpInputsAvailable: httpInputAnalysis.hasHttpInput
     },
     actions: {
       setActiveTab,
@@ -282,7 +288,6 @@ const useDataMapperState = (initialData, availableData) => {
       handleFileUpload,
       clearFile,
       handleJsonInput,
-      connectToHttpInput,
       updateMapping,
       addCustomMapping,
       removeMapping,
