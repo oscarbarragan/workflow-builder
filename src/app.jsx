@@ -1,8 +1,7 @@
-// src/App.jsx
+// src/App.jsx - SIN EJECUTAR
 import React from 'react';
 import WorkflowCanvas from './components/workflow/WorkflowCanvas/WorkflowCanvas';
 import { useWorkflow } from './hooks/useWorkflow';
-import { executeWorkflow as executeWorkflowHelper } from './utils/workflowHelpers';
 
 function App() {
   const {
@@ -10,28 +9,12 @@ function App() {
     edges,
     workflowData,
     addNode,
-    executeWorkflow,
     exportWorkflow,
     importWorkflow,
     onNodesChange,
     onEdgesChange,
     onConnect
   } = useWorkflow();
-
-  const handleExecuteWorkflow = () => {
-    const processedData = executeWorkflowHelper(nodes, edges);
-    
-    if (Object.keys(processedData).length === 0) {
-      alert('No hay datos para procesar. Configura los nodos primero.');
-      return;
-    }
-    
-    alert(
-      `Workflow ejecutado exitosamente!\n\n` +
-      `Nodos procesados: ${Object.keys(processedData).length}\n\n` +
-      `Datos procesados:\n${JSON.stringify(processedData, null, 2)}`
-    );
-  };
 
   const handleImportWorkflow = (workflowData) => {
     console.log('📥 Importing workflow from UI...');
@@ -68,7 +51,7 @@ function App() {
           target: edge.target
         })),
         metadata: {
-          version: '1.0',
+          version: '2.1',
           createdAt: new Date().toISOString(),
           totalNodes: nodes.length,
           totalEdges: edges.length
@@ -112,7 +95,6 @@ function App() {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onAddNode={addNode}
-      onExecuteWorkflow={handleExecuteWorkflow}
       onExportWorkflow={exportWorkflow}
       onImportWorkflow={handleImportWorkflow}
       onSaveWorkflow={handleSaveWorkflow}

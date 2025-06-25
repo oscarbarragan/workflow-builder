@@ -1,22 +1,108 @@
-// src/components/workflow/nodes/CustomNode/CustomNode.jsx - FINAL ACTUALIZADO
-import React, { useState } from 'react';
+// src/components/workflow/nodes/CustomNode/CustomNode.jsx - CON TOOLTIP
+import React, { useState, useRef, useEffect } from 'react';
 import { Handle, Position } from 'reactflow';
-import { User, MapPin, FileText, Globe, Database, Code } from 'lucide-react';
+import { FileText, Globe, Database, Code } from 'lucide-react';
 import { getNodeConfig, getMappedVariablesForLayout } from '../../../../utils/nodeHelpers';
 import { NODE_TYPES, STYLES } from '../../../../utils/constants';
-import NodeModal from './NodeModal';
 import DataFlow from './DataFlow';
+import NodeTooltip from '../NodeTooltip/NodeTooltip';
 import LayoutDesigner from '../../../layout-designer/LayoutDesigner/LayoutDesigner';
 import HttpInput from '../HttpInput/HttpInput';
 import DataMapper from '../DataMapper/DataMapper';
 import ScriptProcessor from '../ScriptProcessor/ScriptProcessor';
 
 const CustomNode = ({ id, data, selected }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLayoutDesignerOpen, setIsLayoutDesignerOpen] = useState(false);
   const [isHttpInputOpen, setIsHttpInputOpen] = useState(false);
   const [isDataMapperOpen, setIsDataMapperOpen] = useState(false);
   const [isScriptProcessorOpen, setIsScriptProcessorOpen] = useState(false);
+  
+  // NUEVO: Estados para el tooltip
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [isAnchored, setIsAnchored] = useState(data.properties?.isAnchored || false);
+  const nodeRef = useRef(null);
+  const tooltipTimeoutRef = useRef(null);
+
+  // NUEVO: Cleanup del timeout cuando se desmonta el componente
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // NUEVO: Handlers para el tooltip
+  const handleMouseEnter = (e) => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    
+    tooltipTimeoutRef.current = setTimeout(() => {
+      const rect = nodeRef.current?.getBoundingClientRect();
+      if (rect) {
+        setTooltipPosition({
+          x: rect.right,
+          y: rect.top
+        });
+        setShowTooltip(true);
+      }
+    }, 500); // Mostrar tooltip después de 500ms
+  };
+
+  const handleMouseLeave = () => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setShowTooltip(false);
+    }, 200); // Ocultar tooltip después de 200ms
+  };
+
+  // NUEVO: Handlers para las acciones del tooltip
+  const handleAnchor = (nodeId, shouldAnchor) => {
+    console.log(`🔒 ${shouldAnchor ? 'Anchoring' : 'Unanchoring'} node:`, nodeId);
+    setIsAnchored(shouldAnchor);
+    
+    // Actualizar las propiedades del nodo
+    data.onPropertiesChange(id, { 
+      ...data.properties, 
+      isAnchored: shouldAnchor 
+    });
+    
+    // Notificar a ReactFlow si es necesario
+    if (shouldAnchor && data.onAnchor) {
+      data.onAnchor(nodeId);
+    } else if (!shouldAnchor && data.onUnanchor) {
+      data.onUnanchor(nodeId);
+    }
+    
+    setShowTooltip(false);
+  };
+
+  const handleDelete = (nodeId) => {
+    console.log('🗑️ Deleting node:', nodeId);
+    
+    if (window.confirm('¿Estás seguro de que quieres eliminar este nodo?')) {
+      if (data.onDelete) {
+        data.onDelete(nodeId);
+      }
+    }
+    
+    setShowTooltip(false);
+  };
+
+  const handleDuplicate = (nodeId) => {
+    console.log('📋 Duplicating node:', nodeId);
+    
+    if (data.onDuplicate) {
+      data.onDuplicate(nodeId);
+    }
+    
+    setShowTooltip(false);
+  };
 
   const nodeConfig = getNodeConfig(data.type);
 
@@ -39,12 +125,8 @@ const CustomNode = ({ id, data, selected }) => {
         setIsScriptProcessorOpen(true);
         break;
       default:
-        setIsModalOpen(true);
+        console.log('Tipo de nodo no reconocido:', data.type);
     }
-  };
-
-  const handleSave = (formData) => {
-    data.onPropertiesChange(id, formData);
   };
 
   const handleLayoutSave = (layoutData) => {
@@ -54,17 +136,17 @@ const CustomNode = ({ id, data, selected }) => {
     });
   };
 
-  // MEJORADO: Usar la nueva función para obtener variables mapeadas
+  const handleSave = (formData) => {
+    data.onPropertiesChange(id, formData);
+  };
+
+  // Usar la nueva función para obtener variables mapeadas
   const getAvailableDataForLayout = () => {
     return getMappedVariablesForLayout(id, data.allNodes || [], data.allEdges || []);
   };
 
   const getIcon = () => {
     switch (data.type) {
-      case NODE_TYPES.USER_FORM:
-        return <User size={16} color={nodeConfig.color} />;
-      case NODE_TYPES.LOCATION_FORM:
-        return <MapPin size={16} color={nodeConfig.color} />;
       case NODE_TYPES.LAYOUT_DESIGNER:
         return <FileText size={16} color={nodeConfig.color} />;
       case NODE_TYPES.HTTP_INPUT:
@@ -139,11 +221,15 @@ const CustomNode = ({ id, data, selected }) => {
 
   const nodeStyle = {
     ...STYLES.node,
-    border: `2px solid ${selected ? '#3b82f6' : '#e5e7eb'}`,
+    border: `2px solid ${selected ? '#3b82f6' : isAnchored ? '#16a34a' : '#e5e7eb'}`,
     transform: selected ? 'scale(1.02)' : 'scale(1)',
     boxShadow: selected 
       ? '0 8px 25px -8px rgba(59, 130, 246, 0.4)' 
-      : '0 2px 4px rgba(0, 0, 0, 0.1)'
+      : isAnchored
+        ? '0 4px 12px -2px rgba(22, 163, 74, 0.3)'
+        : '0 2px 4px rgba(0, 0, 0, 0.1)',
+    cursor: isAnchored ? 'default' : 'grab',
+    position: 'relative'
   };
 
   const contentStyle = {
@@ -199,8 +285,11 @@ const CustomNode = ({ id, data, selected }) => {
       />
       
       <div 
+        ref={nodeRef}
         onClick={handleNodeClick} 
         onMouseDown={(e) => e.stopPropagation()} // Prevenir interferencia
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={nodeStyle}
       >
         <div style={contentStyle}>
@@ -225,6 +314,17 @@ const CustomNode = ({ id, data, selected }) => {
               <span style={{ fontSize: '8px' }}>
                 {statusInfo.statusText}
               </span>
+              {/* NUEVO: Indicador de anclado */}
+              {isAnchored && (
+                <span style={{ 
+                  fontSize: '8px', 
+                  marginLeft: '4px',
+                  color: '#16a34a',
+                  fontWeight: '600'
+                }}>
+                  🔒
+                </span>
+              )}
             </div>
           </div>
           
@@ -247,15 +347,6 @@ const CustomNode = ({ id, data, selected }) => {
           border: '2px solid white',
           borderRadius: '50%'
         }}
-      />
-
-      {/* Standard Configuration Modal */}
-      <NodeModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        nodeType={data.type}
-        initialData={data.properties || {}}
-        onSave={handleSave}
       />
 
       {/* Layout Designer */}
@@ -289,6 +380,7 @@ const CustomNode = ({ id, data, selected }) => {
           availableData={getAvailableDataForLayout()}
         />
       )}
+
       {/* Script Processor */}
       {data.type === NODE_TYPES.SCRIPT_PROCESSOR && isScriptProcessorOpen && (
         <ScriptProcessor
@@ -299,6 +391,17 @@ const CustomNode = ({ id, data, selected }) => {
           availableData={getAvailableDataForLayout()}
         />
       )}
+
+      {/* NUEVO: Tooltip del nodo */}
+      <NodeTooltip
+        nodeId={id}
+        isVisible={showTooltip}
+        position={tooltipPosition}
+        isAnchored={isAnchored}
+        onAnchor={handleAnchor}
+        onDelete={handleDelete}
+        onDuplicate={handleDuplicate}
+      />
     </>
   );
 };

@@ -1,11 +1,11 @@
-// src/hooks/useWorkflow.js
+// src/hooks/useWorkflow.js - CORREGIDO
 import { useState, useCallback, useEffect } from 'react';
 import { addEdge, useNodesState, useEdgesState } from 'reactflow';
 import { generateNodeId } from '../utils/nodeHelpers';
 
 export const useWorkflow = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, setEdges, onEdgesState] = useEdgesState([]);
   const [workflowData, setWorkflowData] = useState({});
 
   // Handle node properties change
@@ -18,6 +18,46 @@ export const useWorkflow = () => {
       )
     );
   }, [setNodes]);
+
+  // Remove node from workflow - DECLARACIÓN ÚNICA
+  const removeNode = useCallback((nodeId) => {
+    setNodes((nds) => nds.filter(node => node.id !== nodeId));
+    setEdges((eds) => eds.filter(edge => 
+      edge.source !== nodeId && edge.target !== nodeId
+    ));
+    console.log('✅ Node removed:', nodeId);
+  }, [setNodes, setEdges]);
+
+  // Duplicate node - USANDO removeNode ya declarado
+  const duplicateNode = useCallback((nodeId) => {
+    const nodeToClone = nodes.find(node => node.id === nodeId);
+    if (!nodeToClone) return;
+
+    const newNodeId = generateNodeId();
+    const newNode = {
+      ...nodeToClone,
+      id: newNodeId,
+      position: {
+        x: nodeToClone.position.x + 50,
+        y: nodeToClone.position.y + 50
+      },
+      data: {
+        ...nodeToClone.data,
+        properties: {
+          ...nodeToClone.data.properties,
+          isAnchored: false // Los nodos duplicados no están anclados por defecto
+        },
+        onPropertiesChange: handlePropertiesChange,
+        onDelete: removeNode,
+        onDuplicate: duplicateNode,
+        allNodes: nodes,
+        allEdges: edges
+      }
+    };
+
+    setNodes((nds) => nds.concat(newNode));
+    console.log('✅ Node duplicated:', newNodeId);
+  }, [nodes, edges, handlePropertiesChange, setNodes, removeNode]);
 
   // Add new node to workflow
   const addNode = useCallback((type) => {
@@ -33,38 +73,20 @@ export const useWorkflow = () => {
         type: type,
         properties: {},
         onPropertiesChange: handlePropertiesChange,
+        onDelete: removeNode,
+        onDuplicate: duplicateNode,
         allNodes: nodes,
         allEdges: edges
       },
     };
     setNodes((nds) => nds.concat(newNode));
-  }, [setNodes, handlePropertiesChange, nodes, edges]);
+  }, [setNodes, handlePropertiesChange, removeNode, duplicateNode, nodes, edges]);
 
   // Handle edge connections
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
-
-  // Remove node from workflow
-  const removeNode = useCallback((nodeId) => {
-    setNodes((nds) => nds.filter(node => node.id !== nodeId));
-    setEdges((eds) => eds.filter(edge => 
-      edge.source !== nodeId && edge.target !== nodeId
-    ));
-  }, [setNodes, setEdges]);
-
-  // Execute workflow
-  const executeWorkflow = useCallback(() => {
-    const processedData = {};
-    nodes.forEach(node => {
-      if (node.data.properties && Object.keys(node.data.properties).length > 0) {
-        processedData[node.id] = node.data.properties;
-      }
-    });
-    
-    return processedData;
-  }, [nodes]);
 
   // Import workflow from JSON data
   const importWorkflow = useCallback((workflowData) => {
@@ -91,6 +113,8 @@ export const useWorkflow = () => {
           type: nodeData.type,
           properties: nodeData.properties || {},
           onPropertiesChange: handlePropertiesChange,
+          onDelete: removeNode,
+          onDuplicate: duplicateNode,
           allNodes: [],
           allEdges: []
         }
@@ -130,7 +154,7 @@ export const useWorkflow = () => {
         message: `Error al importar: ${error.message}`
       };
     }
-  }, [setNodes, setEdges, handlePropertiesChange]);
+  }, [setNodes, setEdges, handlePropertiesChange, removeNode, duplicateNode]);
 
   // Update workflow data for export
   const updateWorkflowData = useCallback(() => {
@@ -147,7 +171,7 @@ export const useWorkflow = () => {
         target: edge.target
       })),
       metadata: {
-        version: '1.0',
+        version: '2.1',
         createdAt: new Date().toISOString(),
         totalNodes: nodes.length,
         totalEdges: edges.length
@@ -198,12 +222,14 @@ export const useWorkflow = () => {
         ...node,
         data: {
           ...node.data,
+          onDelete: removeNode,
+          onDuplicate: duplicateNode,
           allNodes: nds,
           allEdges: edges
         }
       }))
     );
-  }, [edges, setNodes]);
+  }, [edges, setNodes, removeNode, duplicateNode]);
 
   // Update workflow data when nodes or edges change
   useEffect(() => {
@@ -219,7 +245,7 @@ export const useWorkflow = () => {
     // Actions
     addNode,
     removeNode,
-    executeWorkflow,
+    duplicateNode,
     exportWorkflow,
     importWorkflow,
     loadWorkflow,

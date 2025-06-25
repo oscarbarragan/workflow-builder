@@ -1,13 +1,10 @@
-// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx - ACTUALIZADO
+// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx - LIMPIO
 import React, { useState } from 'react';
 import { 
-  User, 
-  MapPin, 
   FileText, 
   Globe, 
   Database, 
   Code,
-  Play, 
   Download, 
   Save, 
   Upload 
@@ -18,7 +15,6 @@ import { NODE_TYPES, STYLES, NODE_CATEGORIES } from '../../../../utils/constants
 
 const AddNodesPanel = ({ 
   onAddNode, 
-  onExecuteWorkflow, 
   onExportWorkflow,
   onSaveWorkflow,
   onImportWorkflow,
@@ -26,9 +22,8 @@ const AddNodesPanel = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState(new Set(['input', 'forms']));
 
-  // Organizar nodos por categorías
+  // Organizar nodos por categorías - SIN FORMULARIOS, TODAS EXPANDIDAS
   const nodeCategories = {
     input: {
       title: '📥 Entrada de Datos',
@@ -61,31 +56,12 @@ const AddNodesPanel = ({
         }
       ]
     },
-    forms: {
-      title: '📝 Formularios',
-      nodes: [
-        {
-          type: NODE_TYPES.USER_FORM,
-          label: 'Usuario',
-          icon: <User size={16} />,
-          variant: 'primary',
-          description: 'Formulario de datos de usuario'
-        },
-        {
-          type: NODE_TYPES.LOCATION_FORM,
-          label: 'Ubicación',
-          icon: <MapPin size={16} />,
-          variant: 'success',
-          description: 'Formulario de datos de ubicación'
-        }
-      ]
-    },
     output: {
       title: '📤 Salida',
       nodes: [
         {
           type: NODE_TYPES.LAYOUT_DESIGNER,
-          label: 'Layout',
+          label: 'Layout Designer',
           icon: <FileText size={16} />,
           variant: 'purple',
           description: 'Diseñador de layout de documentos'
@@ -94,14 +70,8 @@ const AddNodesPanel = ({
     }
   };
 
+  // ACCIONES SIN EJECUTAR
   const actionButtons = [
-    {
-      label: 'Ejecutar',
-      icon: <Play size={16} />,
-      variant: 'success',
-      onClick: onExecuteWorkflow,
-      description: 'Ejecutar el workflow completo'
-    },
     {
       label: 'Importar',
       icon: <Upload size={16} />,
@@ -146,18 +116,6 @@ const AddNodesPanel = ({
     }
   };
 
-  const toggleCategory = (categoryKey) => {
-    setExpandedCategories(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(categoryKey)) {
-        newSet.delete(categoryKey);
-      } else {
-        newSet.add(categoryKey);
-      }
-      return newSet;
-    });
-  };
-
   const getButtonStyle = (variant) => {
     const variantStyles = {
       purple: {
@@ -182,13 +140,18 @@ const AddNodesPanel = ({
       <div style={{
         ...STYLES.panel,
         minWidth: '240px',
-        maxWidth: '300px'
+        maxWidth: '300px',
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}>
         <h3 style={{
           margin: '0 0 16px 0',
           fontSize: '16px',
           fontWeight: '600',
-          color: '#374151'
+          color: '#374151',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
         }}>
           🚀 Workflow Builder
         </h3>
@@ -223,76 +186,90 @@ const AddNodesPanel = ({
           </div>
         )}
 
-        {/* Node Categories */}
-        <div style={{ marginBottom: '20px' }}>
+        {/* Node Categories - TODAS EXPANDIDAS - FIXED OVERFLOW */}
+        <div style={{ 
+          marginBottom: '20px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
           <h4 style={{
             margin: '0 0 12px 0',
             fontSize: '14px',
             fontWeight: '500',
-            color: '#374151'
+            color: '#374151',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}>
             Agregar Nodos
           </h4>
           
           {Object.entries(nodeCategories).map(([categoryKey, category]) => (
-            <div key={categoryKey} style={{ marginBottom: '12px' }}>
-              {/* Category Header */}
-              <button
-                onClick={() => toggleCategory(categoryKey)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '8px 12px',
-                  background: expandedCategories.has(categoryKey) ? '#eff6ff' : '#f9fafb',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '6px',
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                <span>{category.title}</span>
+            <div key={categoryKey} style={{ 
+              marginBottom: '12px',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              {/* Category Header - SIN CLICK - FIXED OVERFLOW */}
+              <div style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                padding: '8px 12px',
+                background: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                color: '#1e40af',
+                marginBottom: '8px',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
+              }}>
                 <span style={{
-                  transform: expandedCategories.has(categoryKey) ? 'rotate(90deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s'
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  width: '100%'
                 }}>
-                  ▶
+                  {category.title}
                 </span>
-              </button>
+              </div>
               
-              {/* Category Nodes */}
-              {expandedCategories.has(categoryKey) && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '8px',
-                  background: '#f8fafc',
-                  borderRadius: '6px',
-                  border: '1px solid #e2e8f0'
-                }}>
-                  {category.nodes.map((node) => (
-                    <Button
-                      key={node.type}
-                      variant={node.variant}
-                      onClick={() => onAddNode(node.type)}
-                      icon={node.icon}
-                      iconPosition="left"
-                      fullWidth
-                      style={{
-                        ...getButtonStyle(node.variant),
-                        marginBottom: '6px',
-                        fontSize: '13px'
-                      }}
-                      title={node.description}
-                    >
-                      {node.label}
-                    </Button>
-                  ))}
-                </div>
-              )}
+              {/* Category Nodes - SIEMPRE VISIBLES - FIXED OVERFLOW */}
+              <div style={{
+                padding: '8px',
+                background: '#f8fafc',
+                borderRadius: '6px',
+                border: '1px solid #e2e8f0',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}>
+                {category.nodes.map((node) => (
+                  <Button
+                    key={node.type}
+                    variant={node.variant}
+                    onClick={() => onAddNode(node.type)}
+                    icon={node.icon}
+                    iconPosition="left"
+                    fullWidth
+                    style={{
+                      ...getButtonStyle(node.variant),
+                      marginBottom: '6px',
+                      fontSize: '13px',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title={node.description}
+                  >
+                    {node.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -303,13 +280,19 @@ const AddNodesPanel = ({
           borderTop: '1px solid #e5e7eb'
         }} />
 
-        {/* Actions Section */}
-        <div>
+        {/* Actions Section - SIN EJECUTAR - FIXED OVERFLOW */}
+        <div style={{
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
           <h4 style={{
             margin: '0 0 12px 0',
             fontSize: '14px',
             fontWeight: '500',
-            color: '#374151'
+            color: '#374151',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}>
             ⚡ Acciones
           </h4>
@@ -326,7 +309,14 @@ const AddNodesPanel = ({
                 loading={button.loading}
                 disabled={button.disabled}
                 title={button.description}
-                style={getButtonStyle(button.variant)}
+                style={{
+                  ...getButtonStyle(button.variant),
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}
               >
                 {button.label}
               </Button>
@@ -403,8 +393,8 @@ const AddNodesPanel = ({
           }}>
             <li><strong>HTTP Input:</strong> Crea endpoints para recibir datos</li>
             <li><strong>Data Mapper:</strong> Mapea JSON a variables internas</li>
-            <li><strong>Formularios:</strong> Captura datos de usuario</li>
-            <li><strong>Layout:</strong> Diseña la salida visual</li>
+            <li><strong>Script Processor:</strong> Procesa datos con JavaScript</li>
+            <li><strong>Layout Designer:</strong> Diseña la salida visual</li>
             <li>Conecta nodos arrastrando desde los círculos</li>
             <li>Haz clic en los nodos para configurarlos</li>
           </ul>
@@ -417,7 +407,7 @@ const AddNodesPanel = ({
           fontSize: '10px',
           color: '#9ca3af'
         }}>
-          Workflow Builder v2.0 - Con HTTP Input & Data Mapper
+          Workflow Builder v2.1 - HTTP Input & Data Mapper
         </div>
       </div>
 

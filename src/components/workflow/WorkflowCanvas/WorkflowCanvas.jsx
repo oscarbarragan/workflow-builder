@@ -1,4 +1,4 @@
-// src/components/workflow/WorkflowCanvas/WorkflowCanvas.jsx - CORREGIDO
+// src/components/workflow/WorkflowCanvas/WorkflowCanvas.jsx - SIN EJECUTAR
 import React, { useMemo } from 'react';
 import ReactFlow, {
   Background,
@@ -24,7 +24,6 @@ const WorkflowCanvas = ({
   onEdgesChange,
   onConnect,
   onAddNode,
-  onExecuteWorkflow,
   onExportWorkflow,
   onImportWorkflow,
   onSaveWorkflow,
@@ -114,11 +113,10 @@ const WorkflowCanvas = ({
           }}
           nodeColor={(node) => {
             switch (node.data.type) {
-              case 'user-form': return '#3b82f6';
-              case 'location-form': return '#16a34a';
               case 'layout-designer': return '#7c3aed';
               case 'http-input': return '#f59e0b';
               case 'data-mapper': return '#14b8a6';
+              case 'script-processor': return '#8b5cf6';
               default: return '#6b7280';
             }
           }}
@@ -128,7 +126,6 @@ const WorkflowCanvas = ({
         <Panel position="top-left">
           <AddNodesPanel
             onAddNode={onAddNode}
-            onExecuteWorkflow={onExecuteWorkflow}
             onExportWorkflow={onExportWorkflow}
             onImportWorkflow={onImportWorkflow}
             onSaveWorkflow={onSaveWorkflow}

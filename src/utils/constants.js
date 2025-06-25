@@ -1,8 +1,6 @@
-// src/utils/constants.js - CORREGIDO
+// src/utils/constants.js - LIMPIO SIN FORMULARIOS
 // Node types
 export const NODE_TYPES = {
-  USER_FORM: 'user-form',
-  LOCATION_FORM: 'location-form',
   LAYOUT_DESIGNER: 'layout-designer',
   HTTP_INPUT: 'http-input',
   DATA_MAPPER: 'data-mapper',
@@ -128,22 +126,6 @@ export const DEFAULT_ELEMENT_PROPS = {
 
 // Node configurations
 export const NODE_CONFIG = {
-  [NODE_TYPES.USER_FORM]: {
-    title: 'Formulario Usuario',
-    icon: 'User',
-    color: '#2563eb',
-    fields: ['nombre'],
-    category: 'forms'
-  },
-  
-  [NODE_TYPES.LOCATION_FORM]: {
-    title: 'Formulario Ubicación',
-    icon: 'MapPin',
-    color: '#16a34a',
-    fields: ['apellido', 'ciudad'],
-    category: 'forms'
-  },
-  
   [NODE_TYPES.LAYOUT_DESIGNER]: {
     title: 'Diseñador Layout',
     icon: 'FileText',
@@ -209,6 +191,5 @@ export const AUTH_TYPES = [
 export const NODE_CATEGORIES = {
   INPUT: 'input',
   PROCESSING: 'processing',
-  OUTPUT: 'output',
-  FORMS: 'forms'
+  OUTPUT: 'output'
 };

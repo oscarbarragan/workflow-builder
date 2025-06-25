@@ -1,4 +1,4 @@
-// src/utils/nodeHelpers.js - CORREGIDO PARA HTTP INPUT CON DEBUGGING
+// src/utils/nodeHelpers.js - SIN FORMULARIOS
 import { NODE_CONFIG, NODE_TYPES } from './constants';
 
 // Generate unique node ID
@@ -56,18 +56,6 @@ export const getAvailableData = (nodeId, nodes, edges) => {
       console.log(`📊 FIXED: Processing source node: ${sourceNode.id}, type: ${nodeType}`, properties);
       
       switch (nodeType) {
-        case NODE_TYPES.USER_FORM:
-        case NODE_TYPES.LOCATION_FORM:
-          // Datos de formularios
-          Object.keys(properties).forEach(key => {
-            if (key !== 'status' && key !== 'createdAt') {
-              const fullKey = `${nodeType.replace('-', '_')}.${key}`;
-              availableData[fullKey] = properties[key];
-              console.log(`✅ FIXED: Added form data: ${fullKey} = ${properties[key]}`);
-            }
-          });
-          break;
-          
         case NODE_TYPES.HTTP_INPUT:
           // CRITICAL FIX: Mejorar la detección de HTTP Input
           console.log('🌐 FIXED: Processing HTTP Input node:', properties);
@@ -337,7 +325,7 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
           break;
           
         default:
-          // Otros tipos de nodos
+          // Otros tipos de nodos (NO INCLUYE FORMULARIOS)
           Object.keys(properties).forEach(key => {
             if (key !== 'status' && key !== 'createdAt') {
               const fullKey = `${nodeType}.${key}`;
