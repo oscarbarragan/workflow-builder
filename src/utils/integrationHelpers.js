@@ -67,6 +67,7 @@ export const traceDataFlow = (nodes, edges, startNodeId) => {
 export const generateWorkflowIntegrationReport = (nodes, edges) => {
   const httpInputNodes = nodes.filter(n => n.data.type === 'http-input');
   const dataMapperNodes = nodes.filter(n => n.data.type === 'data-mapper');
+  const dataTransformerNodes = nodes.filter(n => n.data.type === 'data-transformer');
   
   const httpInputs = httpInputNodes.map(node => generateHttpInputApiDoc(node));
   const dataMappers = dataMapperNodes.map(node => generateDataMapperFlowDoc(node, nodes, edges));
@@ -82,15 +83,22 @@ export const generateWorkflowIntegrationReport = (nodes, edges) => {
     httpToMapper: dataFlows.filter(flow => 
       flow.flow.some(node => node.type === 'data-mapper')
     ).length,
-    mapperToLayout: dataMappers.filter(mapper =>
+    mapperToTransformer: dataMappers.filter(mapper =>
       edges.some(edge => 
         edge.source === mapper.nodeId && 
+        nodes.find(n => n.id === edge.target)?.data.type === 'data-transformer'
+      )
+    ).length,
+    transformerToLayout: dataTransformerNodes.filter(transformer =>
+      edges.some(edge => 
+        edge.source === transformer.id && 
         nodes.find(n => n.id === edge.target)?.data.type === 'layout-designer'
       )
     ).length,
     completeFlows: dataFlows.filter(flow =>
-      flow.flow.length >= 3 && // HTTP Input -> Data Mapper -> Something else
+      flow.flow.length >= 4 && // HTTP Input -> Data Mapper -> Data Transformer -> Layout
       flow.flow.some(node => node.type === 'data-mapper') &&
+      flow.flow.some(node => node.type === 'data-transformer') &&
       flow.flow.some(node => node.type === 'layout-designer')
     ).length
   };
@@ -108,6 +116,77 @@ export const generateWorkflowIntegrationReport = (nodes, edges) => {
     dataFlows,
     recommendations: generateIntegrationRecommendations(nodes, edges, httpInputs, dataMappers)
   };
+};
+
+// Documentación del Data Transformer
+export const generateDataTransformerFlowDoc = (node, allNodes, edges) => {
+  const props = node.data.properties;
+  
+  // Find connected nodes
+  const incomingEdges = edges.filter(edge => edge.target === node.id);
+  const sourceNodes = incomingEdges
+    .map(edge => allNodes.find(n => n.id === edge.source))
+    .filter(n => n);
+  
+  const outgoingEdges = edges.filter(edge => edge.source === node.id);
+  const targetNodes = outgoingEdges
+    .map(edge => allNodes.find(n => n.id === edge.target))
+    .filter(n => n);
+  
+  return {
+    nodeId: node.id,
+    transformations: {
+      total: props.transformations?.length || 0,
+      enabled: props.transformations?.filter(t => t.enabled).length || 0,
+      valid: props.transformations?.filter(t => t.isValid).length || 0,
+      byDataType: getTransformationsByDataType(props.transformations || []),
+      byTransformationType: getTransformationsByType(props.transformations || [])
+    },
+    outputVariables: Object.keys(props.outputVariables || {}),
+    statistics: props.statistics || {},
+    connections: {
+      inputs: sourceNodes.map(n => ({
+        nodeId: n.id,
+        type: n.data.type,
+        providesData: getDataCount(n.data.properties)
+      })),
+      outputs: targetNodes.map(n => ({
+        nodeId: n.id,
+        type: n.data.type
+      }))
+    },
+    validation: validateDataTransformer(props),
+    performance: {
+      successRate: props.statistics?.successRate || 0,
+      executionTime: props.lastExecuted || null
+    }
+  };
+};
+
+// Helper functions
+const getTransformationsByDataType = (transformations) => {
+  return transformations.reduce((acc, t) => {
+    acc[t.dataType] = (acc[t.dataType] || 0) + 1;
+    return acc;
+  }, {});
+};
+
+const getTransformationsByType = (transformations) => {
+  return transformations.reduce((acc, t) => {
+    acc[t.transformationType] = (acc[t.transformationType] || 0) + 1;
+    return acc;
+  }, {});
+};
+
+const getDataCount = (properties) => {
+  if (!properties) return 0;
+  
+  let count = 0;
+  if (properties.outputVariables) count += Object.keys(properties.outputVariables).length;
+  if (properties.headers) count += properties.headers.length;
+  if (properties.enableBodyCapture) count += 1;
+  
+  return count;
 };
 
 // Generate recommendations for better integration

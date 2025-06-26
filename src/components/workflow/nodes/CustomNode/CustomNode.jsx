@@ -1,7 +1,7 @@
-// src/components/workflow/nodes/CustomNode/CustomNode.jsx - OPTIMIZADO
+// src/components/workflow/nodes/CustomNode/CustomNode.jsx - CORREGIDO
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { FileText, Globe, Database, Code } from 'lucide-react';
+import { FileText, Globe, Database, Code, Zap } from 'lucide-react';
 import { getNodeConfig, getMappedVariablesForLayout, getAvailableData } from '../../../../utils/nodeHelpers';
 import { NODE_TYPES, STYLES } from '../../../../utils/constants';
 import DataFlow from './DataFlow';
@@ -9,6 +9,7 @@ import NodeTooltip from '../NodeTooltip/NodeTooltip';
 import LayoutDesigner from '../../../layout-designer/LayoutDesigner/LayoutDesigner';
 import HttpInput from '../HttpInput/HttpInput';
 import DataMapper from '../DataMapper/DataMapper';
+import DataTransformer from '../DataTransformer/DataTransformer';  // ✅ AGREGADO
 import ScriptProcessor from '../ScriptProcessor/ScriptProcessor';
 
 const CustomNode = ({ id, data, selected }) => {
@@ -22,6 +23,7 @@ const CustomNode = ({ id, data, selected }) => {
   const [isLayoutDesignerOpen, setIsLayoutDesignerOpen] = useState(false);
   const [isHttpInputOpen, setIsHttpInputOpen] = useState(false);
   const [isDataMapperOpen, setIsDataMapperOpen] = useState(false);
+  const [isDataTransformerOpen, setIsDataTransformerOpen] = useState(false);  // ✅ AGREGADO
   const [isScriptProcessorOpen, setIsScriptProcessorOpen] = useState(false);
   
   // NUEVO: Estados para el tooltip
@@ -31,18 +33,36 @@ const CustomNode = ({ id, data, selected }) => {
   const nodeRef = useRef(null);
   const tooltipTimeoutRef = useRef(null);
 
-  // OPTIMIZATION: Get callbacks directly from data (don't over-memoize)
-  const handlePropertiesChange = data.onPropertiesChange || (() => {
-    console.warn('onPropertiesChange not available for node:', id);
-  });
+  // CRITICAL FIX: Declarar handlePropertiesChange ANTES de usarlo
+  const handlePropertiesChange = useMemo(() => {
+    return data.onPropertiesChange || ((nodeId, properties) => {
+      console.warn('onPropertiesChange not available for node:', nodeId);
+    });
+  }, [data.onPropertiesChange]);
 
-  const handleDelete = data.onDelete || (() => {
-    console.warn('onDelete not available for node:', id);
-  });
+  // CRITICAL FIX: Declarar handleDelete ANTES de usarlo
+  const handleDelete = useMemo(() => {
+    return data.onDelete || ((nodeId) => {
+      console.warn('onDelete not available for node:', nodeId);
+    });
+  }, [data.onDelete]);
 
-  const handleDuplicate = data.onDuplicate || (() => {
-    console.warn('onDuplicate not available for node:', id);
-  });
+  // CRITICAL FIX: Declarar handleDuplicate ANTES de usarlo
+  const handleDuplicate = useMemo(() => {
+    return data.onDuplicate || ((nodeId) => {
+      console.warn('onDuplicate not available for node:', nodeId);
+    });
+  }, [data.onDuplicate]);
+
+  // CRITICAL FIX: Declarar handleSave ANTES de usarlo
+  const handleSave = useMemo(() => {
+    return (formData) => {
+      console.log('💾 Saving node data:', id, formData);
+      if (handlePropertiesChange) {
+        handlePropertiesChange(id, formData);
+      }
+    };
+  }, [id, handlePropertiesChange]);
 
   // OPTIMIZATION: Memoize available data calculation
   const availableData = useMemo(() => {
@@ -161,6 +181,9 @@ const CustomNode = ({ id, data, selected }) => {
       case NODE_TYPES.DATA_MAPPER:
         setIsDataMapperOpen(true);
         break;
+      case NODE_TYPES.DATA_TRANSFORMER:  // ✅ AGREGADO
+        setIsDataTransformerOpen(true);
+        break;
       case NODE_TYPES.SCRIPT_PROCESSOR:
         setIsScriptProcessorOpen(true);
         break;
@@ -176,10 +199,6 @@ const CustomNode = ({ id, data, selected }) => {
     });
   };
 
-  const handleSave = (formData) => {
-    handlePropertiesChange(id, formData);
-  };
-
   const getIcon = () => {
     switch (data.type) {
       case NODE_TYPES.LAYOUT_DESIGNER:
@@ -188,6 +207,8 @@ const CustomNode = ({ id, data, selected }) => {
         return <Globe size={16} color={nodeConfig.color} />;
       case NODE_TYPES.DATA_MAPPER:
         return <Database size={16} color={nodeConfig.color} />;
+      case NODE_TYPES.DATA_TRANSFORMER:  // ✅ AGREGADO
+        return <Zap size={16} color={nodeConfig.color} />;
       case NODE_TYPES.SCRIPT_PROCESSOR:
         return <Code size={16} color={nodeConfig.color} />;
       default:
@@ -223,6 +244,19 @@ const CustomNode = ({ id, data, selected }) => {
           statusText: validMappings > 0 
             ? `${validMappings} variables mapeadas`
             : 'Configurar mapeo'
+        };
+
+      case NODE_TYPES.DATA_TRANSFORMER:  // ✅ AGREGADO
+        const transformationsCount = data.properties?.transformations?.length || 0;
+        const enabledTransformations = data.properties?.transformations?.filter(t => t.enabled)?.length || 0;
+        const outputVariablesCount = Object.keys(data.properties?.outputVariables || {}).length;
+        return {
+          configured: hasProperties && enabledTransformations > 0,
+          statusText: enabledTransformations > 0 
+            ? `${enabledTransformations}/${transformationsCount} transformaciones → ${outputVariablesCount} variables`
+            : transformationsCount > 0 
+              ? `${transformationsCount} transformaciones (deshabilitadas)`
+              : 'Configurar transformaciones'
         };
         
       case NODE_TYPES.SCRIPT_PROCESSOR:
@@ -410,6 +444,17 @@ const CustomNode = ({ id, data, selected }) => {
         <DataMapper
           isOpen={isDataMapperOpen}
           onClose={() => setIsDataMapperOpen(false)}
+          initialData={data.properties || {}}
+          onSave={handleSave}
+          availableData={availableData}
+        />
+      )}
+
+      {/* Data Transformer - ✅ AGREGADO */}
+      {data.type === NODE_TYPES.DATA_TRANSFORMER && isDataTransformerOpen && (
+        <DataTransformer
+          isOpen={isDataTransformerOpen}
+          onClose={() => setIsDataTransformerOpen(false)}
           initialData={data.properties || {}}
           onSave={handleSave}
           availableData={availableData}

@@ -533,6 +533,40 @@ export const generateDataStructureDoc = (nodes) => {
   });
 };
 
+  // Función para validar Data Transformer
+  export const validateDataTransformer = (properties) => {
+    const errors = [];
+    
+    if (!properties.transformations || !Array.isArray(properties.transformations)) {
+      errors.push('No hay transformaciones configuradas');
+    }
+    
+    const enabledTransformations = properties.transformations?.filter(t => t.enabled) || [];
+    if (enabledTransformations.length === 0) {
+      errors.push('Debe tener al menos una transformación habilitada');
+    }
+    
+    // Validate each enabled transformation
+    enabledTransformations.forEach((transformation, index) => {
+      if (!transformation.inputVariable || transformation.inputVariable.trim() === '') {
+        errors.push(`Transformación ${index + 1}: variable de entrada requerida`);
+      }
+      
+      if (!transformation.outputVariable || transformation.outputVariable.trim() === '') {
+        errors.push(`Transformación ${index + 1}: variable de salida requerida`);
+      }
+      
+      if (!transformation.isValid) {
+        errors.push(`Transformación ${index + 1}: configuración inválida`);
+      }
+    });
+    
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
 /**
  * Enhanced workflow execution for new node types
  */
@@ -582,6 +616,18 @@ export const executeWorkflowEnhanced = (nodes, edges) => {
           timestamp: new Date().toISOString()
         };
         break;
+        case 'data-transformer':
+          processedData[node.id] = {
+            type: 'data-transformation',
+            transformations: properties.transformations?.filter(t => t.enabled) || [],
+            outputVariables: properties.outputVariables || {},
+            transformationsCount: properties.transformations?.length || 0,
+            enabledTransformationsCount: properties.transformations?.filter(t => t.enabled).length || 0,
+            successRate: properties.statistics?.successRate || 0,
+            status: 'configured',
+            timestamp: new Date().toISOString()
+          };
+          break;
         
       default:
         // Handle existing node types

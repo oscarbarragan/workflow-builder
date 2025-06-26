@@ -1,10 +1,11 @@
-// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx - LIMPIO
+// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx - CORREGIDO
 import React, { useState } from 'react';
 import { 
   FileText, 
   Globe, 
   Database, 
   Code,
+  Zap,        // ✅ AGREGADO: Importar Zap para Data Transformer
   Download, 
   Save, 
   Upload 
@@ -23,7 +24,7 @@ const AddNodesPanel = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Organizar nodos por categorías - SIN FORMULARIOS, TODAS EXPANDIDAS
+  // Organizar nodos por categorías - ACTUALIZADO con Data Transformer
   const nodeCategories = {
     input: {
       title: '📥 Entrada de Datos',
@@ -46,6 +47,13 @@ const AddNodesPanel = ({
           icon: <Database size={16} />,
           variant: 'info',
           description: 'Mapea estructura JSON a variables internas'
+        },
+        {
+          type: NODE_TYPES.DATA_TRANSFORMER,  // ✅ AGREGADO
+          label: 'Data Transformer',
+          icon: <Zap size={16} />,           // ✅ CORREGIDO: Ahora Zap está importado
+          variant: 'purple',
+          description: 'Aplica transformaciones basadas en tipos de datos'
         },
         {
           type: NODE_TYPES.SCRIPT_PROCESSOR,
@@ -369,7 +377,7 @@ const AddNodesPanel = ({
           </div>
         )}
 
-        {/* Help Section */}
+        {/* Help Section - ACTUALIZADO */}
         <div style={{
           marginTop: '20px',
           padding: '12px',
@@ -393,6 +401,7 @@ const AddNodesPanel = ({
           }}>
             <li><strong>HTTP Input:</strong> Crea endpoints para recibir datos</li>
             <li><strong>Data Mapper:</strong> Mapea JSON a variables internas</li>
+            <li><strong>Data Transformer:</strong> Transforma datos por tipo</li>
             <li><strong>Script Processor:</strong> Procesa datos con JavaScript</li>
             <li><strong>Layout Designer:</strong> Diseña la salida visual</li>
             <li>Conecta nodos arrastrando desde los círculos</li>
@@ -400,14 +409,14 @@ const AddNodesPanel = ({
           </ul>
         </div>
 
-        {/* Version Info */}
+        {/* Version Info - ACTUALIZADO */}
         <div style={{
           marginTop: '12px',
           textAlign: 'center',
           fontSize: '10px',
           color: '#9ca3af'
         }}>
-          Workflow Builder v2.1 - HTTP Input & Data Mapper
+          Workflow Builder v2.2 - Data Transformer Edition
         </div>
       </div>
 

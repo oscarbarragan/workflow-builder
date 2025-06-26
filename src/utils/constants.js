@@ -1,9 +1,10 @@
-// src/utils/constants.js - LIMPIO SIN FORMULARIOS
+// src/utils/constants.js - ACTUALIZADO para incluir Data Transformer
 // Node types
 export const NODE_TYPES = {
   LAYOUT_DESIGNER: 'layout-designer',
   HTTP_INPUT: 'http-input',
   DATA_MAPPER: 'data-mapper',
+  DATA_TRANSFORMER: 'data-transformer', // NUEVO
   SCRIPT_PROCESSOR: 'script-processor'
 };
 
@@ -124,7 +125,7 @@ export const DEFAULT_ELEMENT_PROPS = {
   }
 };
 
-// Node configurations
+// Node configurations - ACTUALIZADO
 export const NODE_CONFIG = {
   [NODE_TYPES.LAYOUT_DESIGNER]: {
     title: 'Diseñador Layout',
@@ -146,6 +147,14 @@ export const NODE_CONFIG = {
     title: 'Data Mapper',
     icon: 'Database',
     color: '#14b8a6',
+    fields: [],
+    category: 'processing'
+  },
+  
+  [NODE_TYPES.DATA_TRANSFORMER]: { // NUEVO
+    title: 'Data Transformer',
+    icon: 'Zap',
+    color: '#8b5cf6',
     fields: [],
     category: 'processing'
   },
@@ -193,3 +202,5 @@ export const NODE_CATEGORIES = {
   PROCESSING: 'processing',
   OUTPUT: 'output'
 };
+
+

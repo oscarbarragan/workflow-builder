@@ -193,6 +193,35 @@ export const getAvailableData = (nodeId, nodes, edges) => {
             availableData[`${nodeType}.elementsCount`] = properties.layout.elements.length;
           }
           break;
+
+          case NODE_TYPES.DATA_TRANSFORMER:
+            // Variables transformadas del Data Transformer
+            if (properties.outputVariables) {
+              Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+                const fullKey = `transformer.${varName}`;
+                availableData[fullKey] = {
+                  type: varData.type,
+                  value: varData.value,
+                  originalVariable: varData.inputVariable,
+                  transformationType: varData.transformationType,
+                  source: 'data-transformer'
+                };
+                console.log(`✅ FIXED: Added transformer variable: ${fullKey}`);
+              });
+            }
+            
+            // Información de las transformaciones
+            if (properties.transformations && properties.transformations.length > 0) {
+              availableData[`${nodeType}.transformationsCount`] = properties.transformations.length;
+              availableData[`${nodeType}.enabledTransformations`] = properties.transformations.filter(t => t.enabled).length;
+            }
+            
+            // Información de estadísticas
+            if (properties.statistics) {
+              availableData[`${nodeType}.successRate`] = properties.statistics.successRate || 0;
+              availableData[`${nodeType}.outputVariablesCount`] = properties.statistics.outputVariablesCount || 0;
+            }
+            break;
           
         default:
           // Fallback para otros tipos
@@ -323,6 +352,24 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
             });
           }
           break;
+
+          case NODE_TYPES.DATA_TRANSFORMER:
+            // Variables del Data Transformer
+            if (properties.outputVariables) {
+              Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+                mappedVariables[varName] = {
+                  type: varData.type,
+                  source: 'data-transformer',
+                  value: varData.value,
+                  displayValue: typeof varData.value === 'object' 
+                    ? `[${varData.type}] Transformed Object`
+                    : String(varData.value),
+                  originalVariable: varData.inputVariable,
+                  transformationType: varData.transformationType
+                };
+              });
+            }
+            break;     
           
         default:
           // Otros tipos de nodos (NO INCLUYE FORMULARIOS)
