@@ -1,14 +1,16 @@
-// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx - CORREGIDO
+// src/components/workflow/panels/AddNodesPanel/AddNodesPanel.jsx - CON GRUPOS COLAPSABLES
 import React, { useState } from 'react';
 import { 
   FileText, 
   Globe, 
   Database, 
   Code,
-  Zap,        // ✅ AGREGADO: Importar Zap para Data Transformer
+  Zap,
   Download, 
   Save, 
-  Upload 
+  Upload,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import Button from '../../../common/Button/Button';
 import ImportWorkflow from '../../../common/ImportWorkflow/ImportWorkflow';
@@ -23,8 +25,32 @@ const AddNodesPanel = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  
+  // ✅ NUEVO: Estado para controlar qué grupos están expandidos
+  const [expandedCategories, setExpandedCategories] = useState({
+    input: true,      // Por defecto expandido
+    processing: true, // Por defecto expandido
+    output: true      // Por defecto expandido
+  });
 
-  // Organizar nodos por categorías - ACTUALIZADO con Data Transformer
+  // ✅ NUEVA FUNCIÓN: Toggle expansión de categorías
+  const toggleCategory = (categoryKey) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [categoryKey]: !prev[categoryKey]
+    }));
+  };
+
+  // ✅ NUEVA FUNCIÓN: Expandir/colapsar todas las categorías
+  const toggleAllCategories = (expanded) => {
+    setExpandedCategories({
+      input: expanded,
+      processing: expanded,
+      output: expanded
+    });
+  };
+
+  // Organizar nodos por categorías
   const nodeCategories = {
     input: {
       title: '📥 Entrada de Datos',
@@ -49,9 +75,9 @@ const AddNodesPanel = ({
           description: 'Mapea estructura JSON a variables internas'
         },
         {
-          type: NODE_TYPES.DATA_TRANSFORMER,  // ✅ AGREGADO
+          type: NODE_TYPES.DATA_TRANSFORMER,
           label: 'Data Transformer',
-          icon: <Zap size={16} />,           // ✅ CORREGIDO: Ahora Zap está importado
+          icon: <Zap size={16} />,
           variant: 'purple',
           description: 'Aplica transformaciones basadas en tipos de datos'
         },
@@ -78,7 +104,7 @@ const AddNodesPanel = ({
     }
   };
 
-  // ACCIONES SIN EJECUTAR
+  // Acciones del workflow
   const actionButtons = [
     {
       label: 'Importar',
@@ -143,6 +169,10 @@ const AddNodesPanel = ({
     return variantStyles[variant] || {};
   };
 
+  // ✅ NUEVA FUNCIÓN: Contar categorías expandidas
+  const expandedCount = Object.values(expandedCategories).filter(Boolean).length;
+  const totalCategories = Object.keys(expandedCategories).length;
+
   return (
     <>
       <div style={{
@@ -163,6 +193,64 @@ const AddNodesPanel = ({
         }}>
           🚀 Workflow Builder
         </h3>
+
+        {/* ✅ NUEVO: Controles de expansión */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px',
+          padding: '6px 8px',
+          background: '#f8fafc',
+          borderRadius: '6px',
+          border: '1px solid #e2e8f0'
+        }}>
+          <span style={{
+            fontSize: '12px',
+            color: '#64748b',
+            fontWeight: '500'
+          }}>
+            Categorías ({expandedCount}/{totalCategories})
+          </span>
+          
+          <div style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => toggleAllCategories(true)}
+              disabled={expandedCount === totalCategories}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: expandedCount === totalCategories ? 'not-allowed' : 'pointer',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                color: expandedCount === totalCategories ? '#9ca3af' : '#3b82f6',
+                fontWeight: '500'
+              }}
+              title="Expandir todas"
+            >
+              Expandir
+            </button>
+            
+            <button
+              onClick={() => toggleAllCategories(false)}
+              disabled={expandedCount === 0}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: expandedCount === 0 ? 'not-allowed' : 'pointer',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                color: expandedCount === 0 ? '#9ca3af' : '#3b82f6',
+                fontWeight: '500'
+              }}
+              title="Colapsar todas"
+            >
+              Colapsar
+            </button>
+          </div>
+        </div>
 
         {/* Statistics */}
         {workflowStats.totalNodes > 0 && (
@@ -194,7 +282,7 @@ const AddNodesPanel = ({
           </div>
         )}
 
-        {/* Node Categories - TODAS EXPANDIDAS - FIXED OVERFLOW */}
+        {/* ✅ MODIFICADO: Node Categories con función de colapso */}
         <div style={{ 
           marginBottom: '20px',
           width: '100%',
@@ -218,66 +306,90 @@ const AddNodesPanel = ({
               width: '100%',
               boxSizing: 'border-box'
             }}>
-              {/* Category Header - SIN CLICK - FIXED OVERFLOW */}
-              <div style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-start',
-                padding: '8px 12px',
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#1e40af',
-                marginBottom: '8px',
-                boxSizing: 'border-box',
-                overflow: 'hidden'
-              }}>
+              {/* ✅ MODIFICADO: Category Header CON CLICK para colapsar */}
+              <button
+                onClick={() => toggleCategory(categoryKey)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#1e40af',
+                  marginBottom: '8px',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#dbeafe';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = '#eff6ff';
+                }}
+              >
                 <span style={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
-                  width: '100%'
+                  flex: 1,
+                  textAlign: 'left'
                 }}>
                   {category.title}
                 </span>
-              </div>
+                
+                {/* ✅ NUEVO: Icono de expansión */}
+                {expandedCategories[categoryKey] ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
+                )}
+              </button>
               
-              {/* Category Nodes - SIEMPRE VISIBLES - FIXED OVERFLOW */}
-              <div style={{
-                padding: '8px',
-                background: '#f8fafc',
-                borderRadius: '6px',
-                border: '1px solid #e2e8f0',
-                width: '100%',
-                boxSizing: 'border-box'
-              }}>
-                {category.nodes.map((node) => (
-                  <Button
-                    key={node.type}
-                    variant={node.variant}
-                    onClick={() => onAddNode(node.type)}
-                    icon={node.icon}
-                    iconPosition="left"
-                    fullWidth
-                    style={{
-                      ...getButtonStyle(node.variant),
-                      marginBottom: '6px',
-                      fontSize: '13px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                    title={node.description}
-                  >
-                    {node.label}
-                  </Button>
-                ))}
-              </div>
+              {/* ✅ MODIFICADO: Category Nodes - CONDICIONAL basado en expansión */}
+              {expandedCategories[categoryKey] && (
+                <div style={{
+                  padding: '8px',
+                  background: '#f8fafc',
+                  borderRadius: '6px',
+                  border: '1px solid #e2e8f0',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  // ✅ NUEVO: Animación suave de entrada
+                  animation: 'slideDown 0.2s ease-out',
+                  overflow: 'hidden'
+                }}>
+                  {category.nodes.map((node) => (
+                    <Button
+                      key={node.type}
+                      variant={node.variant}
+                      onClick={() => onAddNode(node.type)}
+                      icon={node.icon}
+                      iconPosition="left"
+                      fullWidth
+                      style={{
+                        ...getButtonStyle(node.variant),
+                        marginBottom: '6px',
+                        fontSize: '13px',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}
+                      title={node.description}
+                    >
+                      {node.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -288,7 +400,7 @@ const AddNodesPanel = ({
           borderTop: '1px solid #e5e7eb'
         }} />
 
-        {/* Actions Section - SIN EJECUTAR - FIXED OVERFLOW */}
+        {/* Actions Section */}
         <div style={{
           width: '100%',
           boxSizing: 'border-box'
@@ -377,7 +489,7 @@ const AddNodesPanel = ({
           </div>
         )}
 
-        {/* Help Section - ACTUALIZADO */}
+        {/* Help Section */}
         <div style={{
           marginTop: '20px',
           padding: '12px',
@@ -404,19 +516,19 @@ const AddNodesPanel = ({
             <li><strong>Data Transformer:</strong> Transforma datos por tipo</li>
             <li><strong>Script Processor:</strong> Procesa datos con JavaScript</li>
             <li><strong>Layout Designer:</strong> Diseña la salida visual</li>
-            <li>Conecta nodos arrastrando desde los círculos</li>
+            <li>🔗 <strong>Conexiones:</strong> Solo UNA entrada por nodo</li>
             <li>Haz clic en los nodos para configurarlos</li>
           </ul>
         </div>
 
-        {/* Version Info - ACTUALIZADO */}
+        {/* Version Info */}
         <div style={{
           marginTop: '12px',
           textAlign: 'center',
           fontSize: '10px',
           color: '#9ca3af'
         }}>
-          Workflow Builder v2.2 - Data Transformer Edition
+          Workflow Builder v2.3 - Single Connection Edition
         </div>
       </div>
 
@@ -426,6 +538,24 @@ const AddNodesPanel = ({
         onClose={() => setIsImportModalOpen(false)}
         onImport={handleImportWorkflow}
       />
+
+      {/* ✅ NUEVO: CSS para animaciones suaves */}
+      <style>
+        {`
+          @keyframes slideDown {
+            from {
+              opacity: 0;
+              transform: translateY(-10px);
+              max-height: 0;
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+              max-height: 200px;
+            }
+          }
+        `}
+      </style>
     </>
   );
 };
