@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/DataTransformer/DataTransformer.jsx
+// src/components/workflow/nodes/DataTransformer/DataTransformer.jsx - COMPLETO CORREGIDO
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
@@ -61,15 +61,19 @@ const DataTransformer = ({
   }, [isOpen, availableData]);
 
   const initializeTransformations = () => {
+    console.log('🔄 Initializing transformations with available data:', availableData);
     const newTransformations = [];
     
     Object.entries(availableData).forEach(([key, value]) => {
+      console.log(`🔍 Processing variable: ${key}`, value);
+      
       const dataType = inferDataType(value);
+      console.log(`📊 Inferred data type for ${key}: ${dataType}`);
       
       newTransformations.push({
         id: `transform_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         inputVariable: key,
-        outputVariable: key, // ✅ CORREGIDO: Mantener el mismo nombre por defecto
+        outputVariable: key, // Mantener el mismo nombre por defecto
         inputValue: value,
         dataType: dataType,
         transformationType: 'none', // No transformation by default
@@ -79,23 +83,113 @@ const DataTransformer = ({
       });
     });
     
+    console.log('✅ Created transformations:', newTransformations);
     setTransformations(newTransformations);
   };
 
+  // ✅ FUNCIÓN CORREGIDA: Inferencia de tipos de datos más precisa
   const inferDataType = (value) => {
-    if (value === null || value === undefined) return 'string';
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number') return 'number';
-    if (typeof value === 'string') {
-      // Try to detect specific string types
-      if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
-      if (/^[\w\.-]+@[\w\.-]+\.\w+$/.test(value)) return 'email';
-      if (/^https?:\/\//.test(value)) return 'url';
+    console.log('🔍 inferDataType called with:', value, typeof value);
+    
+    // Manejar null/undefined
+    if (value === null || value === undefined) {
+      console.log('➡️ Detected: null/undefined -> string');
       return 'string';
     }
-    if (Array.isArray(value)) return 'array';
-    if (typeof value === 'object') return 'object';
+    
+    // Manejar primitivos primero
+    if (typeof value === 'boolean') {
+      console.log('➡️ Detected: boolean');
+      return 'boolean';
+    }
+    
+    if (typeof value === 'number') {
+      console.log('➡️ Detected: number');
+      return 'number';
+    }
+    
+    if (typeof value === 'string') {
+      console.log('➡️ Detected: string, checking patterns...');
+      
+      // Detectar email
+      if (/^[\w\.-]+@[\w\.-]+\.\w+$/.test(value)) {
+        console.log('➡️ String pattern: email');
+        return 'email';
+      }
+      
+      // Detectar URL
+      if (/^https?:\/\//.test(value)) {
+        console.log('➡️ String pattern: url');
+        return 'url';
+      }
+      
+      // Detectar fecha (varios formatos)
+      if (/^\d{4}-\d{2}-\d{2}/.test(value) || 
+          /^\d{2}\/\d{2}\/\d{4}/.test(value) || 
+          !isNaN(Date.parse(value))) {
+        console.log('➡️ String pattern: date');
+        return 'date';
+      }
+      
+      console.log('➡️ String pattern: generic string');
+      return 'string';
+    }
+    
+    // Manejar arrays
+    if (Array.isArray(value)) {
+      console.log('➡️ Detected: array');
+      return 'array';
+    }
+    
+    // ✅ CORREGIDO: Manejar objetos complejos con más precisión
+    if (typeof value === 'object' && value !== null) {
+      console.log('➡️ Detected: object (complex)');
+      
+      // Si es un objeto con propiedades específicas del Data Mapper o HTTP Input
+      if (value.hasOwnProperty('type') && value.hasOwnProperty('source')) {
+        console.log('➡️ Object appears to be metadata, treating as object');
+        return 'object';
+      }
+      
+      // Si es un objeto simple con pocos campos, podríamos inferir como object
+      const keys = Object.keys(value);
+      if (keys.length <= 10) {
+        console.log('➡️ Small object, keeping as object');
+        return 'object';
+      }
+      
+      return 'object';
+    }
+    
+    // Fallback
+    console.log('➡️ Fallback: string');
     return 'string';
+  };
+
+  // ✅ FUNCIÓN MEJORADA: Inferir tipos basándose en el valor real de los datos
+  const inferDataTypeFromRealValue = (value) => {
+    console.log('🎯 inferDataTypeFromRealValue:', value, typeof value);
+    
+    // Si tenemos un objeto con metadata del Data Transformer/Mapper
+    if (typeof value === 'object' && value !== null) {
+      // Verificar si es metadata de nuestro sistema
+      if (value.hasOwnProperty('value')) {
+        console.log('🎯 Found nested value, using that instead');
+        return inferDataType(value.value);
+      }
+      
+      if (value.hasOwnProperty('type') && value.hasOwnProperty('source')) {
+        console.log('🎯 Metadata object detected, inferring from type');
+        return value.type || 'object';
+      }
+      
+      if (value.hasOwnProperty('displayValue')) {
+        console.log('🎯 Display value detected, inferring from that');
+        return inferDataType(value.displayValue);
+      }
+    }
+    
+    return inferDataType(value);
   };
 
   const updateTransformation = (id, field, value) => {
@@ -108,11 +202,20 @@ const DataTransformer = ({
           updated.transformationConfig = {};
         }
         
-        // ✅ CORREGIDO: Solo cambiar outputVariable si explícitamente se modifica
-        // NO cambiar automáticamente cuando cambia inputVariable
+        // Solo cambiar outputVariable si explícitamente se modifica
         if (field === 'inputVariable' && transform.outputVariable === transform.inputVariable) {
-          // Solo actualizar si el outputVariable era igual al inputVariable anterior
           updated.outputVariable = value;
+        }
+        
+        // ✅ MEJORADO: Re-inferir tipo de dato cuando cambia la variable de entrada
+        if (field === 'inputVariable') {
+          const newInputValue = availableData[value];
+          updated.inputValue = newInputValue;
+          updated.dataType = inferDataTypeFromRealValue(newInputValue);
+          updated.transformationType = 'none'; // Reset to none when changing input
+          updated.transformationConfig = {};
+          
+          console.log(`🔄 Updated data type for ${value}: ${updated.dataType}`);
         }
         
         // Validate transformation
@@ -134,6 +237,7 @@ const DataTransformer = ({
     return true;
   };
 
+  // ✅ FUNCIÓN CORREGIDA: executeTransformations - Pasar TODAS las variables
   const executeTransformations = async () => {
     setIsExecuting(true);
     setExecutionError(null);
@@ -141,11 +245,21 @@ const DataTransformer = ({
     
     try {
       const enabledTransformations = transformations.filter(t => t.enabled && t.isValid);
-      const results = {};
+      
+      // ✅ CORREGIDO: Comenzar con TODAS las variables originales
+      const results = { ...availableData }; // Copiar todas las variables originales
       const newOutputVariables = {};
       
+      console.log('⚡ Starting transformation execution...');
+      console.log(`⚡ Original variables: ${Object.keys(availableData).length}`);
+      console.log(`⚡ Enabled transformations: ${enabledTransformations.length}`);
+      
+      // Aplicar las transformaciones habilitadas
       for (const transformation of enabledTransformations) {
         const inputValue = availableData[transformation.inputVariable];
+        
+        console.log(`🔄 Transforming: ${transformation.inputVariable} → ${transformation.outputVariable}`);
+        console.log(`🔄 Transformation type: ${transformation.transformationType}`);
         
         try {
           const transformedValue = applyTransformation(
@@ -154,8 +268,10 @@ const DataTransformer = ({
             transformation.transformationConfig
           );
           
+          // ✅ CORREGIDO: Agregar/actualizar en results (puede sobrescribir la original)
           results[transformation.outputVariable] = transformedValue;
           
+          // Guardar metadata de la transformación
           newOutputVariables[transformation.outputVariable] = {
             type: inferDataType(transformedValue),
             value: transformedValue,
@@ -164,22 +280,32 @@ const DataTransformer = ({
             inputVariable: transformation.inputVariable
           };
           
+          console.log(`✅ Transformed ${transformation.inputVariable} → ${transformation.outputVariable}:`, transformedValue);
+          
         } catch (error) {
-          console.error(`Error transforming ${transformation.inputVariable}:`, error);
-          results[transformation.outputVariable] = inputValue; // Fallback to original value
+          console.error(`❌ Error transforming ${transformation.inputVariable}:`, error);
+          // En caso de error, mantener el valor original
+          results[transformation.outputVariable] = inputValue;
         }
       }
       
-      setExecutionResult(results);
+      console.log('✅ Transformation execution completed');
+      console.log(`✅ Total result variables: ${Object.keys(results).length}`);
+      console.log(`✅ Original variables preserved: ${Object.keys(availableData).length}`);
+      console.log(`✅ New/Modified variables: ${Object.keys(newOutputVariables).length}`);
+      
+      setExecutionResult(results); // ✅ results ahora contiene TODAS las variables
       setOutputVariables(newOutputVariables);
       
     } catch (error) {
+      console.error('❌ Execution error:', error);
       setExecutionError(error.message);
     } finally {
       setIsExecuting(false);
     }
   };
 
+  // ✅ FUNCIÓN CORREGIDA: handleSave - Guardar TODAS las variables
   const handleSave = () => {
     const validation = validateDataTransformerConfig({
       transformations,
@@ -192,10 +318,38 @@ const DataTransformer = ({
       return;
     }
 
+    // ✅ CORREGIDO: Guardar TODAS las variables (originales + transformadas)
+    const allVariables = {};
+    
+    // 1. Primero agregar TODAS las variables de entrada (originales)
+    Object.entries(availableData).forEach(([key, value]) => {
+      allVariables[key] = value;
+      console.log(`💾 Saving original variable: ${key} = ${value}`);
+    });
+    
+    // 2. Luego agregar/sobrescribir con las variables transformadas
+    Object.entries(outputVariables).forEach(([key, varData]) => {
+      allVariables[key] = varData.value;
+      console.log(`💾 Saving/Updating transformed variable: ${key} = ${varData.value}`);
+    });
+    
+    // 3. También incluir execution results si existen
+    if (executionResult) {
+      Object.entries(executionResult).forEach(([key, value]) => {
+        allVariables[key] = value;
+        console.log(`💾 Saving execution result: ${key} = ${value}`);
+      });
+    }
+
     const savedData = {
       transformations,
       outputVariables,
       executionResult,
+      
+      // ✅ NUEVO: Guardar los datos de entrada para pasarlos a nodos siguientes
+      inputData: availableData,  // Datos originales de entrada
+      allVariables: allVariables, // Todas las variables (originales + transformadas)
+      
       status: 'configured',
       createdAt: new Date().toISOString(),
       lastExecuted: executionResult ? new Date().toISOString() : null,
@@ -203,9 +357,16 @@ const DataTransformer = ({
         totalTransformations: transformations.length,
         enabledTransformations: transformations.filter(t => t.enabled).length,
         validTransformations: transformations.filter(t => t.isValid).length,
-        outputVariablesCount: Object.keys(outputVariables).length
+        outputVariablesCount: Object.keys(outputVariables).length,
+        totalVariablesCount: Object.keys(allVariables).length, // ✅ NUEVO
+        originalVariablesCount: Object.keys(availableData).length // ✅ NUEVO
       }
     };
+    
+    console.log('💾 Data Transformer saving data:', savedData);
+    console.log(`💾 Total variables being passed: ${Object.keys(allVariables).length}`);
+    console.log(`💾 Original variables: ${Object.keys(availableData).length}`);
+    console.log(`💾 Transformed variables: ${Object.keys(outputVariables).length}`);
     
     onSave(savedData);
     onClose();

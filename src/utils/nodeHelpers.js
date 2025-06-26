@@ -1,4 +1,4 @@
-// src/utils/nodeHelpers.js - SIN FORMULARIOS
+// src/utils/nodeHelpers.js - ARCHIVO COMPLETO SIN DATOS DEMO
 import { NODE_CONFIG, NODE_TYPES } from './constants';
 
 // Generate unique node ID
@@ -36,7 +36,72 @@ export const debugNodeConnections = (nodeId, nodes, edges) => {
   });
 };
 
-// FIXED: Get available data from incoming nodes with improved HTTP Input detection
+// ✅ FUNCIÓN CORREGIDA: Extraer el valor real de los objetos complejos
+const extractRealValue = (value) => {
+  console.log('🔍 extractRealValue:', value);
+  
+  // Si es null o undefined, devolver tal como está
+  if (value === null || value === undefined) {
+    return value;
+  }
+  
+  // Si es un primitivo, devolver tal como está
+  if (typeof value !== 'object') {
+    return value;
+  }
+  
+  // Si es un array, devolver tal como está
+  if (Array.isArray(value)) {
+    return value;
+  }
+  
+  // Si es un objeto con metadata de nuestro sistema
+  if (value.hasOwnProperty('value')) {
+    console.log('✅ Found nested value:', value.value);
+    return value.value;
+  }
+  
+  if (value.hasOwnProperty('displayValue')) {
+    console.log('✅ Found display value:', value.displayValue);
+    return value.displayValue;
+  }
+  
+  if (value.hasOwnProperty('defaultValue')) {
+    console.log('✅ Found default value:', value.defaultValue);
+    return value.defaultValue;
+  }
+  
+  // Si es un objeto simple pequeño, mantenerlo como está
+  const keys = Object.keys(value);
+  if (keys.length <= 5) {
+    return value;
+  }
+  
+  // Para objetos complejos, devolver una representación string
+  return JSON.stringify(value);
+};
+
+// Helper function to generate body examples based on content type
+const getBodyExampleForContentType = (contentType) => {
+  switch (contentType) {
+    case 'application/json':
+      return {
+        id: 123,
+        name: "Ejemplo Usuario",
+        email: "usuario@ejemplo.com",
+        data: { field1: "valor1", field2: 42 }
+      };
+    case 'application/x-www-form-urlencoded':
+    case 'multipart/form-data':
+      return "nombre=Juan&email=juan@ejemplo.com&edad=30";
+    case 'text/plain':
+      return "Contenido de texto plano";
+    default:
+      return "Contenido del body";
+  }
+};
+
+// ✅ FUNCIÓN PRINCIPAL CORREGIDA: Get available data from incoming nodes - SIN DATOS DEMO
 export const getAvailableData = (nodeId, nodes, edges) => {
   const availableData = {};
   const incomingEdges = edges.filter(edge => edge.target === nodeId);
@@ -57,7 +122,6 @@ export const getAvailableData = (nodeId, nodes, edges) => {
       
       switch (nodeType) {
         case NODE_TYPES.HTTP_INPUT:
-          // CRITICAL FIX: Mejorar la detección de HTTP Input
           console.log('🌐 FIXED: Processing HTTP Input node:', properties);
           
           // VERIFICAR que el HTTP Input esté configurado correctamente
@@ -70,102 +134,42 @@ export const getAvailableData = (nodeId, nodes, edges) => {
             break; // Skip this HTTP Input if not configured
           }
           
-          // Generar una clave única y descriptiva para el HTTP Input
-          const httpInputKey = `httpInput_${sourceNode.id}`;
-          
-          // FIXED: Crear estructura completa del HTTP Input
-          const httpInputData = {
-            // Información básica del endpoint
-            endpoint: properties.endpoint || `http://localhost:3000/api${properties.path}`,
-            method: properties.method || 'GET',
-            path: properties.path,
-            
-            // Configuración del body
-            bodyVariable: properties.bodyVariable || 'requestBody',
-            enableBodyCapture: properties.enableBodyCapture !== undefined ? properties.enableBodyCapture : false,
-            contentType: properties.contentType || 'application/json',
-            
-            // Headers
-            headers: properties.headers || [],
-            
-            // Configuración adicional
-            authentication: properties.authentication || 'none',
-            description: properties.description || `${properties.method} endpoint`,
-            
-            // Metadata para debugging
-            nodeId: sourceNode.id,
-            configured: properties.configured,
-            
-            // DEBUGGING: Agregar información extra
-            debug_properties: properties
-          };
-          
-          // Agregar el HTTP Input completo con clave específica
-          availableData[httpInputKey] = httpInputData;
-          console.log(`✅ FIXED: Added HTTP Input: ${httpInputKey}`, httpInputData);
-          
-          // ADDITIONAL: Agregar también las variables individuales para compatibilidad
-          if (httpInputData.headers && httpInputData.headers.length > 0) {
-            httpInputData.headers.forEach(header => {
+          // ✅ CORREGIDO: Solo agregar variables reales configuradas (sin datos demo)
+          if (properties.headers && properties.headers.length > 0) {
+            properties.headers.forEach(header => {
               if (header.variable) {
-                const headerKey = `headers.${header.variable}`;
-                availableData[headerKey] = {
-                  type: 'string',
-                  source: 'http-header',
-                  headerName: header.name,
-                  required: header.required,
-                  defaultValue: header.defaultValue || `example_${header.variable}`,
-                  description: header.description,
-                  httpInputNodeId: sourceNode.id
-                };
-                console.log(`✅ FIXED: Added header variable: ${headerKey}`);
+                const headerKey = header.variable;
+                const headerValue = header.defaultValue || `example_${header.variable}`;
+                
+                availableData[headerKey] = headerValue;
+                console.log(`✅ FIXED: Added header: ${headerKey} = "${headerValue}"`);
               }
             });
           }
           
           // Agregar variable del body si está habilitada
-          if (httpInputData.enableBodyCapture && httpInputData.bodyVariable) {
-            availableData[httpInputData.bodyVariable] = {
-              type: 'object',
-              source: 'http-body',
-              contentType: httpInputData.contentType,
-              description: 'Request body content',
-              httpInputNodeId: sourceNode.id,
-              example: getBodyExampleForContentType(httpInputData.contentType)
-            };
-            console.log(`✅ FIXED: Added body variable: ${httpInputData.bodyVariable}`);
+          if (properties.enableBodyCapture && properties.bodyVariable) {
+            const bodyValue = getBodyExampleForContentType(properties.contentType);
+            availableData[properties.bodyVariable] = bodyValue;
+            console.log(`✅ FIXED: Added body variable: ${properties.bodyVariable}`);
           }
-          
           break;
           
         case NODE_TYPES.DATA_MAPPER:
           // Variables mapeadas del Data Mapper
           if (properties.outputVariables) {
             Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
-              const fullKey = `mapper.${varName}`;
-              availableData[fullKey] = {
-                type: varData.type,
-                value: typeof varData.sourceValue === 'object' 
-                  ? `[${varData.type}] ${JSON.stringify(varData.sourceValue).substring(0, 30)}...`
-                  : String(varData.sourceValue || `[${varData.type}] from ${varData.jsonPath}`),
-                jsonPath: varData.jsonPath,
-                source: varData.source || 'manual',
-                httpInputConnected: varData.httpInputConnected || null
-              };
-              console.log(`✅ FIXED: Added mapper variable: ${fullKey}`);
+              const realValue = extractRealValue(varData.sourceValue || varData.value || varData);
+              availableData[varName] = realValue;
+              console.log(`✅ FIXED: Added mapper variable: ${varName} = ${realValue} (type: ${typeof realValue})`);
             });
           }
           
-          // Información del mapeo
+          // Información del mapeo (como metadata adicional)
           if (properties.mappings && properties.mappings.length > 0) {
-            availableData[`${nodeType}.mappingsCount`] = properties.mappings.length;
-            availableData[`${nodeType}.validMappings`] = properties.mappings.filter(m => m.isValid).length;
-          }
-          
-          // Información de la conexión HTTP Input
-          if (properties.connectedHttpInput) {
-            availableData[`${nodeType}.connectedEndpoint`] = properties.connectedHttpInput.endpoint;
-            availableData[`${nodeType}.sourceType`] = 'http-input';
+            // Agregar estadísticas como números simples
+            availableData[`mappingsCount`] = properties.mappings.length;
+            availableData[`validMappings`] = properties.mappings.filter(m => m.isValid).length;
           }
           break;
           
@@ -173,102 +177,101 @@ export const getAvailableData = (nodeId, nodes, edges) => {
           // Variables generadas por Script Processor
           if (properties.outputVariables) {
             Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
-              const fullKey = `script.${varName}`;
-              availableData[fullKey] = typeof varData.value === 'object' 
-                ? `[${varData.type}] ${JSON.stringify(varData.value).substring(0, 30)}...`
-                : String(varData.value || `[${varData.type}] processed`);
-              console.log(`✅ FIXED: Added script variable: ${fullKey}`);
+              const realValue = extractRealValue(varData.value || varData);
+              availableData[varName] = realValue;
+              console.log(`✅ FIXED: Added script variable: ${varName} = ${realValue}`);
             });
           }
           
           if (properties.executionResult) {
-            availableData[`${nodeType}.executed`] = 'true';
-            availableData[`${nodeType}.outputCount`] = Object.keys(properties.outputVariables || {}).length;
+            availableData[`scriptExecuted`] = true;  // boolean
+            availableData[`outputCount`] = Object.keys(properties.outputVariables || {}).length; // number
           }
           break;
           
         case NODE_TYPES.LAYOUT_DESIGNER:
-          // Datos del layout
+          // Datos del layout como números simples
           if (properties.layout && properties.layout.elements) {
-            availableData[`${nodeType}.elementsCount`] = properties.layout.elements.length;
+            availableData[`elementsCount`] = properties.layout.elements.length; // number
           }
           break;
 
-          case NODE_TYPES.DATA_TRANSFORMER:
-            // Variables transformadas del Data Transformer
+        case NODE_TYPES.DATA_TRANSFORMER:
+          // ✅ CORREGIDO: El Data Transformer debe pasar TODAS las variables
+          console.log('⚡ FIXED: Processing Data Transformer - passing ALL variables');
+          
+          // 1. Primero agregar TODAS las variables originales (sin transformar)
+          if (properties.inputData) {
+            Object.entries(properties.inputData).forEach(([varName, value]) => {
+              availableData[varName] = value;
+              console.log(`✅ FIXED: Added original variable from transformer: ${varName} = ${value}`);
+            });
+          }
+          
+          // 2. Si existe allVariables (que incluye originales + transformadas), usar eso
+          if (properties.allVariables) {
+            Object.entries(properties.allVariables).forEach(([varName, value]) => {
+              availableData[varName] = value;
+              console.log(`✅ FIXED: Added variable from allVariables: ${varName} = ${value}`);
+            });
+          } else {
+            // 3. Fallback: agregar outputVariables (solo transformadas)
             if (properties.outputVariables) {
               Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
-                const fullKey = `transformer.${varName}`;
-                availableData[fullKey] = {
-                  type: varData.type,
-                  value: varData.value,
-                  originalVariable: varData.inputVariable,
-                  transformationType: varData.transformationType,
-                  source: 'data-transformer'
-                };
-                console.log(`✅ FIXED: Added transformer variable: ${fullKey}`);
+                const realValue = extractRealValue(varData.value || varData);
+                availableData[varName] = realValue;
+                console.log(`✅ FIXED: Added transformer variable: ${varName} = ${realValue}`);
               });
             }
-            
-            // Información de las transformaciones
-            if (properties.transformations && properties.transformations.length > 0) {
-              availableData[`${nodeType}.transformationsCount`] = properties.transformations.length;
-              availableData[`${nodeType}.enabledTransformations`] = properties.transformations.filter(t => t.enabled).length;
-            }
-            
-            // Información de estadísticas
-            if (properties.statistics) {
-              availableData[`${nodeType}.successRate`] = properties.statistics.successRate || 0;
-              availableData[`${nodeType}.outputVariablesCount`] = properties.statistics.outputVariablesCount || 0;
-            }
-            break;
+          }
+          
+          // 4. También agregar las variables del execution result si existen
+          if (properties.executionResult) {
+            Object.entries(properties.executionResult).forEach(([varName, value]) => {
+              availableData[varName] = value;
+              console.log(`✅ FIXED: Added execution result: ${varName} = ${value}`);
+            });
+          }
+          
+          // Información de las transformaciones como números simples
+          if (properties.transformations && properties.transformations.length > 0) {
+            availableData[`transformationsCount`] = properties.transformations.length; // number
+            availableData[`enabledTransformations`] = properties.transformations.filter(t => t.enabled).length; // number
+          }
+          
+          // Información de estadísticas como números
+          if (properties.statistics) {
+            availableData[`successRate`] = properties.statistics.successRate || 0; // number
+            availableData[`outputVariablesCount`] = properties.statistics.outputVariablesCount || 0; // number
+          }
+          break;
           
         default:
-          // Fallback para otros tipos
+          // Fallback para otros tipos - extraer valores reales
           Object.keys(properties).forEach(key => {
             if (key !== 'status' && key !== 'createdAt') {
-              const fullKey = `${nodeType}.${key}`;
               const value = properties[key];
-              if (typeof value === 'object') {
-                availableData[fullKey] = `[Object] ${JSON.stringify(value).substring(0, 20)}...`;
-              } else {
-                availableData[fullKey] = String(value);
-              }
-              console.log(`✅ FIXED: Added generic data: ${fullKey}`);
+              const realValue = extractRealValue(value);
+              availableData[key] = realValue;
+              console.log(`✅ FIXED: Added generic data: ${key} = ${realValue} (type: ${typeof realValue})`);
             }
           });
       }
     }
   });
   
-  console.log(`📋 FIXED: Final available data for node ${nodeId}:`, Object.keys(availableData));
-  console.log(`🔍 FIXED: HTTP Input keys found:`, Object.keys(availableData).filter(k => k.startsWith('httpInput_')));
+  // ✅ ELIMINADO: No agregar datos de ejemplo automáticamente
+  // Solo mostrar mensaje informativo si no hay datos
+  if (Object.keys(availableData).length === 0) {
+    console.log('ℹ️ No hay datos disponibles de nodos conectados');
+  } else {
+    console.log(`📋 FIXED: Final available data for node ${nodeId}:`, availableData);
+    console.log(`🔍 FIXED: Data types detected:`, Object.fromEntries(
+      Object.entries(availableData).map(([k, v]) => [k, `${typeof v} ${Array.isArray(v) ? '(array)' : ''}`])
+    ));
+  }
   
   return availableData;
-};
-
-// Helper function to generate body examples based on content type
-const getBodyExampleForContentType = (contentType) => {
-  switch (contentType) {
-    case 'application/json':
-      return {
-        id: 123,
-        name: "Ejemplo Usuario",
-        email: "usuario@ejemplo.com",
-        data: { field1: "valor1", field2: 42 }
-      };
-    case 'application/x-www-form-urlencoded':
-    case 'multipart/form-data':
-      return {
-        nombre: "Juan Pérez",
-        email: "juan@ejemplo.com",
-        edad: 30
-      };
-    case 'text/plain':
-      return "Contenido de texto plano";
-    default:
-      return "Contenido del body";
-  }
 };
 
 // ENHANCED: Get mapped variables specifically for Layout Designer with HTTP Input support
@@ -298,7 +301,7 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
           if (properties.headers && properties.headers.length > 0) {
             properties.headers.forEach(header => {
               if (header.variable) {
-                mappedVariables[`headers.${header.variable}`] = {
+                mappedVariables[header.variable] = {
                   type: 'string',
                   source: 'http-header',
                   value: header.defaultValue || `[Header: ${header.name}]`,
@@ -324,14 +327,15 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
           // Variables del Data Mapper
           if (properties.outputVariables) {
             Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+              const realValue = extractRealValue(varData.sourceValue || varData.value || varData);
               mappedVariables[varName] = {
-                type: varData.type,
+                type: typeof realValue,
                 source: varData.source === 'http-input' ? 'data-mapper-http' : 'data-mapper-manual',
                 jsonPath: varData.jsonPath,
-                value: varData.sourceValue,
-                displayValue: typeof varData.sourceValue === 'object' 
-                  ? `[${varData.type}] Complex Object`
-                  : String(varData.sourceValue),
+                value: realValue,
+                displayValue: typeof realValue === 'object' 
+                  ? `[${typeof realValue}] Complex Object`
+                  : String(realValue),
                 httpInputConnected: varData.httpInputConnected
               };
             });
@@ -342,46 +346,59 @@ export const getMappedVariablesForLayout = (nodeId, nodes, edges) => {
           // Variables del Script Processor
           if (properties.outputVariables) {
             Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+              const realValue = extractRealValue(varData.value || varData);
               mappedVariables[varName] = {
-                type: varData.type,
+                type: typeof realValue,
                 source: 'script-processor',
                 jsonPath: '',
-                value: varData.value,
-                displayValue: varData.displayValue || String(varData.value)
+                value: realValue,
+                displayValue: varData.displayValue || String(realValue)
               };
             });
           }
           break;
 
-          case NODE_TYPES.DATA_TRANSFORMER:
-            // Variables del Data Transformer
-            if (properties.outputVariables) {
-              Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
-                mappedVariables[varName] = {
-                  type: varData.type,
-                  source: 'data-transformer',
-                  value: varData.value,
-                  displayValue: typeof varData.value === 'object' 
-                    ? `[${varData.type}] Transformed Object`
-                    : String(varData.value),
-                  originalVariable: varData.inputVariable,
-                  transformationType: varData.transformationType
-                };
-              });
-            }
-            break;     
+        case NODE_TYPES.DATA_TRANSFORMER:
+          // Variables del Data Transformer - usar allVariables si existe
+          if (properties.allVariables) {
+            Object.entries(properties.allVariables).forEach(([varName, value]) => {
+              mappedVariables[varName] = {
+                type: typeof value,
+                source: 'data-transformer',
+                value: value,
+                displayValue: typeof value === 'object' 
+                  ? `[${typeof value}] Transformed Object`
+                  : String(value)
+              };
+            });
+          } else if (properties.outputVariables) {
+            Object.entries(properties.outputVariables).forEach(([varName, varData]) => {
+              const realValue = extractRealValue(varData.value || varData);
+              mappedVariables[varName] = {
+                type: typeof realValue,
+                source: 'data-transformer',
+                value: realValue,
+                displayValue: typeof realValue === 'object' 
+                  ? `[${typeof realValue}] Transformed Object`
+                  : String(realValue),
+                originalVariable: varData.inputVariable,
+                transformationType: varData.transformationType
+              };
+            });
+          }
+          break;     
           
         default:
-          // Otros tipos de nodos (NO INCLUYE FORMULARIOS)
+          // Otros tipos de nodos
           Object.keys(properties).forEach(key => {
             if (key !== 'status' && key !== 'createdAt') {
-              const fullKey = `${nodeType}.${key}`;
-              mappedVariables[fullKey] = {
-                type: 'string',
+              const realValue = extractRealValue(properties[key]);
+              mappedVariables[key] = {
+                type: typeof realValue,
                 source: nodeType,
                 jsonPath: '',
-                value: properties[key],
-                displayValue: String(properties[key])
+                value: realValue,
+                displayValue: String(realValue)
               };
             }
           });
