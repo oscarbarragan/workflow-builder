@@ -1,11 +1,10 @@
-// src/hooks/useWorkflow.js - CORREGIDO
+// src/hooks/useWorkflow.js - CORREGIDO CON RESTRICCIÓN DE UNA CONEXIÓN
 import { useState, useCallback, useEffect } from 'react';
 import { addEdge, useNodesState, useEdgesState } from 'reactflow';
 import { generateNodeId } from '../utils/nodeHelpers';
 
 export const useWorkflow = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  // CORREGIDO: Cambiar onEdgesState por onEdgesChange
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [workflowData, setWorkflowData] = useState({});
 
@@ -20,7 +19,7 @@ export const useWorkflow = () => {
     );
   }, [setNodes]);
 
-  // Remove node from workflow - DECLARACIÓN ÚNICA
+  // Remove node from workflow
   const removeNode = useCallback((nodeId) => {
     setNodes((nds) => nds.filter(node => node.id !== nodeId));
     setEdges((eds) => eds.filter(edge => 
@@ -29,7 +28,7 @@ export const useWorkflow = () => {
     console.log('✅ Node removed:', nodeId);
   }, [setNodes, setEdges]);
 
-  // Duplicate node - OPTIMIZED: Use functional updates
+  // Duplicate node
   const duplicateNode = useCallback((nodeId) => {
     setNodes((prevNodes) => {
       const nodeToClone = prevNodes.find(node => node.id === nodeId);
@@ -57,7 +56,7 @@ export const useWorkflow = () => {
     });
   }, [setNodes]);
 
-  // Add new node to workflow - FIXED: Include callbacks immediately
+  // Add new node to workflow
   const addNode = useCallback((type) => {
     const nodeId = generateNodeId();
     const newNode = {
@@ -70,7 +69,6 @@ export const useWorkflow = () => {
       data: { 
         type: type,
         properties: {},
-        // CRITICAL: Add callbacks immediately so tooltip works
         onPropertiesChange: handlePropertiesChange,
         onDelete: removeNode,
         onDuplicate: duplicateNode,
@@ -81,13 +79,62 @@ export const useWorkflow = () => {
     setNodes((nds) => [...nds, newNode]);
   }, [setNodes, handlePropertiesChange, removeNode, duplicateNode]);
 
-  // Handle edge connections
+  // ✅ NUEVA FUNCIÓN: Validar conexión antes de crearla
+  const canConnect = useCallback((connection, existingEdges) => {
+    const { source, target } = connection;
+    
+    // No permitir auto-conexión
+    if (source === target) {
+      console.log('❌ Cannot connect node to itself');
+      return false;
+    }
+    
+    // ✅ NUEVA RESTRICCIÓN: Los nodos HTTP Input no pueden recibir conexiones (solo enviar)
+    const targetNode = nodes.find(node => node.id === target);
+    if (targetNode && targetNode.data.type === 'http-input') {
+      console.log(`❌ HTTP Input nodes cannot receive connections. They are entry points only.`);
+      return false;
+    }
+    
+    // ✅ RESTRICCIÓN PRINCIPAL: Verificar si el nodo target ya tiene una conexión de entrada
+    const hasExistingConnection = existingEdges.some(edge => edge.target === target);
+    
+    if (hasExistingConnection) {
+      console.log(`❌ Node ${target} already has an incoming connection. Only one connection per node is allowed.`);
+      return false;
+    }
+    
+    // Verificar si ya existe esta conexión específica
+    const connectionExists = existingEdges.some(edge => 
+      edge.source === source && edge.target === target
+    );
+    
+    if (connectionExists) {
+      console.log('❌ Connection already exists');
+      return false;
+    }
+    
+    console.log('✅ Connection allowed');
+    return true;
+  }, [nodes]); // ✅ Agregar nodes como dependencia
+
+  // ✅ FUNCIÓN MODIFICADA: Handle edge connections con validación
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges]
+    (params) => {
+      setEdges((eds) => {
+        // Validar la conexión antes de crearla
+        if (!canConnect(params, eds)) {
+          return eds; // No agregar la conexión si no es válida
+        }
+        
+        console.log('✅ Creating new connection:', params);
+        return addEdge(params, eds);
+      });
+    },
+    [setEdges, canConnect]
   );
 
-  // Import workflow from JSON data - OPTIMIZED
+  // Import workflow from JSON data
   const importWorkflow = useCallback((workflowData) => {
     try {
       // Clear current workflow
@@ -103,7 +150,7 @@ export const useWorkflow = () => {
         throw new Error('Datos de workflow inválidos: falta el array de conexiones');
       }
 
-      // Import nodes - SIMPLIFIED: Don't add circular references in initial data
+      // Import nodes
       const importedNodes = workflowData.nodes.map(nodeData => ({
         id: nodeData.id,
         type: 'customNode',
@@ -114,31 +161,50 @@ export const useWorkflow = () => {
         }
       }));
 
-      // Import edges
-      const importedEdges = workflowData.edges.map(edgeData => ({
-        id: edgeData.id,
-        source: edgeData.source,
-        target: edgeData.target,
-        type: 'smoothstep',
-        animated: true,
-        style: {
-          stroke: '#3b82f6',
-          strokeWidth: 2,
+      // ✅ VALIDACIÓN DE EDGES: Filtrar edges que violen las reglas de conexión
+      const validEdges = [];
+      const usedTargets = new Set();
+      
+      workflowData.edges.forEach(edgeData => {
+        // Verificar que el target no sea un HTTP Input
+        const targetNode = importedNodes.find(n => n.id === edgeData.target);
+        if (targetNode && targetNode.data.type === 'http-input') {
+          console.log(`⚠️ Skipping edge to ${edgeData.target} - HTTP Input nodes cannot receive connections`);
+          return;
         }
-      }));
+        
+        // Solo agregar el edge si el target no ha sido usado
+        if (!usedTargets.has(edgeData.target)) {
+          validEdges.push({
+            id: edgeData.id,
+            source: edgeData.source,
+            target: edgeData.target,
+            type: 'smoothstep',
+            animated: true,
+            style: {
+              stroke: '#3b82f6',
+              strokeWidth: 2,
+            }
+          });
+          usedTargets.add(edgeData.target);
+        } else {
+          console.log(`⚠️ Skipping edge to ${edgeData.target} - node already has an incoming connection`);
+        }
+      });
 
       // Set imported data
       setNodes(importedNodes);
-      setEdges(importedEdges);
+      setEdges(validEdges);
 
       console.log('✅ Workflow importado exitosamente:', {
         nodes: importedNodes.length,
-        edges: importedEdges.length
+        edges: validEdges.length,
+        skippedEdges: workflowData.edges.length - validEdges.length
       });
 
       return {
         success: true,
-        message: `Workflow importado: ${importedNodes.length} nodos, ${importedEdges.length} conexiones`
+        message: `Workflow importado: ${importedNodes.length} nodos, ${validEdges.length} conexiones${workflowData.edges.length - validEdges.length > 0 ? ` (${workflowData.edges.length - validEdges.length} conexiones saltadas por restricción)` : ''}`
       };
 
     } catch (error) {
@@ -165,10 +231,11 @@ export const useWorkflow = () => {
         target: edge.target
       })),
       metadata: {
-        version: '2.1',
+        version: '2.2', // Incrementar versión para indicar soporte de una conexión
         createdAt: new Date().toISOString(),
         totalNodes: nodes.length,
-        totalEdges: edges.length
+        totalEdges: edges.length,
+        connectionPolicy: 'single-input-no-cycles' // ✅ ACTUALIZADO: Documentar política anti-ciclos
       },
       timestamp: new Date().toISOString()
     };
@@ -192,7 +259,7 @@ export const useWorkflow = () => {
     setWorkflowData({});
   }, [setNodes, setEdges]);
 
-  // Load workflow from data (alternative to import for internal use)
+  // Load workflow from data
   const loadWorkflow = useCallback((workflowData) => {
     try {
       const result = importWorkflow(workflowData);
@@ -209,14 +276,13 @@ export const useWorkflow = () => {
     }
   }, [importWorkflow]);
 
-  // Update nodes with current data - FIXED: Ensure callbacks are always present
+  // Update nodes with current data - Ensure callbacks are always present
   useEffect(() => {
     setNodes((nds) =>
       nds.map((node) => ({
         ...node,
         data: {
           ...node.data,
-          // ALWAYS pass the callback functions
           onPropertiesChange: handlePropertiesChange,
           onDelete: removeNode,
           onDuplicate: duplicateNode,
@@ -225,7 +291,6 @@ export const useWorkflow = () => {
         }
       }))
     );
-    // Only depend on edges to avoid infinite loop, but ensure callbacks are fresh
   }, [edges]);
 
   // Update workflow data when nodes or edges change
@@ -248,10 +313,13 @@ export const useWorkflow = () => {
     loadWorkflow,
     clearWorkflow,
     
-    // ReactFlow handlers - CORREGIDO: onEdgesChange en lugar de onEdgesState
+    // ReactFlow handlers
     onNodesChange,
     onEdgesChange,
-    onConnect,
-    handlePropertiesChange
+    onConnect, // ✅ Ya incluye la validación de una conexión
+    handlePropertiesChange,
+    
+    // ✅ NUEVA UTILIDAD: Exponer función de validación para uso externo si es necesario
+    canConnect
   };
 };
