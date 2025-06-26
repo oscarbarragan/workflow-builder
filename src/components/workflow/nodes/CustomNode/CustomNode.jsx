@@ -1,8 +1,8 @@
-// src/components/workflow/nodes/CustomNode/CustomNode.jsx - CON TOOLTIP
-import React, { useState, useRef, useEffect } from 'react';
+// src/components/workflow/nodes/CustomNode/CustomNode.jsx - OPTIMIZADO
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { FileText, Globe, Database, Code } from 'lucide-react';
-import { getNodeConfig, getMappedVariablesForLayout } from '../../../../utils/nodeHelpers';
+import { getNodeConfig, getMappedVariablesForLayout, getAvailableData } from '../../../../utils/nodeHelpers';
 import { NODE_TYPES, STYLES } from '../../../../utils/constants';
 import DataFlow from './DataFlow';
 import NodeTooltip from '../NodeTooltip/NodeTooltip';
@@ -12,6 +12,13 @@ import DataMapper from '../DataMapper/DataMapper';
 import ScriptProcessor from '../ScriptProcessor/ScriptProcessor';
 
 const CustomNode = ({ id, data, selected }) => {
+  // DEBUG: Log when component renders
+  console.log('🔄 CustomNode render:', id, 'callbacks:', {
+    onDelete: !!data.onDelete,
+    onDuplicate: !!data.onDuplicate,
+    onPropertiesChange: !!data.onPropertiesChange
+  });
+
   const [isLayoutDesignerOpen, setIsLayoutDesignerOpen] = useState(false);
   const [isHttpInputOpen, setIsHttpInputOpen] = useState(false);
   const [isDataMapperOpen, setIsDataMapperOpen] = useState(false);
@@ -24,6 +31,29 @@ const CustomNode = ({ id, data, selected }) => {
   const nodeRef = useRef(null);
   const tooltipTimeoutRef = useRef(null);
 
+  // OPTIMIZATION: Get callbacks directly from data (don't over-memoize)
+  const handlePropertiesChange = data.onPropertiesChange || (() => {
+    console.warn('onPropertiesChange not available for node:', id);
+  });
+
+  const handleDelete = data.onDelete || (() => {
+    console.warn('onDelete not available for node:', id);
+  });
+
+  const handleDuplicate = data.onDuplicate || (() => {
+    console.warn('onDuplicate not available for node:', id);
+  });
+
+  // OPTIMIZATION: Memoize available data calculation
+  const availableData = useMemo(() => {
+    return getAvailableData(id, data.allNodes || [], data.allEdges || []);
+  }, [id, data.allNodes, data.allEdges]);
+
+  // OPTIMIZATION: Memoize mapped variables
+  const mappedVariables = useMemo(() => {
+    return getMappedVariablesForLayout(id, data.allNodes || [], data.allEdges || []);
+  }, [id, data.allNodes, data.allEdges]);
+
   // NUEVO: Cleanup del timeout cuando se desmonta el componente
   useEffect(() => {
     return () => {
@@ -33,22 +63,32 @@ const CustomNode = ({ id, data, selected }) => {
     };
   }, []);
 
-  // NUEVO: Handlers para el tooltip
+  // NUEVO: Handlers para el tooltip - SIMPLIFIED positioning
   const handleMouseEnter = (e) => {
+    console.log('🖱️ Mouse enter on node:', id);
+    
     if (tooltipTimeoutRef.current) {
       clearTimeout(tooltipTimeoutRef.current);
     }
     
     tooltipTimeoutRef.current = setTimeout(() => {
-      const rect = nodeRef.current?.getBoundingClientRect();
-      if (rect) {
+      if (nodeRef.current) {
+        // SIMPLIFIED: Use getBoundingClientRect for viewport coordinates
+        const rect = nodeRef.current.getBoundingClientRect();
+        
+        // Position tooltip to the right and slightly above the node
         setTooltipPosition({
-          x: rect.right,
-          y: rect.top
+          x: rect.right + 8,  // 8px to the right
+          y: rect.top - 5     // 5px above
         });
         setShowTooltip(true);
+        console.log('👁️ Tooltip position (viewport):', {
+          x: rect.right + 8,
+          y: rect.top - 5,
+          nodeRect: rect
+        });
       }
-    }, 500); // Mostrar tooltip después de 500ms
+    }, 300);
   };
 
   const handleMouseLeave = () => {
@@ -56,49 +96,49 @@ const CustomNode = ({ id, data, selected }) => {
       clearTimeout(tooltipTimeoutRef.current);
     }
     
+    // FIXED: Longer timeout so user can interact with tooltip
     tooltipTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
-    }, 200); // Ocultar tooltip después de 200ms
+    }, 1000); // Increased to 1 second
   };
 
-  // NUEVO: Handlers para las acciones del tooltip
+  // NUEVO: Handlers para las acciones del tooltip - FIXED
   const handleAnchor = (nodeId, shouldAnchor) => {
     console.log(`🔒 ${shouldAnchor ? 'Anchoring' : 'Unanchoring'} node:`, nodeId);
     setIsAnchored(shouldAnchor);
     
     // Actualizar las propiedades del nodo
-    data.onPropertiesChange(id, { 
-      ...data.properties, 
-      isAnchored: shouldAnchor 
-    });
-    
-    // Notificar a ReactFlow si es necesario
-    if (shouldAnchor && data.onAnchor) {
-      data.onAnchor(nodeId);
-    } else if (!shouldAnchor && data.onUnanchor) {
-      data.onUnanchor(nodeId);
+    if (handlePropertiesChange) {
+      handlePropertiesChange(id, { 
+        ...data.properties, 
+        isAnchored: shouldAnchor 
+      });
     }
     
     setShowTooltip(false);
   };
 
-  const handleDelete = (nodeId) => {
-    console.log('🗑️ Deleting node:', nodeId);
+  const handleNodeDelete = (nodeId) => {
+    console.log('🗑️ Deleting node:', nodeId, 'handleDelete available:', !!handleDelete);
     
     if (window.confirm('¿Estás seguro de que quieres eliminar este nodo?')) {
-      if (data.onDelete) {
-        data.onDelete(nodeId);
+      if (handleDelete) {
+        handleDelete(nodeId);
+      } else {
+        console.error('❌ handleDelete function not available');
       }
     }
     
     setShowTooltip(false);
   };
 
-  const handleDuplicate = (nodeId) => {
-    console.log('📋 Duplicating node:', nodeId);
+  const handleNodeDuplicate = (nodeId) => {
+    console.log('📋 Duplicating node:', nodeId, 'handleDuplicate available:', !!handleDuplicate);
     
-    if (data.onDuplicate) {
-      data.onDuplicate(nodeId);
+    if (handleDuplicate) {
+      handleDuplicate(nodeId);
+    } else {
+      console.error('❌ handleDuplicate function not available');
     }
     
     setShowTooltip(false);
@@ -130,19 +170,14 @@ const CustomNode = ({ id, data, selected }) => {
   };
 
   const handleLayoutSave = (layoutData) => {
-    data.onPropertiesChange(id, { 
+    handlePropertiesChange(id, { 
       ...data.properties, 
       layout: layoutData 
     });
   };
 
   const handleSave = (formData) => {
-    data.onPropertiesChange(id, formData);
-  };
-
-  // Usar la nueva función para obtener variables mapeadas
-  const getAvailableDataForLayout = () => {
-    return getMappedVariablesForLayout(id, data.allNodes || [], data.allEdges || []);
+    handlePropertiesChange(id, formData);
   };
 
   const getIcon = () => {
@@ -287,7 +322,7 @@ const CustomNode = ({ id, data, selected }) => {
       <div 
         ref={nodeRef}
         onClick={handleNodeClick} 
-        onMouseDown={(e) => e.stopPropagation()} // Prevenir interferencia
+        onMouseDown={(e) => e.stopPropagation()}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         style={nodeStyle}
@@ -356,7 +391,7 @@ const CustomNode = ({ id, data, selected }) => {
           onClose={() => setIsLayoutDesignerOpen(false)}
           onSave={handleLayoutSave}
           initialData={data.properties?.layout}
-          availableData={getAvailableDataForLayout()}
+          availableData={mappedVariables}
         />
       )}
 
@@ -377,7 +412,7 @@ const CustomNode = ({ id, data, selected }) => {
           onClose={() => setIsDataMapperOpen(false)}
           initialData={data.properties || {}}
           onSave={handleSave}
-          availableData={getAvailableDataForLayout()}
+          availableData={availableData}
         />
       )}
 
@@ -388,19 +423,19 @@ const CustomNode = ({ id, data, selected }) => {
           onClose={() => setIsScriptProcessorOpen(false)}
           initialData={data.properties || {}}
           onSave={handleSave}
-          availableData={getAvailableDataForLayout()}
+          availableData={availableData}
         />
       )}
 
-      {/* NUEVO: Tooltip del nodo */}
+      {/* NUEVO: Tooltip del nodo - ALWAYS RENDER but control visibility */}
       <NodeTooltip
         nodeId={id}
         isVisible={showTooltip}
         position={tooltipPosition}
         isAnchored={isAnchored}
         onAnchor={handleAnchor}
-        onDelete={handleDelete}
-        onDuplicate={handleDuplicate}
+        onDelete={handleNodeDelete}
+        onDuplicate={handleNodeDuplicate}
       />
     </>
   );

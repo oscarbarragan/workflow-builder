@@ -1,6 +1,6 @@
-// src/components/workflow/nodes/NodeTooltip/NodeTooltip.jsx
-import React, { useState } from 'react';
-import { Anchor, Trash2, Copy, MoreVertical, Lock, Unlock } from 'lucide-react';
+// src/components/workflow/nodes/NodeTooltip/NodeTooltip.jsx - CON PORTAL
+import React from 'react';
+import { createPortal } from 'react-dom';
 
 const NodeTooltip = ({ 
   nodeId, 
@@ -11,27 +11,26 @@ const NodeTooltip = ({
   onDelete, 
   onDuplicate 
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-
   if (!isVisible) return null;
 
+  // FIXED: Use fixed positioning for precise control
   const tooltipStyle = {
-    position: 'absolute',
-    left: position.x + 10,
-    top: position.y - 40,
-    background: 'rgba(255, 255, 255, 0.95)',
+    position: 'fixed',
+    left: position.x,
+    top: position.y,
+    background: 'rgba(255, 255, 255, 0.98)',
     backdropFilter: 'blur(8px)',
     border: '1px solid #e5e7eb',
     borderRadius: '8px',
-    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
     zIndex: 10000,
     fontSize: '12px',
     fontWeight: '500',
     color: '#374151',
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    padding: isExpanded ? '8px' : '6px 8px',
+    gap: '2px',
+    padding: '4px',
     transition: 'all 0.2s ease',
     userSelect: 'none',
     pointerEvents: 'auto'
@@ -41,13 +40,16 @@ const NodeTooltip = ({
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '4px',
+    padding: '6px',
+    borderRadius: '6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.15s ease',
-    color: '#6b7280'
+    color: '#6b7280',
+    fontSize: '14px',
+    width: '26px',
+    height: '26px'
   };
 
   const getButtonHoverStyle = (color) => ({
@@ -56,25 +58,16 @@ const NodeTooltip = ({
     transform: 'scale(1.1)'
   });
 
-  if (!isExpanded) {
-    return (
-      <div style={tooltipStyle}>
-        <span style={{ fontSize: '11px', marginRight: '4px' }}>Opciones del nodo</span>
-        <button
-          style={buttonStyle}
-          onClick={() => setIsExpanded(true)}
-          onMouseEnter={(e) => Object.assign(e.target.style, getButtonHoverStyle('#3b82f6'))}
-          onMouseLeave={(e) => Object.assign(e.target.style, buttonStyle)}
-          title="Mostrar opciones"
-        >
-          <MoreVertical size={14} />
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div style={tooltipStyle}>
+  const tooltip = (
+    <div 
+      style={tooltipStyle}
+      onMouseEnter={() => {
+        // Keep tooltip open when hovering over it
+      }}
+      onMouseLeave={() => {
+        // Don't close immediately, let the node handle it
+      }}
+    >
       {/* Botón Anclar/Desanclar */}
       <button
         style={{
@@ -91,12 +84,16 @@ const NodeTooltip = ({
         }}
         onMouseLeave={(e) => {
           if (!isAnchored) {
-            Object.assign(e.target.style, buttonStyle);
+            Object.assign(e.target.style, {
+              ...buttonStyle,
+              background: 'transparent',
+              color: '#6b7280'
+            });
           }
         }}
-        title={isAnchored ? 'Desanclar nodo' : 'Anclar nodo en posición'}
+        title={isAnchored ? 'Desanclar nodo' : 'Anclar nodo'}
       >
-        {isAnchored ? <Lock size={14} /> : <Unlock size={14} />}
+        {isAnchored ? '●' : '○'}
       </button>
 
       {/* Separador */}
@@ -104,7 +101,7 @@ const NodeTooltip = ({
         width: '1px',
         height: '16px',
         background: '#e5e7eb',
-        margin: '0 2px'
+        margin: '0 1px'
       }} />
 
       {/* Botón Duplicar */}
@@ -115,7 +112,7 @@ const NodeTooltip = ({
         onMouseLeave={(e) => Object.assign(e.target.style, buttonStyle)}
         title="Duplicar nodo"
       >
-        <Copy size={14} />
+        ⧉
       </button>
 
       {/* Botón Eliminar */}
@@ -126,29 +123,13 @@ const NodeTooltip = ({
         onMouseLeave={(e) => Object.assign(e.target.style, buttonStyle)}
         title="Eliminar nodo"
       >
-        <Trash2 size={14} />
-      </button>
-
-      {/* Separador */}
-      <div style={{
-        width: '1px',
-        height: '16px',
-        background: '#e5e7eb',
-        margin: '0 2px'
-      }} />
-
-      {/* Botón Cerrar */}
-      <button
-        style={buttonStyle}
-        onClick={() => setIsExpanded(false)}
-        onMouseEnter={(e) => Object.assign(e.target.style, getButtonHoverStyle('#6b7280'))}
-        onMouseLeave={(e) => Object.assign(e.target.style, buttonStyle)}
-        title="Cerrar menú"
-      >
         ✕
       </button>
     </div>
   );
+
+  // Render tooltip in document body using portal for better positioning
+  return createPortal(tooltip, document.body);
 };
 
 export default NodeTooltip;
