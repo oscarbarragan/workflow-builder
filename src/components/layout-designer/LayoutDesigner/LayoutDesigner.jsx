@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+// src/components/layout-designer/LayoutDesigner/LayoutDesigner.jsx - CORREGIDO colapso sidebar
+import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Button from '../../common/Button/Button';
 import Canvas from './Canvas';
@@ -21,8 +22,10 @@ const LayoutDesigner = ({
   const [showStyleEditor, setShowStyleEditor] = useState(false);
   const [editingStyleType, setEditingStyleType] = useState(null);
   const [editingStyleId, setEditingStyleId] = useState(null);
-  const [forceUpdate, setForceUpdate] = useState(0);
-  const [showVariableValues, setShowVariableValues] = useState(false); // ✅ NUEVO: Control para mostrar valores vs variables
+  const [showVariableValues, setShowVariableValues] = useState(false);
+  
+  // ✅ NUEVO: Estado para controlar actualizaciones del sidebar sin perder estado
+  const [sidebarUpdateTrigger, setSidebarUpdateTrigger] = useState(0);
 
   const {
     elements,
@@ -122,52 +125,82 @@ const LayoutDesigner = ({
     }
   }, [isOpen]);
 
-  // ✅ NUEVO: Handler para toggle de visualización de variables
-  const handleToggleVariableValues = () => {
+  const handleToggleVariableValues = useCallback(() => {
     setShowVariableValues(prev => !prev);
     console.log('🔄 Toggling variable values display:', !showVariableValues);
-  };
+  }, [showVariableValues]);
 
-  // ✅ Handler para aplicar estilos desde el sidebar
-  const handleApplyStyle = (elementId, styleType, styleId) => {
-    console.log('🎨 Applying style:', styleType, styleId, 'to element:', elementId);
+  // ✅ CORREGIDO: Handler para aplicar estilos desde el sidebar
+  const handleApplyStyle = useCallback((elementId, styleType, styleId) => {
+    console.log('🎨 Applying style:', { elementId, styleType, styleId });
     
+    if (!elementId || !styleType || !styleId) {
+      console.warn('❌ Missing parameters for style application');
+      return;
+    }
+
     const styleIdField = `${styleType}Id`;
-    updateElement(elementId, { [styleIdField]: styleId });
     
-    // Forzar actualización para reflejar cambios
-    setForceUpdate(prev => prev + 1);
-  };
+    const updates = {
+      [styleIdField]: styleId
+    };
+
+    // Limpiar estilos manuales para evitar conflictos
+    if (styleType === 'textStyle') {
+      updates.textStyle = null;
+    } else if (styleType === 'paragraphStyle') {
+      updates.paragraphStyle = null;
+    } else if (styleType === 'borderStyle') {
+      updates.borderStyle = null;
+    } else if (styleType === 'fillStyle') {
+      updates.fillStyle = null;
+    }
+
+    console.log('📝 Updating element with:', updates);
+    updateElement(elementId, updates);
+    
+    // ✅ CRÍTICO: Trigger sidebar update sin perder estado
+    setSidebarUpdateTrigger(prev => prev + 1);
+    
+    console.log('✅ Style applied successfully');
+  }, [updateElement]);
 
   // ✅ Handler para crear nuevo estilo
-  const handleCreateNewStyle = (styleType) => {
+  const handleCreateNewStyle = useCallback((styleType) => {
     console.log('✨ Creating new style:', styleType);
     setEditingStyleType(styleType);
     setEditingStyleId(null);
     setShowStyleEditor(true);
-  };
+  }, []);
 
   // ✅ Handler para editar estilo existente
-  const handleEditStyle = (styleType, styleId) => {
+  const handleEditStyle = useCallback((styleType, styleId) => {
     console.log('📝 Editing style:', styleType, styleId);
     setEditingStyleType(styleType);
     setEditingStyleId(styleId);
     setShowStyleEditor(true);
-  };
+  }, []);
 
-  // ✅ Handler cuando se guarda un estilo
-  const handleStyleSaved = (styleId, styleData) => {
+  // ✅ MEJORADO: Handler cuando se guarda un estilo
+  const handleStyleSaved = useCallback((styleId, styleData) => {
     console.log('💾 Style saved:', styleId, styleData);
-    setForceUpdate(prev => prev + 1);
-  };
+    
+    // ✅ IMPORTANTE: Solo trigger update, no recargar página
+    setSidebarUpdateTrigger(prev => prev + 1);
+    
+    // Cerrar modal
+    setShowStyleEditor(false);
+    setEditingStyleType(null);
+    setEditingStyleId(null);
+  }, []);
 
-  // ✅ NUEVO: Handler cuando se crea un estilo desde Properties Panel
-  const handleStyleCreatedFromProperties = (styleType, styleId) => {
+  // ✅ Handler cuando se crea un estilo desde Properties Panel
+  const handleStyleCreatedFromProperties = useCallback((styleType, styleId) => {
     console.log('🎨 Style created from properties:', styleType, styleId);
-    setForceUpdate(prev => prev + 1);
-  };
+    setSidebarUpdateTrigger(prev => prev + 1);
+  }, []);
 
-  const handleElementMouseDown = (e, element) => {
+  const handleElementMouseDown = useCallback((e, element) => {
     console.log('🎯 LayoutDesigner handleElementMouseDown:', element.type, element.id);
     
     e.preventDefault();
@@ -178,71 +211,78 @@ const LayoutDesigner = ({
     
     handleMouseDown(e, element);
     console.log('✅ Drag started for:', element.id);
-  };
+  }, [selectElement, handleMouseDown]);
 
-  const handleCanvasClick = (e) => {
+  const handleCanvasClick = useCallback((e) => {
     console.log('🎨 LayoutDesigner handleCanvasClick - clearing selection');
     clearSelection();
-  };
+  }, [clearSelection]);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     console.log('💾 Saving layout data');
     onSave(getLayoutData());
     onClose();
-  };
+  }, [onSave, getLayoutData, onClose]);
 
-  const handleDuplicateSelected = () => {
+  const handleDuplicateSelected = useCallback(() => {
     if (selectedElement) {
       console.log('📋 Duplicating element:', selectedElement.id);
       duplicateElement(selectedElement.id);
     }
-  };
+  }, [selectedElement, duplicateElement]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     console.log('❌ Closing layout designer');
     clearSelection();
     onClose();
-  };
+  }, [clearSelection, onClose]);
 
-  const handleAddElement = (type) => {
+  const handleAddElement = useCallback((type) => {
     console.log('➕ Adding element:', type);
     addElement(type);
-  };
+  }, [addElement]);
 
-  const handleDeleteSelected = () => {
+  const handleDeleteSelected = useCallback(() => {
     if (selectedElement) {
       console.log('🗑️ Deleting element:', selectedElement.id);
       deleteSelected();
     }
-  };
+  }, [selectedElement, deleteSelected]);
 
-  const handleTextChange = (elementId, field, value) => {
+  const handleTextChange = useCallback((elementId, field, value) => {
     console.log('✏️ Text changed:', elementId, field, value);
     updateElement(elementId, { [field]: value });
-  };
+  }, [updateElement]);
 
-  const handleElementDoubleClick = (element) => {
+  const handleElementDoubleClick = useCallback((element) => {
     console.log('👆 Element double clicked:', element.type);
     if (element.type === 'variable') {
       console.log('📝 Opening variable selector for:', element.id);
     }
-  };
+  }, []);
 
-  const handleGlobalMouseMove = (e) => {
+  const handleGlobalMouseMove = useCallback((e) => {
     if (isDragging) {
       handleMouseMove(e);
     } else if (isResizing) {
       handleResizeMove(e);
     }
-  };
+  }, [isDragging, isResizing, handleMouseMove, handleResizeMove]);
 
-  const handleGlobalMouseUp = (e) => {
+  const handleGlobalMouseUp = useCallback((e) => {
     if (isDragging) {
       handleMouseUp(e);
     } else if (isResizing) {
       handleResizeEnd(e);
     }
-  };
+  }, [isDragging, isResizing, handleMouseUp, handleResizeEnd]);
+
+  // ✅ NUEVO: Handler para cerrar el modal de estilos
+  const handleCloseStyleEditor = useCallback(() => {
+    setShowStyleEditor(false);
+    setEditingStyleType(null);
+    setEditingStyleId(null);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -287,7 +327,7 @@ const LayoutDesigner = ({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header más limpio - SIN debug info */}
+        {/* Header */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -371,23 +411,23 @@ const LayoutDesigner = ({
           elementsCount={elements.length}
         />
 
-        {/* ✅ Main Content Area con Sidebar de Estilos y Variables */}
+        {/* Main Content Area */}
         <div style={{
           display: 'flex',
           flex: 1,
           gap: '16px',
           minHeight: 0
         }}>
-          {/* ✅ MEJORADO: Styles Sidebar con Variables */}
+          {/* ✅ CORREGIDO: Styles Sidebar sin key que cause re-render completo */}
           <StylesSidebar
             selectedElement={selectedElement}
             onApplyStyle={handleApplyStyle}
             onCreateNewStyle={handleCreateNewStyle}
             onEditStyle={handleEditStyle}
-            availableVariables={availableData} // ✅ NUEVO: Pasar variables
-            showVariableValues={showVariableValues} // ✅ NUEVO: Control de visualización
-            onToggleVariableValues={handleToggleVariableValues} // ✅ NUEVO: Toggle
-            key={forceUpdate} // Forzar re-render cuando cambian los estilos
+            availableVariables={availableData}
+            showVariableValues={showVariableValues}
+            onToggleVariableValues={handleToggleVariableValues}
+            updateTrigger={sidebarUpdateTrigger} // ✅ Usar prop para updates controlados
           />
 
           {/* Canvas */}
@@ -403,21 +443,21 @@ const LayoutDesigner = ({
             onResizeStart={handleResizeStart}
             onTextChange={handleTextChange}
             onElementDoubleClick={handleElementDoubleClick}
-            availableVariables={availableData} // ✅ Pasar variables disponibles
-            showVariableValues={showVariableValues} // ✅ NUEVO: Control de visualización
+            availableVariables={availableData}
+            showVariableValues={showVariableValues}
           />
 
-          {/* ✅ MEJORADO: Properties Panel con controles manuales */}
+          {/* Properties Panel */}
           <PropertiesPanel
             selectedElement={selectedElement}
             onUpdateSelectedElement={updateSelectedElement}
             availableData={availableData}
-            onCreateNewStyle={handleCreateNewStyle} // ✅ NUEVO: Para crear estilos
-            onStyleCreated={handleStyleCreatedFromProperties} // ✅ NUEVO: Callback
+            onCreateNewStyle={handleCreateNewStyle}
+            onStyleCreated={handleStyleCreatedFromProperties}
           />
         </div>
 
-        {/* Footer limpio */}
+        {/* Footer */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -468,11 +508,7 @@ const LayoutDesigner = ({
       {/* ✅ Modal de Editor de Estilos */}
       <StyleEditorModal
         isOpen={showStyleEditor}
-        onClose={() => {
-          setShowStyleEditor(false);
-          setEditingStyleType(null);
-          setEditingStyleId(null);
-        }}
+        onClose={handleCloseStyleEditor}
         styleType={editingStyleType}
         editingStyleId={editingStyleId}
         onStyleSaved={handleStyleSaved}

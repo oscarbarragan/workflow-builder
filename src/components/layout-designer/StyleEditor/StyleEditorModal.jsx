@@ -1,4 +1,4 @@
-// src/components/layout-designer/StyleEditor/StyleEditorModal.jsx
+// src/components/layout-designer/StyleEditor/StyleEditorModal.jsx - CORREGIDO
 import React, { useState, useEffect } from 'react';
 import { X, Save, Palette, Type, Frame, Square } from 'lucide-react';
 import Modal from '../../common/Modal/Modal';
@@ -118,9 +118,11 @@ const StyleEditorModal = ({
       return;
     }
 
+    // ✅ CRÍTICO: SIEMPRE marcar como custom cuando se crea o edita
     const styleData = {
       name: styleName.trim(),
       category: styleCategory,
+      isCustom: true, // ✅ SIEMPRE custom
       ...styleProperties
     };
 
@@ -136,13 +138,25 @@ const StyleEditorModal = ({
           }
           break;
         case 'paragraphStyle':
-          styleManager.addParagraphStyle(styleId, styleData);
+          if (editingStyleId) {
+            styleManager.updateParagraphStyle(styleId, styleData);
+          } else {
+            styleManager.addParagraphStyle(styleId, styleData);
+          }
           break;
         case 'borderStyle':
-          styleManager.addBorderStyle(styleId, styleData);
+          if (editingStyleId) {
+            styleManager.updateBorderStyle(styleId, styleData);
+          } else {
+            styleManager.addBorderStyle(styleId, styleData);
+          }
           break;
         case 'fillStyle':
-          styleManager.addFillStyle(styleId, styleData);
+          if (editingStyleId) {
+            styleManager.updateFillStyle(styleId, styleData);
+          } else {
+            styleManager.addFillStyle(styleId, styleData);
+          }
           break;
       }
 
@@ -425,75 +439,6 @@ const StyleEditorModal = ({
           step="0.1"
         />
       </div>
-
-      {/* Spacing */}
-      <div>
-        <label style={{ 
-          display: 'block', 
-          fontSize: '14px', 
-          fontWeight: '500', 
-          marginBottom: '8px',
-          color: '#374151'
-        }}>
-          Espaciado
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-          <div>
-            <label style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', display: 'block' }}>
-              Sangría
-            </label>
-            <input
-              type="number"
-              value={styleProperties.indent || 0}
-              onChange={(e) => updateProperty('indent', parseInt(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '12px'
-              }}
-              min="0"
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', display: 'block' }}>
-              Antes
-            </label>
-            <input
-              type="number"
-              value={styleProperties.spaceBefore || 0}
-              onChange={(e) => updateProperty('spaceBefore', parseInt(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '12px'
-              }}
-              min="0"
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', display: 'block' }}>
-              Después
-            </label>
-            <input
-              type="number"
-              value={styleProperties.spaceAfter || 0}
-              onChange={(e) => updateProperty('spaceAfter', parseInt(e.target.value) || 0)}
-              style={{
-                width: '100%',
-                padding: '6px 8px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '12px'
-              }}
-              min="0"
-            />
-          </div>
-        </div>
-      </div>
     </div>
   );
 
@@ -750,8 +695,6 @@ const StyleEditorModal = ({
   };
 
   const getPreviewStyles = () => {
-    const styles = {};
-
     if (styleType === 'textStyle') {
       return {
         fontFamily: styleProperties.fontFamily || 'Arial, sans-serif',
@@ -770,10 +713,7 @@ const StyleEditorModal = ({
       return {
         textAlign: styleProperties.alignment || 'left',
         lineHeight: styleProperties.lineHeight || 1.4,
-        letterSpacing: `${styleProperties.letterSpacing || 0}px`,
-        textIndent: `${styleProperties.indent || 0}px`,
-        marginTop: `${styleProperties.spaceBefore || 0}px`,
-        marginBottom: `${styleProperties.spaceAfter || 0}px`
+        letterSpacing: `${styleProperties.letterSpacing || 0}px`
       };
     }
 
@@ -793,7 +733,7 @@ const StyleEditorModal = ({
       };
     }
 
-    return styles;
+    return {};
   };
 
   const renderStyleEditor = () => {

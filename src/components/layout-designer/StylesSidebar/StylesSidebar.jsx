@@ -1,5 +1,5 @@
-// src/components/layout-designer/StylesSidebar/StylesSidebar.jsx
-import React, { useState, useRef } from 'react';
+// src/components/layout-designer/StylesSidebar/StylesSidebar.jsx - CORREGIDO colapso
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Type, 
   Square, 
@@ -24,12 +24,14 @@ const StylesSidebar = ({
   onApplyStyle,
   onCreateNewStyle,
   onEditStyle,
-  availableVariables = {}, // ✅ NUEVO: Variables disponibles
-  showVariableValues = false, // ✅ NUEVO: Control de visualización
-  onToggleVariableValues // ✅ NUEVO: Toggle de visualización
+  availableVariables = {},
+  showVariableValues = false,
+  onToggleVariableValues,
+  updateTrigger = 0 // ✅ NUEVO: prop para controlar actualizaciones
 }) => {
+  // ✅ CRÍTICO: Estado persistente que NO se resetea
   const [expandedSections, setExpandedSections] = useState({
-    variables: true, // ✅ NUEVO: Sección de variables
+    variables: true,
     textStyles: true,
     paragraphStyles: true,
     borderStyles: false,
@@ -37,6 +39,36 @@ const StylesSidebar = ({
   });
   const [activeTab, setActiveTab] = useState('styles');
   const fontInputRef = useRef(null);
+  
+  // ✅ NUEVO: Estado para datos cacheados
+  const [cachedStyles, setCachedStyles] = useState({
+    textStyles: [],
+    paragraphStyles: [],
+    borderStyles: [],
+    fillStyles: []
+  });
+
+  // ✅ CRÍTICO: Solo actualizar datos, NO resetear UI state
+  useEffect(() => {
+    console.log('🔄 StylesSidebar: Updating cached styles due to trigger:', updateTrigger);
+    
+    setCachedStyles({
+      textStyles: styleManager.getAllTextStyles(),
+      paragraphStyles: styleManager.getAllParagraphStyles(),
+      borderStyles: styleManager.getAllBorderStyles(),
+      fillStyles: styleManager.getAllFillStyles()
+    });
+  }, [updateTrigger]); // Solo depende del trigger
+
+  // ✅ Inicializar cache al montar
+  useEffect(() => {
+    setCachedStyles({
+      textStyles: styleManager.getAllTextStyles(),
+      paragraphStyles: styleManager.getAllParagraphStyles(),
+      borderStyles: styleManager.getAllBorderStyles(),
+      fillStyles: styleManager.getAllFillStyles()
+    });
+  }, []);
 
   const sidebarStyle = {
     width: '280px',
@@ -53,10 +85,11 @@ const StylesSidebar = ({
       ...prev,
       [section]: !prev[section]
     }));
+    console.log('📂 Toggled section:', section, 'to:', !expandedSections[section]);
   };
 
   const handleApplyStyle = (styleType, styleId) => {
-    console.log('🎨 Applying style:', styleType, styleId);
+    console.log('🎨 Applying style:', styleType, styleId, 'to element:', selectedElement?.id);
     if (onApplyStyle && selectedElement) {
       onApplyStyle(selectedElement.id, styleType, styleId);
     }
@@ -66,6 +99,47 @@ const StylesSidebar = ({
     console.log('✨ Creating new style:', styleType);
     if (onCreateNewStyle) {
       onCreateNewStyle(styleType);
+    }
+  };
+
+  const handleEditStyle = (styleType, styleId) => {
+    console.log('📝 Editing style:', styleType, styleId);
+    if (onEditStyle) {
+      onEditStyle(styleType, styleId);
+    }
+  };
+
+  // ✅ MEJORADO: Handler para eliminar con actualización inmediata
+  const handleDeleteStyle = (styleType, styleId, styleName) => {
+    if (window.confirm(`¿Eliminar el estilo "${styleName}"?`)) {
+      try {
+        switch(styleType) {
+          case 'textStyle':
+            styleManager.deleteTextStyle(styleId);
+            break;
+          case 'paragraphStyle':
+            styleManager.deleteParagraphStyle(styleId);
+            break;
+          case 'borderStyle':
+            styleManager.deleteBorderStyle(styleId);
+            break;
+          case 'fillStyle':
+            styleManager.deleteFillStyle(styleId);
+            break;
+        }
+        console.log('✅ Style deleted:', styleId);
+        
+        // ✅ CRÍTICO: Actualizar cache inmediatamente
+        setCachedStyles({
+          textStyles: styleManager.getAllTextStyles(),
+          paragraphStyles: styleManager.getAllParagraphStyles(),
+          borderStyles: styleManager.getAllBorderStyles(),
+          fillStyles: styleManager.getAllFillStyles()
+        });
+        
+      } catch (error) {
+        console.error('❌ Error deleting style:', error);
+      }
     }
   };
 
@@ -106,7 +180,6 @@ const StylesSidebar = ({
     </div>
   );
 
-  // ✅ NUEVA: Sección de Variables
   const renderVariablesSection = () => (
     <div>
       {renderSectionHeader(
@@ -116,7 +189,6 @@ const StylesSidebar = ({
       )}
       {expandedSections.variables && (
         <div>
-          {/* Control de visualización */}
           <div style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
             <button
               onClick={onToggleVariableValues}
@@ -256,7 +328,6 @@ const StylesSidebar = ({
       style={{
         padding: '8px 12px',
         borderBottom: '1px solid #f1f5f9',
-        cursor: 'pointer',
         background: isApplied ? '#eff6ff' : 'transparent',
         borderLeft: isApplied ? '3px solid #3b82f6' : '3px solid transparent',
         display: 'flex',
@@ -264,30 +335,64 @@ const StylesSidebar = ({
         alignItems: 'center',
         fontSize: '12px'
       }}
-      onClick={() => handleApplyStyle(styleType, style.id)}
-      onMouseOver={(e) => {
-        if (!isApplied) e.target.style.background = '#f8fafc';
-      }}
-      onMouseOut={(e) => {
-        if (!isApplied) e.target.style.background = 'transparent';
-      }}
     >
-      <div>
+      <div 
+        style={{ 
+          flex: 1, 
+          cursor: 'pointer',
+          minWidth: 0
+        }}
+        onClick={() => handleApplyStyle(styleType, style.id)}
+        onMouseOver={(e) => {
+          if (!isApplied) e.currentTarget.style.background = '#f8fafc';
+        }}
+        onMouseOut={(e) => {
+          if (!isApplied) e.currentTarget.style.background = 'transparent';
+        }}
+      >
         <div style={{ 
           fontWeight: '500', 
           color: '#374151',
-          marginBottom: '2px'
+          marginBottom: '2px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
         }}>
           {style.name}
+          {style.isCustom && (
+            <span style={{
+              fontSize: '9px',
+              background: '#fbbf24',
+              color: 'white',
+              padding: '1px 4px',
+              borderRadius: '2px',
+              marginLeft: '4px'
+            }}>
+              Custom
+            </span>
+          )}
         </div>
+        
         {styleType === 'textStyle' && (
           <div style={{
             fontSize: '10px',
             color: '#6b7280',
-            fontFamily: style.fontFamily,
-            fontSize: Math.min(style.fontSize, 11)
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
           }}>
-            {style.fontFamily} • {style.fontSize}px
+            {style.fontFamily?.split(',')[0]} • {style.fontSize}px
+            {style.bold && ' • Bold'}
+            {style.italic && ' • Italic'}
+          </div>
+        )}
+        {styleType === 'paragraphStyle' && (
+          <div style={{
+            fontSize: '10px',
+            color: '#6b7280'
+          }}>
+            {style.alignment} • {style.lineHeight}
+            {style.letterSpacing && ` • ${style.letterSpacing}px`}
           </div>
         )}
         {styleType === 'borderStyle' && (
@@ -296,81 +401,88 @@ const StylesSidebar = ({
             color: '#6b7280'
           }}>
             {style.width}px {style.style} • {style.color}
+            {style.radius && ` • ${style.radius}px radius`}
           </div>
         )}
-        {style.isCustom && (
-          <span style={{
-            fontSize: '9px',
-            background: '#fbbf24',
-            color: 'white',
-            padding: '1px 4px',
-            borderRadius: '2px',
-            marginLeft: '4px'
+        {styleType === 'fillStyle' && (
+          <div style={{
+            fontSize: '10px',
+            color: '#6b7280'
           }}>
-            Custom
-          </span>
+            {style.backgroundColor} • {Math.round((style.opacity || 1) * 100)}%
+          </div>
         )}
       </div>
       
-      {/* ✅ MEJORADO: Mostrar botones de editar/eliminar para TODOS los estilos custom */}
-      {style.isCustom && (
-        <div style={{ display: 'flex', gap: '4px' }}>
+      {/* Botones de acción para estilos custom */}
+      <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+        {style.isCustom && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onEditStyle && onEditStyle(styleType, style.id);
+              handleEditStyle(styleType, style.id);
             }}
             style={{
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '2px',
-              color: '#6b7280'
+              padding: '4px',
+              color: '#6b7280',
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#e5e7eb';
+              e.target.style.color = '#374151';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'none';
+              e.target.style.color = '#6b7280';
             }}
             title="Editar estilo"
           >
             <Edit3 size={12} />
           </button>
+        )}
+        
+        {style.isCustom && (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`¿Eliminar el estilo "${style.name}"?`)) {
-                switch(styleType) {
-                  case 'textStyle':
-                    styleManager.deleteTextStyle(style.id);
-                    break;
-                  case 'paragraphStyle':
-                    styleManager.deleteParagraphStyle(style.id);
-                    break;
-                  case 'borderStyle':
-                    styleManager.deleteBorderStyle(style.id);
-                    break;
-                  case 'fillStyle':
-                    styleManager.deleteFillStyle(style.id);
-                    break;
-                }
-                // Forzar actualización
-                window.location.reload();
-              }
+              handleDeleteStyle(styleType, style.id, style.name);
             }}
             style={{
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              padding: '2px',
-              color: '#dc2626'
+              padding: '4px',
+              color: '#dc2626',
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#fef2f2';
+              e.target.style.color = '#991b1b';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'none';
+              e.target.style.color = '#dc2626';
             }}
             title="Eliminar estilo"
           >
             <Trash2 size={12} />
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 
+  // ✅ CORREGIDO: Usar cache en lugar de llamar directamente al styleManager
   const renderTextStyles = () => {
-    const textStyles = styleManager.getAllTextStyles();
     const currentTextStyleId = selectedElement?.textStyleId;
 
     return (
@@ -401,7 +513,7 @@ const StylesSidebar = ({
               </button>
             </div>
             
-            {textStyles.map(style => 
+            {cachedStyles.textStyles.map(style => 
               renderStyleItem(style, 'textStyle', style.id === currentTextStyleId)
             )}
           </div>
@@ -411,7 +523,6 @@ const StylesSidebar = ({
   };
 
   const renderParagraphStyles = () => {
-    const paragraphStyles = styleManager.getAllParagraphStyles();
     const currentParagraphStyleId = selectedElement?.paragraphStyleId;
 
     return (
@@ -442,7 +553,7 @@ const StylesSidebar = ({
               </button>
             </div>
             
-            {paragraphStyles.map(style => 
+            {cachedStyles.paragraphStyles.map(style => 
               renderStyleItem(style, 'paragraphStyle', style.id === currentParagraphStyleId)
             )}
           </div>
@@ -452,7 +563,6 @@ const StylesSidebar = ({
   };
 
   const renderBorderStyles = () => {
-    const borderStyles = styleManager.getAllBorderStyles();
     const currentBorderStyleId = selectedElement?.borderStyleId;
 
     return (
@@ -483,7 +593,7 @@ const StylesSidebar = ({
               </button>
             </div>
             
-            {borderStyles.map(style => 
+            {cachedStyles.borderStyles.map(style => 
               renderStyleItem(style, 'borderStyle', style.id === currentBorderStyleId)
             )}
           </div>
@@ -493,7 +603,6 @@ const StylesSidebar = ({
   };
 
   const renderFillStyles = () => {
-    const fillStyles = styleManager.getAllFillStyles();
     const currentFillStyleId = selectedElement?.fillStyleId;
 
     return (
@@ -524,7 +633,7 @@ const StylesSidebar = ({
               </button>
             </div>
             
-            {fillStyles.map(style => 
+            {cachedStyles.fillStyles.map(style => 
               renderStyleItem(style, 'fillStyle', style.id === currentFillStyleId)
             )}
           </div>
@@ -682,7 +791,6 @@ const StylesSidebar = ({
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'styles' && (
           <div>
-            {/* ✅ NUEVA: Sección de Variables PRIMERO */}
             {renderVariablesSection()}
             {renderTextStyles()}
             {renderParagraphStyles()}
@@ -751,6 +859,14 @@ const StylesSidebar = ({
                       const styles = JSON.parse(e.target.result);
                       styleManager.importStyles(styles);
                       console.log('✅ Styles imported successfully');
+                      
+                      // ✅ Actualizar cache después de importar
+                      setCachedStyles({
+                        textStyles: styleManager.getAllTextStyles(),
+                        paragraphStyles: styleManager.getAllParagraphStyles(),
+                        borderStyles: styleManager.getAllBorderStyles(),
+                        fillStyles: styleManager.getAllFillStyles()
+                      });
                     } catch (error) {
                       console.error('❌ Error importing styles:', error);
                     }
