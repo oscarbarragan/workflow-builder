@@ -3,62 +3,183 @@
 /* Estilos específicos para el workflow */
 
 .workflow-canvas {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
-    background: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  background: #f8fafc;
+}
+
+/* Estilos para nodos */
+.workflow-node {
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.workflow-node:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.workflow-node.selected {
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px -8px rgba(59, 130, 246, 0.4);
+}
+
+/* Estilos para handles */
+.react-flow__handle {
+  transition: all var(--transition-fast);
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.2);
+}
+
+/* ============================================== */
+/* ✅ ESTILOS PARA EDGES - VERSIÓN CORREGIDA */
+/* ============================================== */
+
+/* Estado normal (por defecto) */
+.react-flow__edge .react-flow__edge-path {
+  stroke: #3b82f6 !important; /* Azul normal */
+  stroke-width: 2px !important;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease;
+}
+
+.react-flow__edge .react-flow__arrowhead {
+  fill: #3b82f6 !important; /* Flecha azul normal */
+  transition: fill 0.2s ease;
+}
+
+/* Estado hover (pasar mouse por encima) */
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #f59e0b !important; /* Naranja en hover */
+  stroke-width: 3px !important;
+  cursor: pointer;
+}
+
+.react-flow__edge:hover .react-flow__arrowhead {
+  fill: #f59e0b !important; /* Flecha naranja en hover */
+}
+
+/* Estado seleccionado */
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #ef4444 !important; /* Rojo cuando está seleccionado */
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));
+}
+
+.react-flow__edge.selected .react-flow__arrowhead {
+  fill: #ef4444 !important; /* Flecha roja cuando está seleccionado */
+}
+
+/* Estado seleccionado + hover (máxima prioridad) */
+.react-flow__edge.selected:hover .react-flow__edge-path {
+  stroke: #dc2626 !important; /* Rojo más oscuro */
+  stroke-width: 5px !important;
+}
+
+.react-flow__edge.selected:hover .react-flow__arrowhead {
+  fill: #dc2626 !important;
+}
+
+/* Animación para edges recién creados */
+@keyframes edge-created {
+  0% {
+      stroke-dasharray: 5;
+      stroke-dashoffset: 10;
+      opacity: 0.5;
   }
-  
-  /* Estilos para nodos */
-  .workflow-node {
-    transition: all var(--transition-base);
-    cursor: pointer;
+  100% {
+      stroke-dasharray: none;
+      stroke-dashoffset: 0;
+      opacity: 1;
   }
-  
-  .workflow-node:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-lg);
-  }
-  
-  .workflow-node.selected {
-    transform: scale(1.02);
-    box-shadow: 0 8px 25px -8px rgba(59, 130, 246, 0.4);
-  }
-  
-  /* Estilos para handles */
-  .react-flow__handle {
-    transition: all var(--transition-fast);
-  }
-  
-  .react-flow__handle:hover {
-    transform: scale(1.2);
-  }
-  
-  /* Estilos para edges */
-  .react-flow__edge-path {
-    transition: stroke var(--transition-base);
-  }
-  
-  .react-flow__edge:hover .react-flow__edge-path {
-    stroke: var(--color-primary);
-    stroke-width: 3;
-  }
-  
-  /* Panel de controles personalizado */
-  .react-flow__controls {
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--color-gray-200);
-  }
-  
-  .react-flow__controls-button {
-    border-bottom: 1px solid var(--color-gray-200);
-    transition: all var(--transition-fast);
-  }
-  
-  .react-flow__controls-button:hover {
-    background: var(--color-gray-50);
-  }
-  
-  /* MiniMap personalizado */
-  .react-flow__minimap {
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--color-gray-200);
-  }
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  animation: edge-created 0.8s ease-out;
+}
+
+/* ============================================== */
+/* RESTO DE ESTILOS (sin cambios) */
+/* ============================================== */
+
+/* Panel de controles personalizado */
+.react-flow__controls {
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-gray-200);
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid var(--color-gray-200);
+  transition: all var(--transition-fast);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--color-gray-50);
+}
+
+/* MiniMap personalizado */
+.react-flow__minimap {
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-gray-200);
+}
+
+/* Agrega esto AL FINAL de tu workflow.css para que tenga máxima prioridad */
+
+/* ============================================== */
+/* 🔥 OVERRIDE FORZADO PARA EDGES DE REACTFLOW */
+/* ============================================== */
+
+/* Selector más específico para mayor prioridad */
+.react-flow__container .react-flow__edge .react-flow__edge-path {
+  stroke: #3b82f6 !important;
+  stroke-width: 2px !important;
+  transition: all 0.2s ease !important;
+  cursor: pointer !important;
+}
+
+.react-flow__container .react-flow__edge .react-flow__arrowhead {
+  fill: #3b82f6 !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Hover state con máxima prioridad */
+.react-flow__container .react-flow__edge:hover .react-flow__edge-path {
+  stroke: #f59e0b !important;
+  stroke-width: 3px !important;
+}
+
+.react-flow__container .react-flow__edge:hover .react-flow__arrowhead {
+  fill: #f59e0b !important;
+}
+
+/* Selected state con máxima prioridad */
+.react-flow__container .react-flow__edge.selected .react-flow__edge-path {
+  stroke: #ef4444 !important;
+  stroke-width: 4px !important;
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6)) !important;
+}
+
+.react-flow__container .react-flow__edge.selected .react-flow__arrowhead {
+  fill: #ef4444 !important;
+}
+
+/* Selected + Hover con máxima prioridad */
+.react-flow__container .react-flow__edge.selected:hover .react-flow__edge-path {
+  stroke: #dc2626 !important;
+  stroke-width: 5px !important;
+  filter: drop-shadow(0 0 10px rgba(220, 38, 38, 0.8)) !important;
+}
+
+.react-flow__container .react-flow__edge.selected:hover .react-flow__arrowhead {
+  fill: #dc2626 !important;
+}
+
+/* Override para el contenedor principal */
+.react-flow__container {
+  background: #fafafa !important;
+}
+
+/* Fix para el color scheme que puede estar interfiriendo */
+.react-flow__container * {
+  color-scheme: light !important;
+}

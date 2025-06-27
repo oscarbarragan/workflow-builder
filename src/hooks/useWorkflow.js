@@ -1,4 +1,4 @@
-// src/hooks/useWorkflow.js - CON RESTRICCIÓN DE UN SOLO HTTP INPUT
+// src/hooks/useWorkflow.js - CON ELIMINACIÓN DE EDGES HABILITADA
 import { useState, useCallback, useEffect } from 'react';
 import { addEdge, useNodesState, useEdgesState } from 'reactflow';
 import { generateNodeId } from '../utils/nodeHelpers';
@@ -34,7 +34,6 @@ export const useWorkflow = () => {
       const nodeToClone = prevNodes.find(node => node.id === nodeId);
       if (!nodeToClone) return prevNodes;
 
-      // ✅ NUEVA RESTRICCIÓN: No permitir duplicar HTTP Input
       if (nodeToClone.data.type === 'http-input') {
         console.log('❌ Cannot duplicate HTTP Input node - only one allowed per workflow');
         return prevNodes;
@@ -62,26 +61,18 @@ export const useWorkflow = () => {
     });
   }, [setNodes]);
 
-  // ✅ NUEVA FUNCIÓN: Verificar si ya existe un HTTP Input
   const hasHttpInput = useCallback((currentNodes) => {
     return currentNodes.some(node => node.data.type === 'http-input');
   }, []);
 
-  // ✅ FUNCIÓN MODIFICADA: Add new node to workflow con restricción de HTTP Input
   const addNode = useCallback((type) => {
-    // ✅ NUEVA VALIDACIÓN: Verificar restricción de HTTP Input
     if (type === 'http-input') {
       setNodes((currentNodes) => {
         if (hasHttpInput(currentNodes)) {
           console.log('❌ Cannot add HTTP Input - only one HTTP Input allowed per workflow');
-          
-          // ✅ OPCIONAL: Mostrar mensaje al usuario (podrías usar un toast/notification aquí)
-          // toast.error('Solo se permite un HTTP Input por workflow');
-          
-          return currentNodes; // No agregar el nodo
+          return currentNodes;
         }
 
-        // Si no existe HTTP Input, proceder normalmente
         const nodeId = generateNodeId();
         const newNode = {
           id: nodeId,
@@ -104,10 +95,9 @@ export const useWorkflow = () => {
         console.log('✅ HTTP Input node added:', nodeId);
         return [...currentNodes, newNode];
       });
-      return; // Salir temprano para HTTP Input
+      return;
     }
 
-    // Para todos los otros tipos de nodos, proceder normalmente
     const nodeId = generateNodeId();
     const newNode = {
       id: nodeId,
@@ -135,20 +125,17 @@ export const useWorkflow = () => {
   const canConnect = useCallback((connection, existingEdges) => {
     const { source, target } = connection;
     
-    // No permitir auto-conexión
     if (source === target) {
       console.log('❌ Cannot connect node to itself');
       return false;
     }
     
-    // Los nodos HTTP Input no pueden recibir conexiones (solo enviar)
     const targetNode = nodes.find(node => node.id === target);
     if (targetNode && targetNode.data.type === 'http-input') {
       console.log(`❌ HTTP Input nodes cannot receive connections. They are entry points only.`);
       return false;
     }
     
-    // Verificar si el nodo target ya tiene una conexión de entrada
     const hasExistingConnection = existingEdges.some(edge => edge.target === target);
     
     if (hasExistingConnection) {
@@ -156,7 +143,6 @@ export const useWorkflow = () => {
       return false;
     }
     
-    // Verificar si ya existe esta conexión específica
     const connectionExists = existingEdges.some(edge => 
       edge.source === source && edge.target === target
     );
@@ -170,7 +156,7 @@ export const useWorkflow = () => {
     return true;
   }, [nodes]);
 
-  // Handle edge connections con validación
+  // ✅ MODIFICADO: Handle edge connections con eliminación habilitada
   const onConnect = useCallback(
     (params) => {
       setEdges((eds) => {
@@ -179,20 +165,45 @@ export const useWorkflow = () => {
         }
         
         console.log('✅ Creating new connection:', params);
-        return addEdge(params, eds);
+        
+        // ✅ EDGE CON ELIMINACIÓN HABILITADA
+        const newEdge = {
+          id: `edge-${params.source}-${params.target}`,
+          source: params.source,
+          target: params.target,
+          animated: true,
+          deletable: true, // ✅ PERMITE ELIMINACIÓN CON DELETE/BACKSPACE
+          style: {
+            stroke: '#3b82f6',
+            strokeWidth: 2,
+          },
+          markerEnd: {
+            type: 'arrowclosed',
+            color: '#3b82f6',
+          }
+        };
+        
+        return addEdge(newEdge, eds);
       });
     },
     [setEdges, canConnect]
   );
 
-  // ✅ FUNCIÓN MODIFICADA: Import workflow con restricción de HTTP Input
+  // ✅ NUEVO: Función para eliminar edge con click
+  const onEdgeClick = useCallback((event, edge) => {
+    if (event.ctrlKey || event.altKey) {
+      if (window.confirm('¿Eliminar esta conexión?')) {
+        setEdges((eds) => eds.filter((e) => e.id !== edge.id));
+        console.log('🗑️ Edge deleted:', edge.id);
+      }
+    }
+  }, [setEdges]);
+
   const importWorkflow = useCallback((workflowData) => {
     try {
-      // Clear current workflow
       setNodes([]);
       setEdges([]);
 
-      // Validate imported data structure
       if (!workflowData.nodes || !Array.isArray(workflowData.nodes)) {
         throw new Error('Datos de workflow inválidos: falta el array de nodos');
       }
@@ -201,25 +212,21 @@ export const useWorkflow = () => {
         throw new Error('Datos de workflow inválidos: falta el array de conexiones');
       }
 
-      // ✅ NUEVA VALIDACIÓN: Verificar que solo haya un HTTP Input en la importación
       const httpInputNodes = workflowData.nodes.filter(node => node.type === 'http-input');
       if (httpInputNodes.length > 1) {
         console.log(`⚠️ Workflow contains ${httpInputNodes.length} HTTP Input nodes, only the first one will be imported`);
         
-        // Filtrar para mantener solo el primer HTTP Input
         const firstHttpInput = httpInputNodes[0];
         workflowData.nodes = workflowData.nodes.filter(node => 
           node.type !== 'http-input' || node.id === firstHttpInput.id
         );
         
-        // También filtrar las conexiones relacionadas con los HTTP Inputs eliminados
         const removedHttpInputIds = httpInputNodes.slice(1).map(node => node.id);
         workflowData.edges = workflowData.edges.filter(edge => 
           !removedHttpInputIds.includes(edge.source) && !removedHttpInputIds.includes(edge.target)
         );
       }
 
-      // Import nodes
       const importedNodes = workflowData.nodes.map(nodeData => ({
         id: nodeData.id,
         type: 'customNode',
@@ -230,38 +237,42 @@ export const useWorkflow = () => {
         }
       }));
 
-      // Validación de edges
+      // ✅ MODIFICADO: Edges importados con eliminación habilitada
       const validEdges = [];
       const usedTargets = new Set();
       
       workflowData.edges.forEach(edgeData => {
-        // Verificar que el target no sea un HTTP Input
         const targetNode = importedNodes.find(n => n.id === edgeData.target);
         if (targetNode && targetNode.data.type === 'http-input') {
           console.log(`⚠️ Skipping edge to ${edgeData.target} - HTTP Input nodes cannot receive connections`);
           return;
         }
         
-        // Solo agregar el edge si el target no ha sido usado
         if (!usedTargets.has(edgeData.target)) {
-          validEdges.push({
-            id: edgeData.id,
+          // ✅ EDGE IMPORTADO CON ELIMINACIÓN HABILITADA
+          const importedEdge = {
+            id: edgeData.id || `edge-${edgeData.source}-${edgeData.target}`,
             source: edgeData.source,
             target: edgeData.target,
-            type: 'smoothstep',
             animated: true,
+            deletable: true, // ✅ PERMITE ELIMINACIÓN
             style: {
               stroke: '#3b82f6',
               strokeWidth: 2,
+            },
+            markerEnd: {
+              type: 'arrowclosed',
+              color: '#3b82f6',
             }
-          });
+          };
+          
+          validEdges.push(importedEdge);
           usedTargets.add(edgeData.target);
         } else {
           console.log(`⚠️ Skipping edge to ${edgeData.target} - node already has an incoming connection`);
         }
       });
 
-      // Set imported data
       setNodes(importedNodes);
       setEdges(validEdges);
 
@@ -309,11 +320,11 @@ export const useWorkflow = () => {
         target: edge.target
       })),
       metadata: {
-        version: '2.3', // Incrementar versión para indicar soporte de entrada única
+        version: '2.3',
         createdAt: new Date().toISOString(),
         totalNodes: nodes.length,
         totalEdges: edges.length,
-        connectionPolicy: 'single-input-single-entry', // ✅ ACTUALIZADO: Documentar política de entrada única
+        connectionPolicy: 'single-input-single-entry',
         httpInputCount: nodes.filter(n => n.data.type === 'http-input').length,
         restrictions: [
           'Only one HTTP Input allowed per workflow',
@@ -361,7 +372,6 @@ export const useWorkflow = () => {
     }
   }, [importWorkflow]);
 
-  // ✅ NUEVA FUNCIÓN UTILITARIA: Obtener información sobre restricciones
   const getWorkflowRestrictions = useCallback(() => {
     const currentHttpInputs = nodes.filter(n => n.data.type === 'http-input').length;
     
@@ -412,24 +422,23 @@ export const useWorkflow = () => {
     workflowData,
     
     // Actions
-    addNode, // ✅ Ya incluye la restricción de HTTP Input único
+    addNode,
     removeNode,
     duplicateNode,
     exportWorkflow,
-    importWorkflow, // ✅ Ya incluye la validación de HTTP Input único
+    importWorkflow,
     loadWorkflow,
     clearWorkflow,
     
     // ReactFlow handlers
     onNodesChange,
     onEdgesChange,
-    onConnect, // ✅ Ya incluye la validación de una conexión
+    onConnect,
+    onEdgeClick, // ✅ NUEVO: Handler para click en edges
     handlePropertiesChange,
     
     // Utilities
     canConnect,
-    
-    // ✅ NUEVAS UTILIDADES: Para verificar restricciones
     hasHttpInput: () => hasHttpInput(nodes),
     getWorkflowRestrictions
   };
