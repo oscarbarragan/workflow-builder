@@ -1,4 +1,4 @@
-// src/components/layout-designer/elements/EnhancedTextElement.jsx
+// src/components/layout-designer/elements/EnhancedTextElement.jsx - VERSIÓN SIMPLIFICADA
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { EXTENDED_ELEMENT_TYPES } from '../../../utils/StyleManager';
 import { styleManager } from '../../../utils/StyleManager';
@@ -12,13 +12,15 @@ const EnhancedTextElement = ({
   onResizeStart,
   onDoubleClick,
   onTextChange,
-  availableVariables = {}
+  availableVariables = {},
+  showVariableValues = false
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [showVariableMenu, setShowVariableMenu] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [variableMenuPosition, setVariableMenuPosition] = useState({ x: 0, y: 0 });
+  const [showTooltip, setShowTooltip] = useState(false);
   const textareaRef = useRef(null);
   const elementRef = useRef(null);
   const variableMenuRef = useRef(null);
@@ -45,7 +47,7 @@ const EnhancedTextElement = ({
     }
   }, [showVariableMenu]);
 
-  // ✅ NUEVO: Función para obtener estilos aplicados del StyleManager
+  // ✅ Función para obtener estilos aplicados del StyleManager
   const getAppliedStyles = () => {
     const appliedStyles = {
       textStyle: {},
@@ -54,7 +56,6 @@ const EnhancedTextElement = ({
       fillStyle: {}
     };
 
-    // Obtener estilos del StyleManager
     if (element.textStyleId) {
       const textStyle = styleManager.getTextStyle(element.textStyleId);
       if (textStyle) appliedStyles.textStyle = textStyle;
@@ -75,7 +76,6 @@ const EnhancedTextElement = ({
       if (fillStyle) appliedStyles.fillStyle = fillStyle;
     }
 
-    // Merge con estilos inline del elemento (override)
     return {
       textStyle: { ...appliedStyles.textStyle, ...element.textStyle },
       paragraphStyle: { ...appliedStyles.paragraphStyle, ...element.paragraphStyle },
@@ -84,13 +84,12 @@ const EnhancedTextElement = ({
     };
   };
 
-  // ✅ MEJORADO: Función para obtener estilos CSS finales
+  // ✅ Función para obtener estilos CSS finales
   const getFinalStyles = () => {
     const styles = getAppliedStyles();
     const { textStyle, paragraphStyle, borderStyle, fillStyle } = styles;
     
     return {
-      // Text styles
       fontFamily: textStyle.fontFamily || 'Arial, sans-serif',
       fontSize: `${textStyle.fontSize || 14}px`,
       fontWeight: textStyle.bold ? 'bold' : (textStyle.fontWeight || 'normal'),
@@ -100,8 +99,6 @@ const EnhancedTextElement = ({
         textStyle.strikethrough ? 'line-through' : ''
       ].filter(Boolean).join(' ') || 'none',
       color: textStyle.color || '#000000',
-      
-      // Paragraph styles
       textAlign: paragraphStyle.alignment || 'left',
       lineHeight: paragraphStyle.lineHeight || '1.4',
       letterSpacing: paragraphStyle.letterSpacing ? `${paragraphStyle.letterSpacing}px` : 'normal',
@@ -110,17 +107,104 @@ const EnhancedTextElement = ({
       marginBottom: paragraphStyle.spaceAfter ? `${paragraphStyle.spaceAfter}px` : '0',
       whiteSpace: paragraphStyle.wordWrap === false ? 'nowrap' : 'pre-wrap',
       wordBreak: paragraphStyle.wordBreak || 'normal',
-      
-      // Border styles
       borderWidth: borderStyle.width !== undefined ? `${borderStyle.width}px` : '0',
       borderStyle: borderStyle.style || 'none',
       borderColor: borderStyle.color || 'transparent',
       borderRadius: borderStyle.radius !== undefined ? `${borderStyle.radius}px` : '0',
-      
-      // Fill styles
       backgroundColor: fillStyle.backgroundColor || 'transparent',
       opacity: fillStyle.opacity !== undefined ? fillStyle.opacity : 1
     };
+  };
+
+  // ✅ MEJORADO: Función para renderizar texto con variables destacadas inline
+  const renderTextContent = () => {
+    const text = element.text || '';
+    
+    if (showVariableValues) {
+      // ✅ CORREGIDO: Función para mostrar valores reales
+      return text.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
+        const variable = availableVariables[variableName.trim()];
+        if (variable) {
+          if (typeof variable === 'object' && variable.displayValue) {
+            return String(variable.displayValue);
+          }
+          return String(variable);
+        }
+        return match;
+      }) || 'Doble click para editar';
+    }
+    
+    if (!text.includes('{{') || !text.includes('}}')) {
+      // No hay variables, mostrar texto normal
+      return text || 'Doble click para editar';
+    }
+    
+    // ✅ RENDERIZADO INLINE: Dividir texto y variables
+    const parts = [];
+    let lastIndex = 0;
+    const variableRegex = /\{\{([^}]+)\}\}/g;
+    let match;
+
+    while ((match = variableRegex.exec(text)) !== null) {
+      // Texto antes de la variable
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: text.slice(lastIndex, match.index)
+        });
+      }
+      
+      // Variable
+      parts.push({
+        type: 'variable',
+        content: match[0],
+        variableName: match[1].trim()
+      });
+      
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Texto después de la última variable
+    if (lastIndex < text.length) {
+      parts.push({
+        type: 'text',
+        content: text.slice(lastIndex)
+      });
+    }
+
+    return (
+      <span>
+        {parts.map((part, index) => {
+          if (part.type === 'variable') {
+            return (
+              <span 
+                key={`var-${index}`}
+                style={{
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  color: '#1e40af',
+                  padding: '1px 3px',
+                  borderRadius: '3px',
+                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  fontSize: '0.95em',
+                  fontWeight: '600',
+                  fontFamily: 'monospace',
+                  display: 'inline'
+                }}
+                title={`Variable: ${part.variableName}`}
+              >
+                {part.content}
+              </span>
+            );
+          }
+          return <span key={`text-${index}`}>{part.content}</span>;
+        })}
+      </span>
+    );
+  };
+
+  // ✅ Función para detectar si hay variables en el texto
+  const hasVariables = () => {
+    return element.text && element.text.includes('{{') && element.text.includes('}}');
   };
 
   const getElementStyle = () => {
@@ -152,36 +236,32 @@ const EnhancedTextElement = ({
       justifyContent: finalStyles.textAlign === 'center' ? 'center' : 
                      finalStyles.textAlign === 'right' ? 'flex-end' : 'flex-start',
       
-      // ✅ Aplicar estilos finales
+      // ✅ CORREGIDO: Aplicar TODOS los estilos finales siempre
       ...finalStyles,
       
-      // ✅ Override para selección (mantener visibilidad)
+      // ✅ Solo el borde se maneja especialmente
+      border: isEditing 
+        ? '2px solid #3b82f6' 
+        : isSelected 
+          ? '1px dashed #3b82f6' 
+          : finalStyles.borderWidth === '0' || finalStyles.borderStyle === 'none'
+            ? '1px dashed rgba(156, 163, 175, 0.3)'
+            : finalStyles.border,
+      
+      // ✅ Solo agregar selección si no hay background configurado
+      backgroundColor: isSelected && finalStyles.backgroundColor === 'transparent' 
+        ? 'rgba(59, 130, 246, 0.02)' 
+        : finalStyles.backgroundColor,
+      
       boxShadow: isSelected 
-        ? '0 0 0 2px rgba(59, 130, 246, 0.5), ' + (finalStyles.boxShadow || 'none')
+        ? '0 0 0 1px rgba(59, 130, 246, 0.3), ' + (finalStyles.boxShadow || 'none')
         : finalStyles.boxShadow || 'none'
     };
 
     return baseStyle;
   };
 
-  // ✅ NUEVO: Función para parsear texto con variables
-  const parseTextWithVariables = (text) => {
-    if (!text) return '';
-    
-    // Reemplazar variables {{variableName}} con valores reales
-    return text.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
-      const variable = availableVariables[variableName.trim()];
-      if (variable) {
-        if (typeof variable === 'object' && variable.displayValue) {
-          return variable.displayValue;
-        }
-        return String(variable);
-      }
-      return match; // Mantener placeholder si no se encuentra la variable
-    });
-  };
-
-  // ✅ NUEVO: Función para insertar variable en la posición del cursor
+  // ✅ Función para insertar variable
   const insertVariable = (variableName) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -197,14 +277,12 @@ const EnhancedTextElement = ({
     setEditValue(newText);
     setShowVariableMenu(false);
     
-    // Mover cursor después de la variable insertada
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(newCursorPosition, newCursorPosition);
     }, 0);
   };
 
-  // ✅ NUEVO: Mostrar menú de variables
   const showVariableMenuAt = (event) => {
     const rect = textareaRef.current.getBoundingClientRect();
     setVariableMenuPosition({
@@ -212,40 +290,36 @@ const EnhancedTextElement = ({
       y: event.clientY - rect.top + 20
     });
     setShowVariableMenu(true);
+    setShowTooltip(false);
   };
 
   const handleDoubleClick = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     
-    console.log('✏️ Starting text edit mode');
     setIsEditing(true);
     setEditValue(element.text || '');
     setCursorPosition(0);
+    setShowTooltip(true);
   }, [element.text]);
 
   const handleTextareaKeyDown = useCallback((e) => {
-    // Ctrl+Space para abrir menú de variables
     if (e.ctrlKey && e.code === 'Space') {
       e.preventDefault();
       showVariableMenuAt(e);
       return;
     }
 
-    // Ctrl+Enter para finalizar edición
     if (e.key === 'Enter' && e.ctrlKey) {
       e.preventDefault();
       handleEditFinish();
-    } 
-    // Escape para cancelar
-    else if (e.key === 'Escape') {
+    } else if (e.key === 'Escape') {
       e.preventDefault();
       setIsEditing(false);
       setEditValue(element.text || '');
       setShowVariableMenu(false);
-    }
-    // Tab para insertar espacios
-    else if (e.key === 'Tab') {
+      setShowTooltip(false);
+    } else if (e.key === 'Tab') {
       e.preventDefault();
       const start = e.target.selectionStart;
       const end = e.target.selectionEnd;
@@ -259,10 +333,9 @@ const EnhancedTextElement = ({
   }, [editValue]);
 
   const handleEditFinish = useCallback(() => {
-    console.log('✅ Finishing edit with value:', editValue);
-    
     setIsEditing(false);
     setShowVariableMenu(false);
+    setShowTooltip(false);
     
     if (onTextChange && editValue !== element.text) {
       onTextChange(element.id, 'text', editValue);
@@ -289,7 +362,7 @@ const EnhancedTextElement = ({
     }
   }, [element, onResizeStart]);
 
-  // ✅ NUEVO: Renderizar menú de variables
+  // ✅ Menú de variables simplificado
   const renderVariableMenu = () => {
     if (!showVariableMenu || Object.keys(availableVariables).length === 0) {
       return null;
@@ -351,17 +424,6 @@ const EnhancedTextElement = ({
             </div>
           );
         })}
-        
-        <div style={{
-          padding: '6px 12px',
-          borderTop: '1px solid #e5e7eb',
-          fontSize: '10px',
-          color: '#9ca3af',
-          background: '#f9fafb',
-          textAlign: 'center'
-        }}>
-          Ctrl+Espacio para abrir este menú
-        </div>
       </div>
     );
   };
@@ -393,9 +455,11 @@ const EnhancedTextElement = ({
             justifyContent: elementStyle.justifyContent,
             wordWrap: 'break-word',
             whiteSpace: elementStyle.whiteSpace,
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            position: 'relative'
           }}>
-            {parseTextWithVariables(element.text) || 'Doble click para editar'}
+            {/* ✅ MEJORADO: Renderizado inline de variables */}
+            {renderTextContent()}
           </div>
         )}
         
@@ -501,7 +565,7 @@ const EnhancedTextElement = ({
       )}
 
       {/* Indicador de modo edición */}
-      {isEditing && (
+      {isEditing && showTooltip && !showVariableMenu && (
         <div style={{
           position: 'absolute',
           left: element.x,

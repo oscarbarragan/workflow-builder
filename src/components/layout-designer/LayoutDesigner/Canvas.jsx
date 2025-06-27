@@ -15,7 +15,8 @@ const Canvas = ({
   onResizeStart,
   onTextChange,
   onElementDoubleClick,
-  availableVariables = {}
+  availableVariables = {},
+  showVariableValues = false // ✅ NUEVO: Control para mostrar valores vs nombres
 }) => {
   const canvasStyle = {
     flex: '1',
@@ -44,21 +45,7 @@ const Canvas = ({
     msUserSelect: 'none'
   };
 
-  const indicatorStyle = {
-    position: 'absolute',
-    top: '12px',
-    left: '12px',
-    background: 'rgba(59, 130, 246, 0.1)',
-    border: '2px dashed #3b82f6',
-    borderRadius: '8px',
-    padding: '8px 16px',
-    fontSize: '12px',
-    color: '#3b82f6',
-    fontWeight: '600',
-    pointerEvents: 'none',
-    zIndex: 5,
-    backdropFilter: 'blur(4px)'
-  };
+  // ✅ REMOVIDO: Indicador de elementos - ya no se muestra según punto 1
 
   // Handlers con debug
   const handleCanvasMouseDown = useCallback((e) => {
@@ -118,7 +105,7 @@ const Canvas = ({
     return false;
   }, []);
 
-  // ✅ NUEVO: Función para renderizar el elemento apropiado
+  // ✅ MEJORADO: Función para renderizar el elemento apropiado
   const renderElement = (element) => {
     const commonProps = {
       key: element.id,
@@ -138,6 +125,7 @@ const Canvas = ({
         <EnhancedTextElement
           {...commonProps}
           availableVariables={availableVariables}
+          showVariableValues={showVariableValues} // ✅ NUEVO: Pasar control de visualización
         />
       );
     }
@@ -163,32 +151,6 @@ const Canvas = ({
           }
         }}
       >
-        {/* Canvas indicator */}
-        <div style={indicatorStyle}>
-          📐 Área de Diseño - {elements.length} elementos
-        </div>
-
-        {/* Debug info */}
-        <div style={{
-          position: 'absolute',
-          top: '12px',
-          right: '12px',
-          background: 'rgba(255, 255, 255, 0.9)',
-          padding: '8px 12px',
-          borderRadius: '6px',
-          fontSize: '11px',
-          color: '#374151',
-          pointerEvents: 'none',
-          zIndex: 5,
-          fontFamily: 'monospace'
-        }}>
-          <div>Modo: {isDragging ? '🖱️ Drag' : isResizing ? '🔧 Resize' : '⏸️ Idle'}</div>
-          {selectedElement && (
-            <div>Seleccionado: {selectedElement.type}</div>
-          )}
-          <div>Variables: {Object.keys(availableVariables).length}</div>
-        </div>
-
         {/* Elements Layer */}
         <div style={{
           position: 'absolute',
@@ -199,7 +161,13 @@ const Canvas = ({
           pointerEvents: 'auto',
           zIndex: 10
         }}>
-          {elements.map(element => renderElement(element))}
+          {elements && Array.isArray(elements) ? elements.map(element => {
+            if (!element || !element.id) {
+              console.warn('Invalid element found:', element);
+              return null;
+            }
+            return renderElement(element);
+          }) : null}
         </div>
 
         {/* Empty state */}
@@ -222,12 +190,12 @@ const Canvas = ({
               Usa la barra de herramientas para agregar elementos
             </div>
             <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '500' }}>
-              ✨ Nuevo: Panel de estilos lateral como Inspire Designer
+              ✨ Estilo Inspire Designer con gestor de estilos avanzado
             </div>
           </div>
         )}
 
-        {/* Canvas info */}
+        {/* ✅ Canvas info más limpio */}
         <div style={{
           position: 'absolute',
           bottom: '12px',
@@ -242,15 +210,10 @@ const Canvas = ({
           fontWeight: '500',
           border: '1px solid #e5e7eb'
         }}>
-          📊 Elementos: {elements.length}
+          📊 {elements.length} elementos
           {selectedElement && (
             <span style={{ marginLeft: '12px', color: '#3b82f6' }}>
               | 🎯 {selectedElement.type}
-            </span>
-          )}
-          {Object.keys(availableVariables).length > 0 && (
-            <span style={{ marginLeft: '12px', color: '#16a34a' }}>
-              | 🔗 {Object.keys(availableVariables).length} vars
             </span>
           )}
         </div>
@@ -273,7 +236,7 @@ const Canvas = ({
           }} />
         )}
 
-        {/* ✅ NUEVO: Indicador de funcionalidades avanzadas */}
+        {/* ✅ MEJORADO: Indicador de funcionalidades más sutil */}
         <div style={{
           position: 'absolute',
           bottom: '12px',
@@ -288,7 +251,7 @@ const Canvas = ({
           zIndex: 5,
           fontWeight: '500'
         }}>
-          💡 Ctrl+Espacio para variables | Panel de estilos lateral
+          💡 Doble-clic para editar | Ctrl+Espacio para variables
         </div>
       </div>
     </div>

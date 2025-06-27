@@ -22,6 +22,7 @@ const LayoutDesigner = ({
   const [editingStyleType, setEditingStyleType] = useState(null);
   const [editingStyleId, setEditingStyleId] = useState(null);
   const [forceUpdate, setForceUpdate] = useState(0);
+  const [showVariableValues, setShowVariableValues] = useState(false); // ✅ NUEVO: Control para mostrar valores vs variables
 
   const {
     elements,
@@ -121,7 +122,13 @@ const LayoutDesigner = ({
     }
   }, [isOpen]);
 
-  // ✅ NUEVO: Handler para aplicar estilos desde el sidebar
+  // ✅ NUEVO: Handler para toggle de visualización de variables
+  const handleToggleVariableValues = () => {
+    setShowVariableValues(prev => !prev);
+    console.log('🔄 Toggling variable values display:', !showVariableValues);
+  };
+
+  // ✅ Handler para aplicar estilos desde el sidebar
   const handleApplyStyle = (elementId, styleType, styleId) => {
     console.log('🎨 Applying style:', styleType, styleId, 'to element:', elementId);
     
@@ -132,7 +139,7 @@ const LayoutDesigner = ({
     setForceUpdate(prev => prev + 1);
   };
 
-  // ✅ NUEVO: Handler para crear nuevo estilo
+  // ✅ Handler para crear nuevo estilo
   const handleCreateNewStyle = (styleType) => {
     console.log('✨ Creating new style:', styleType);
     setEditingStyleType(styleType);
@@ -140,7 +147,7 @@ const LayoutDesigner = ({
     setShowStyleEditor(true);
   };
 
-  // ✅ NUEVO: Handler para editar estilo existente
+  // ✅ Handler para editar estilo existente
   const handleEditStyle = (styleType, styleId) => {
     console.log('📝 Editing style:', styleType, styleId);
     setEditingStyleType(styleType);
@@ -148,9 +155,15 @@ const LayoutDesigner = ({
     setShowStyleEditor(true);
   };
 
-  // ✅ NUEVO: Handler cuando se guarda un estilo
+  // ✅ Handler cuando se guarda un estilo
   const handleStyleSaved = (styleId, styleData) => {
     console.log('💾 Style saved:', styleId, styleData);
+    setForceUpdate(prev => prev + 1);
+  };
+
+  // ✅ NUEVO: Handler cuando se crea un estilo desde Properties Panel
+  const handleStyleCreatedFromProperties = (styleType, styleId) => {
+    console.log('🎨 Style created from properties:', styleType, styleId);
     setForceUpdate(prev => prev + 1);
   };
 
@@ -252,7 +265,7 @@ const LayoutDesigner = ({
     borderRadius: '12px',
     width: '98vw',
     height: '95vh',
-    maxWidth: '1600px', // ✅ Más ancho para acomodar el sidebar
+    maxWidth: '1600px',
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
@@ -274,7 +287,7 @@ const LayoutDesigner = ({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* Header más limpio - SIN debug info */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -289,22 +302,37 @@ const LayoutDesigner = ({
             fontWeight: '700',
             color: '#1f2937'
           }}>
-            🎨 Diseñador de Layout - Estilo Inspire Designer
+            🎨 Layout Designer - Estilo Inspire Designer
           </h2>
           
-          {/* Debug info en el header */}
+          {/* Control de visualización de variables */}
           <div style={{
-            fontSize: '11px',
-            color: '#6b7280',
-            fontFamily: 'monospace',
-            textAlign: 'center',
-            background: '#f3f4f6',
-            padding: '4px 8px',
-            borderRadius: '4px'
+            display: 'flex',
+            alignItems: 'center',
+            gap: '16px'
           }}>
-            <div><strong>Elements:</strong> {elements.length}</div>
-            <div><strong>Selected:</strong> {selectedElement?.id || 'none'}</div>
-            <div><strong>Mode:</strong> {isDragging ? '🖱️ Drag' : isResizing ? '🔧 Resize' : '⏸️ Idle'}</div>
+            <button
+              onClick={handleToggleVariableValues}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                background: showVariableValues ? '#eff6ff' : 'white',
+                color: showVariableValues ? '#1e40af' : '#374151',
+                fontSize: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              title={showVariableValues ? 'Mostrar nombres de variables' : 'Mostrar valores de variables'}
+            >
+              <span style={{ fontSize: '14px' }}>
+                {showVariableValues ? '👁️' : '🔗'}
+              </span>
+              {showVariableValues ? 'Ver Variables' : 'Ver Valores'}
+            </button>
           </div>
           
           <button 
@@ -343,19 +371,22 @@ const LayoutDesigner = ({
           elementsCount={elements.length}
         />
 
-        {/* ✅ NUEVO: Main Content Area con Sidebar de Estilos */}
+        {/* ✅ Main Content Area con Sidebar de Estilos y Variables */}
         <div style={{
           display: 'flex',
           flex: 1,
           gap: '16px',
           minHeight: 0
         }}>
-          {/* ✅ NUEVO: Styles Sidebar */}
+          {/* ✅ MEJORADO: Styles Sidebar con Variables */}
           <StylesSidebar
             selectedElement={selectedElement}
             onApplyStyle={handleApplyStyle}
             onCreateNewStyle={handleCreateNewStyle}
             onEditStyle={handleEditStyle}
+            availableVariables={availableData} // ✅ NUEVO: Pasar variables
+            showVariableValues={showVariableValues} // ✅ NUEVO: Control de visualización
+            onToggleVariableValues={handleToggleVariableValues} // ✅ NUEVO: Toggle
             key={forceUpdate} // Forzar re-render cuando cambian los estilos
           />
 
@@ -373,17 +404,20 @@ const LayoutDesigner = ({
             onTextChange={handleTextChange}
             onElementDoubleClick={handleElementDoubleClick}
             availableVariables={availableData} // ✅ Pasar variables disponibles
+            showVariableValues={showVariableValues} // ✅ NUEVO: Control de visualización
           />
 
-          {/* Properties Panel */}
+          {/* ✅ MEJORADO: Properties Panel con controles manuales */}
           <PropertiesPanel
             selectedElement={selectedElement}
             onUpdateSelectedElement={updateSelectedElement}
             availableData={availableData}
+            onCreateNewStyle={handleCreateNewStyle} // ✅ NUEVO: Para crear estilos
+            onStyleCreated={handleStyleCreatedFromProperties} // ✅ NUEVO: Callback
           />
         </div>
 
-        {/* Footer */}
+        {/* Footer limpio */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -406,11 +440,9 @@ const LayoutDesigner = ({
                 </span>
               </span>
             )}
-            {(isDragging || isResizing) && (
-              <span style={{ marginLeft: '20px', color: '#16a34a' }}>
-                <strong>{isDragging ? '🖱️ Arrastrando' : '🔧 Redimensionando'}</strong>
-              </span>
-            )}
+            <span style={{ marginLeft: '20px', color: showVariableValues ? '#16a34a' : '#f59e0b' }}>
+              <strong>👁️ Vista:</strong> {showVariableValues ? 'Valores' : 'Variables'}
+            </span>
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -433,7 +465,7 @@ const LayoutDesigner = ({
         </div>
       </div>
 
-      {/* ✅ NUEVO: Modal de Editor de Estilos */}
+      {/* ✅ Modal de Editor de Estilos */}
       <StyleEditorModal
         isOpen={showStyleEditor}
         onClose={() => {

@@ -12,7 +12,10 @@ import {
   ChevronRight,
   Palette,
   Frame,
-  FileText
+  FileText,
+  Link2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { styleManager } from '../../../utils/StyleManager';
 
@@ -20,9 +23,13 @@ const StylesSidebar = ({
   selectedElement, 
   onApplyStyle,
   onCreateNewStyle,
-  onEditStyle 
+  onEditStyle,
+  availableVariables = {}, // ✅ NUEVO: Variables disponibles
+  showVariableValues = false, // ✅ NUEVO: Control de visualización
+  onToggleVariableValues // ✅ NUEVO: Toggle de visualización
 }) => {
   const [expandedSections, setExpandedSections] = useState({
+    variables: true, // ✅ NUEVO: Sección de variables
     textStyles: true,
     paragraphStyles: true,
     borderStyles: false,
@@ -69,7 +76,6 @@ const StylesSidebar = ({
       const success = await styleManager.addCustomFont(file, fontName);
       if (success) {
         console.log('✅ Font uploaded successfully:', fontName);
-        // Refresh the component to show new font
       } else {
         console.error('❌ Failed to upload font');
       }
@@ -97,6 +103,150 @@ const StylesSidebar = ({
         {title}
       </div>
       {expandedSections[section] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+    </div>
+  );
+
+  // ✅ NUEVA: Sección de Variables
+  const renderVariablesSection = () => (
+    <div>
+      {renderSectionHeader(
+        `Variables (${Object.keys(availableVariables).length})`, 
+        'variables', 
+        <Link2 size={14} />
+      )}
+      {expandedSections.variables && (
+        <div>
+          {/* Control de visualización */}
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9' }}>
+            <button
+              onClick={onToggleVariableValues}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                background: showVariableValues ? '#eff6ff' : 'white',
+                color: showVariableValues ? '#1e40af' : '#374151',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px'
+              }}
+            >
+              {showVariableValues ? <Eye size={12} /> : <EyeOff size={12} />}
+              {showVariableValues ? 'Mostrar Variables' : 'Mostrar Valores'}
+            </button>
+          </div>
+          
+          {Object.keys(availableVariables).length === 0 ? (
+            <div style={{
+              padding: '20px 12px',
+              textAlign: 'center',
+              color: '#9ca3af',
+              fontSize: '12px'
+            }}>
+              <Link2 size={24} style={{ marginBottom: '8px', opacity: 0.5 }} />
+              <div>No hay variables disponibles</div>
+              <div style={{ fontSize: '11px', marginTop: '4px' }}>
+                Conecta nodos para obtener variables
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              maxHeight: '250px',
+              overflowY: 'auto'
+            }}>
+              {Object.entries(availableVariables).map(([key, varData]) => {
+                let displayValue, typeInfo;
+                
+                if (typeof varData === 'object' && varData !== null && varData.displayValue !== undefined) {
+                  displayValue = String(varData.displayValue || '');
+                  typeInfo = varData.type || 'unknown';
+                } else {
+                  displayValue = typeof varData === 'string' ? varData : String(varData || '');
+                  typeInfo = typeof varData;
+                }
+                
+                const truncatedValue = displayValue.length > 30 
+                  ? `${displayValue.substring(0, 30)}...` 
+                  : displayValue;
+
+                return (
+                  <div
+                    key={`variable-${key}`}
+                    style={{
+                      padding: '8px 12px',
+                      borderBottom: '1px solid #f3f4f6',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseOver={(e) => e.target.style.backgroundColor = '#f8fafc'}
+                    onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+                    title={`Usar variable: {{${key}}}\nTipo: ${typeInfo}\nValor: ${displayValue}`}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '4px'
+                    }}>
+                      <div style={{
+                        fontWeight: '600',
+                        color: '#374151',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <span style={{ 
+                          color: typeInfo === 'string' ? '#16a34a' : 
+                                typeInfo === 'number' ? '#3b82f6' : 
+                                typeInfo === 'boolean' ? '#f59e0b' : 
+                                typeInfo === 'array' ? '#7c3aed' : 
+                                typeInfo === 'object' ? '#dc2626' : '#6b7280'
+                        }}>
+                          🔗
+                        </span>
+                        {`{{${key}}}`}
+                      </div>
+                      <span style={{
+                        fontSize: '9px',
+                        padding: '1px 4px',
+                        background: '#e5e7eb',
+                        borderRadius: '3px',
+                        color: '#6b7280'
+                      }}>
+                        {String(typeInfo)}
+                      </span>
+                    </div>
+                    
+                    <div style={{
+                      color: '#6b7280',
+                      fontSize: '11px',
+                      fontFamily: showVariableValues ? 'inherit' : 'monospace'
+                    }}>
+                      {showVariableValues ? truncatedValue : `{{${key}}}`}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          <div style={{
+            padding: '8px 12px',
+            fontSize: '10px',
+            color: '#9ca3af',
+            fontStyle: 'italic',
+            textAlign: 'center',
+            borderTop: '1px solid #f1f5f9'
+          }}>
+            💡 Usa Ctrl+Espacio en texto para insertar variables
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -162,6 +312,7 @@ const StylesSidebar = ({
         )}
       </div>
       
+      {/* ✅ MEJORADO: Mostrar botones de editar/eliminar para TODOS los estilos custom */}
       {style.isCustom && (
         <div style={{ display: 'flex', gap: '4px' }}>
           <button
@@ -184,8 +335,22 @@ const StylesSidebar = ({
             onClick={(e) => {
               e.stopPropagation();
               if (window.confirm(`¿Eliminar el estilo "${style.name}"?`)) {
-                styleManager.deleteTextStyle(style.id);
-                // Refresh component
+                switch(styleType) {
+                  case 'textStyle':
+                    styleManager.deleteTextStyle(style.id);
+                    break;
+                  case 'paragraphStyle':
+                    styleManager.deleteParagraphStyle(style.id);
+                    break;
+                  case 'borderStyle':
+                    styleManager.deleteBorderStyle(style.id);
+                    break;
+                  case 'fillStyle':
+                    styleManager.deleteFillStyle(style.id);
+                    break;
+                }
+                // Forzar actualización
+                window.location.reload();
               }
             }}
             style={{
@@ -517,6 +682,8 @@ const StylesSidebar = ({
       <div style={{ flex: 1, overflowY: 'auto' }}>
         {activeTab === 'styles' && (
           <div>
+            {/* ✅ NUEVA: Sección de Variables PRIMERO */}
+            {renderVariablesSection()}
             {renderTextStyles()}
             {renderParagraphStyles()}
             {renderBorderStyles()}
@@ -584,7 +751,6 @@ const StylesSidebar = ({
                       const styles = JSON.parse(e.target.result);
                       styleManager.importStyles(styles);
                       console.log('✅ Styles imported successfully');
-                      // Refresh component
                     } catch (error) {
                       console.error('❌ Error importing styles:', error);
                     }
