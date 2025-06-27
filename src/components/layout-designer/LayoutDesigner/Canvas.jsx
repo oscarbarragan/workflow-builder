@@ -1,5 +1,7 @@
 import React, { useCallback } from 'react';
 import LayoutElement from '../elements/LayoutElement';
+import EnhancedTextElement from '../elements/EnhancedTextElement';
+import { EXTENDED_ELEMENT_TYPES } from '../../../utils/StyleManager';
 
 const Canvas = ({ 
   elements, 
@@ -12,10 +14,11 @@ const Canvas = ({
   onElementMouseDown,
   onResizeStart,
   onTextChange,
-  onElementDoubleClick
+  onElementDoubleClick,
+  availableVariables = {}
 }) => {
   const canvasStyle = {
-    flex: '1 1 70%',
+    flex: '1',
     minWidth: '500px',
     border: '3px solid #3b82f6',
     borderRadius: '12px',
@@ -49,7 +52,7 @@ const Canvas = ({
     border: '2px dashed #3b82f6',
     borderRadius: '8px',
     padding: '8px 16px',
-    fontSize: '13px',
+    fontSize: '12px',
     color: '#3b82f6',
     fontWeight: '600',
     pointerEvents: 'none',
@@ -57,7 +60,7 @@ const Canvas = ({
     backdropFilter: 'blur(4px)'
   };
 
-  // Handlers con debug - ACTUALIZADOS
+  // Handlers con debug
   const handleCanvasMouseDown = useCallback((e) => {
     const isCanvas = e.target.getAttribute('data-canvas') === 'true';
     console.log('🎨 Canvas MouseDown:', isCanvas ? 'canvas' : 'other');
@@ -115,6 +118,34 @@ const Canvas = ({
     return false;
   }, []);
 
+  // ✅ NUEVO: Función para renderizar el elemento apropiado
+  const renderElement = (element) => {
+    const commonProps = {
+      key: element.id,
+      element: element,
+      isSelected: selectedElement?.id === element.id,
+      isDragging: isDragging && selectedElement?.id === element.id,
+      isResizing: isResizing,
+      onMouseDown: handleElementMouseDown,
+      onResizeStart: onResizeStart,
+      onDoubleClick: onElementDoubleClick,
+      onTextChange: onTextChange
+    };
+
+    // ✅ Usar EnhancedTextElement para elementos de texto
+    if (element.type === EXTENDED_ELEMENT_TYPES.TEXT || element.type === 'text') {
+      return (
+        <EnhancedTextElement
+          {...commonProps}
+          availableVariables={availableVariables}
+        />
+      );
+    }
+
+    // ✅ Usar LayoutElement para otros tipos
+    return <LayoutElement {...commonProps} />;
+  };
+
   return (
     <div style={canvasStyle}>
       <div 
@@ -137,7 +168,7 @@ const Canvas = ({
           📐 Área de Diseño - {elements.length} elementos
         </div>
 
-        {/* Debug info - ACTUALIZADO */}
+        {/* Debug info */}
         <div style={{
           position: 'absolute',
           top: '12px',
@@ -155,6 +186,7 @@ const Canvas = ({
           {selectedElement && (
             <div>Seleccionado: {selectedElement.type}</div>
           )}
+          <div>Variables: {Object.keys(availableVariables).length}</div>
         </div>
 
         {/* Elements Layer */}
@@ -167,19 +199,7 @@ const Canvas = ({
           pointerEvents: 'auto',
           zIndex: 10
         }}>
-          {elements.map(element => (
-            <LayoutElement
-              key={element.id}
-              element={element}
-              isSelected={selectedElement?.id === element.id}
-              isDragging={isDragging && selectedElement?.id === element.id}
-              isResizing={isResizing}
-              onMouseDown={handleElementMouseDown}
-              onResizeStart={onResizeStart}
-              onDoubleClick={onElementDoubleClick}
-              onTextChange={onTextChange}
-            />
-          ))}
+          {elements.map(element => renderElement(element))}
         </div>
 
         {/* Empty state */}
@@ -198,8 +218,11 @@ const Canvas = ({
             <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#6b7280' }}>
               Canvas Vacío
             </div>
-            <div style={{ fontSize: '14px', color: '#9ca3af' }}>
+            <div style={{ fontSize: '14px', color: '#9ca3af', marginBottom: '8px' }}>
               Usa la barra de herramientas para agregar elementos
+            </div>
+            <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '500' }}>
+              ✨ Nuevo: Panel de estilos lateral como Inspire Designer
             </div>
           </div>
         )}
@@ -225,6 +248,11 @@ const Canvas = ({
               | 🎯 {selectedElement.type}
             </span>
           )}
+          {Object.keys(availableVariables).length > 0 && (
+            <span style={{ marginLeft: '12px', color: '#16a34a' }}>
+              | 🔗 {Object.keys(availableVariables).length} vars
+            </span>
+          )}
         </div>
 
         {/* Active operation overlay */}
@@ -244,6 +272,24 @@ const Canvas = ({
             borderRadius: '8px'
           }} />
         )}
+
+        {/* ✅ NUEVO: Indicador de funcionalidades avanzadas */}
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '12px',
+          background: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          borderRadius: '6px',
+          padding: '6px 10px',
+          fontSize: '10px',
+          color: '#3b82f6',
+          pointerEvents: 'none',
+          zIndex: 5,
+          fontWeight: '500'
+        }}>
+          💡 Ctrl+Espacio para variables | Panel de estilos lateral
+        </div>
       </div>
     </div>
   );

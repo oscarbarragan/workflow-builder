@@ -26,6 +26,35 @@ const LayoutElement = ({
     }
   }, [isEditing]);
 
+  // ✅ NUEVO: Función para obtener estilos de texto de Inspire Designer
+  const getTextStyles = () => {
+    const textStyle = element.textStyle || {};
+    const paragraphStyle = element.paragraphStyle || {};
+    
+    return {
+      // Text Style properties
+      fontFamily: textStyle.fontFamily || 'Arial, sans-serif',
+      fontSize: `${textStyle.fontSize || element.fontSize || 14}px`,
+      fontWeight: textStyle.fontWeight || (textStyle.bold ? 'bold' : 'normal'),
+      fontStyle: textStyle.italic ? 'italic' : 'normal',
+      textDecoration: [
+        textStyle.underline ? 'underline' : '',
+        textStyle.strikethrough ? 'line-through' : ''
+      ].filter(Boolean).join(' ') || 'none',
+      color: textStyle.color || '#000000',
+      
+      // Paragraph Style properties
+      textAlign: paragraphStyle.alignment || 'left',
+      lineHeight: paragraphStyle.lineHeight || '1.4',
+      letterSpacing: paragraphStyle.letterSpacing ? `${paragraphStyle.letterSpacing}px` : 'normal',
+      textIndent: paragraphStyle.indent ? `${paragraphStyle.indent}px` : '0',
+      marginTop: paragraphStyle.spaceBefore ? `${paragraphStyle.spaceBefore}px` : '0',
+      marginBottom: paragraphStyle.spaceAfter ? `${paragraphStyle.spaceAfter}px` : '0',
+      whiteSpace: paragraphStyle.wordWrap === false ? 'nowrap' : 'pre-wrap',
+      wordBreak: paragraphStyle.wordBreak || 'normal'
+    };
+  };
+
   const getElementStyle = () => {
     const baseStyle = {
       position: 'absolute',
@@ -47,24 +76,32 @@ const LayoutElement = ({
 
     switch (element.type) {
       case ELEMENT_TYPES.TEXT:
+        // ✅ MEJORADO: Estilo sin borde ni background, como Inspire Designer
+        const textStyles = getTextStyles();
+        
         return {
           ...baseStyle,
           width: element.width || 200,
-          height: element.height || 40,
-          padding: '8px 12px',
-          background: isSelected ? '#fef3c7' : 'rgba(255, 255, 255, 0.95)',
-          border: isSelected ? '2px solid #3b82f6' : '1px solid #d1d5db',
-          borderRadius: '6px',
-          fontSize: element.fontSize || 14,
-          color: '#1f2937',
-          fontFamily: 'inherit',
-          fontWeight: '500',
+          height: element.height || 'auto',
+          minHeight: element.height || 40,
+          padding: element.padding || '4px 8px',
+          
+          // ✅ SIN BORDE NI BACKGROUND por defecto (como Inspire Designer)
+          background: isSelected && !isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
+          border: isSelected ? '1px dashed #3b82f6' : 'none',
+          borderRadius: '2px',
+          
+          // ✅ Aplicar estilos de texto de Inspire Designer
+          ...textStyles,
+          
+          // ✅ Shadow sutil solo cuando está seleccionado
           boxShadow: isSelected 
-            ? '0 0 0 3px rgba(59, 130, 246, 0.2)' 
-            : '0 1px 3px rgba(0, 0, 0, 0.1)',
-          overflow: 'hidden',
+            ? '0 0 0 1px rgba(59, 130, 246, 0.3)' 
+            : 'none',
+          
+          overflow: 'visible',
           display: 'flex',
-          alignItems: isEditing ? 'flex-start' : 'center',
+          alignItems: element.paragraphStyle?.verticalAlign || 'flex-start',
           justifyContent: 'flex-start'
         };
 
@@ -72,16 +109,16 @@ const LayoutElement = ({
         return {
           ...baseStyle,
           padding: '6px 10px',
-          background: isSelected ? '#dbeafe' : '#e0f2fe',
-          border: isSelected ? '2px solid #3b82f6' : '1px solid #0ea5e9',
-          borderRadius: '6px',
+          background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(14, 165, 233, 0.05)',
+          border: isSelected ? '2px solid #3b82f6' : '1px dashed #0ea5e9',
+          borderRadius: '4px',
           fontSize: element.fontSize || 14,
           color: '#1e40af',
           fontFamily: 'monospace',
           fontWeight: '600',
           boxShadow: isSelected 
-            ? '0 0 0 3px rgba(59, 130, 246, 0.2)' 
-            : '0 2px 4px rgba(14, 165, 233, 0.2)',
+            ? '0 0 0 2px rgba(59, 130, 246, 0.2)' 
+            : '0 1px 3px rgba(14, 165, 233, 0.2)',
           minWidth: 'auto',
           minHeight: 'auto',
           maxWidth: '250px'
@@ -92,11 +129,11 @@ const LayoutElement = ({
           ...baseStyle,
           width: element.width || 100,
           height: element.height || 50,
-          background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(156, 163, 175, 0.1)',
-          border: isSelected ? '2px solid #3b82f6' : '2px solid #6b7280',
-          borderRadius: '4px',
+          background: element.fillColor || (isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(156, 163, 175, 0.1)'),
+          border: `${element.borderWidth || 2}px ${element.borderStyle || 'solid'} ${element.borderColor || (isSelected ? '#3b82f6' : '#6b7280')}`,
+          borderRadius: element.borderRadius || '4px',
           boxShadow: isSelected 
-            ? '0 0 0 3px rgba(59, 130, 246, 0.2)' 
+            ? '0 0 0 2px rgba(59, 130, 246, 0.2)' 
             : '0 2px 4px rgba(0, 0, 0, 0.1)'
         };
 
@@ -185,7 +222,7 @@ const LayoutElement = ({
     // No prevenir otras teclas para permitir edición normal
   }, [handleEditFinish, element.text]);
 
-  // Handler para mousedown - MEJORADO
+  // Handler para mousedown
   const handleMouseDown = useCallback((e) => {
     if (isEditing) {
       // Si está editando, no permitir drag
@@ -201,7 +238,7 @@ const LayoutElement = ({
     onMouseDown(e, element);
   }, [element, onMouseDown, isEditing]);
 
-  // Handler para resize - MEJORADO con elemento completo
+  // Handler para resize
   const handleResizeMouseDown = useCallback((e, corner) => {
     console.log('🔧 Resize handle clicked:', corner);
     
@@ -256,19 +293,25 @@ const LayoutElement = ({
           <div style={{
             width: '100%',
             height: '100%',
-            overflow: 'hidden',
+            overflow: 'visible',
             display: 'flex',
-            alignItems: element.type === ELEMENT_TYPES.TEXT ? 'flex-start' : 'center',
-            justifyContent: 'flex-start',
+            alignItems: element.type === ELEMENT_TYPES.TEXT ? 
+              (element.paragraphStyle?.verticalAlign || 'flex-start') : 'center',
+            justifyContent: element.type === ELEMENT_TYPES.TEXT ? 
+              (element.paragraphStyle?.alignment === 'center' ? 'center' :
+               element.paragraphStyle?.alignment === 'right' ? 'flex-end' : 'flex-start') : 'flex-start',
             wordWrap: 'break-word',
-            whiteSpace: element.type === ELEMENT_TYPES.TEXT ? 'pre-wrap' : 'nowrap',
-            pointerEvents: 'none' // Importante: evitar interferencia
+            whiteSpace: element.paragraphStyle?.wordWrap === false ? 'nowrap' : 'pre-wrap',
+            pointerEvents: 'none', // Importante: evitar interferencia
+            
+            // ✅ Aplicar estilos de texto también al contenedor
+            ...(element.type === ELEMENT_TYPES.TEXT ? getTextStyles() : {})
           }}>
             {getElementContent()}
           </div>
         )}
         
-        {/* Textarea para edición inline - MEJORADO */}
+        {/* Textarea para edición inline */}
         {isEditing && element.type === ELEMENT_TYPES.TEXT && (
           <textarea
             ref={textareaRef}
@@ -286,11 +329,11 @@ const LayoutElement = ({
               height: '100%',
               border: '2px solid #3b82f6',
               background: '#ffffff',
-              fontSize: 'inherit',
-              fontFamily: 'inherit',
-              fontWeight: 'inherit',
-              color: 'inherit',
-              padding: '8px 12px',
+              
+              // ✅ Aplicar estilos de texto del elemento al textarea
+              ...getTextStyles(),
+              
+              padding: element.padding || '4px 8px',
               margin: 0,
               boxSizing: 'border-box',
               outline: 'none',
@@ -325,6 +368,9 @@ const LayoutElement = ({
           }}>
             {element.type} | ({Math.round(element.x)}, {Math.round(element.y)})
             {(element.width || element.height) && ` | ${element.width || 'auto'}×${element.height || 'auto'}`}
+            {/* ✅ Mostrar info de estilos si es texto */}
+            {element.type === ELEMENT_TYPES.TEXT && element.textStyle?.fontFamily && 
+              ` | ${element.textStyle.fontFamily}`}
           </div>
           
           {/* Handles de resize para rectángulos Y textos */}
@@ -359,15 +405,15 @@ const LayoutElement = ({
             </>
           )}
           
-          {/* Borde de selección */}
+          {/* Borde de selección sutil */}
           <div style={{
             position: 'absolute',
-            left: element.x - 2,
-            top: element.y - 2,
-            width: (element.width || 100) + 4,
-            height: (element.height || 50) + 4,
+            left: element.x - 1,
+            top: element.y - 1,
+            width: (element.width || 100) + 2,
+            height: (element.height || 50) + 2,
             border: '1px dashed #3b82f6',
-            borderRadius: '4px',
+            borderRadius: '3px',
             pointerEvents: 'none',
             zIndex: 1500,
             opacity: 0.7
