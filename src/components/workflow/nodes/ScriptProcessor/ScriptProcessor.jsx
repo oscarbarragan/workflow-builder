@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/ScriptProcessor/ScriptProcessor.jsx - CON OUTPUT SCHEMA
+// src/components/workflow/nodes/ScriptProcessor/ScriptProcessor.jsx - COMPONENTE PRINCIPAL REFACTORIZADO
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { 
@@ -8,22 +8,20 @@ import {
   Save,
   Eye,
   EyeOff,
-  CheckCircle,
-  FileText,
-  Database,
-  Zap,
-  ChevronRight,
-  ChevronDown,
-  Copy,
-  Info,
+  Settings,
   Plus,
-  Trash2,
-  RefreshCw,
-  Settings
+  RefreshCw
 } from 'lucide-react';
 import Button from '../../../common/Button/Button';
 import MonacoScriptEditor from './MonacoScriptEditor';
-import { scriptTemplates, getDefaultScript } from '../../../../utils/scriptTemplates';
+import OutputSchemaPanel from './OutputSchemaPanel';
+import InputDataPanel from './InputDataPanel';
+import ResultsPanel from './ResultsPanel';
+import DebugConsole from './DebugConsole';
+import ScriptToolbar from './ScriptToolbar';
+import ScriptHeader from './ScriptHeader';
+import ScriptFooter from './ScriptFooter';
+import { scriptTemplates } from '../../../../utils/scriptTemplates';
 
 const ScriptProcessor = ({ 
   isOpen, 
@@ -32,22 +30,28 @@ const ScriptProcessor = ({
   onSave,
   availableData = {} 
 }) => {
-  const [script, setScript] = useState(initialData.script || getDefaultScript());
+  // ✅ Estados principales
+  const [script, setScript] = useState(initialData.script || ''); // SIN TEMPLATE POR DEFECTO
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState(initialData.executionResult || null);
   const [executionError, setExecutionError] = useState(null);
   const [logs, setLogs] = useState([]);
   const [outputVariables, setOutputVariables] = useState(initialData.outputVariables || {});
+  
+  // ✅ Estados de UI
   const [showInputData, setShowInputData] = useState(true);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [showOutputPanel, setShowOutputPanel] = useState(true);
   
-  // ✅ NUEVO: Estados para Output Schema
+  // ✅ Estados para Output Schema
   const [outputSchema, setOutputSchema] = useState(initialData.outputSchema || []);
   const [previewData, setPreviewData] = useState({});
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(true);
-  const [showOutputPanel, setShowOutputPanel] = useState(true);
 
-  // Disable ReactFlow when modal is open
+  // ✅ NUEVO: Estado para validación de Monaco
+  const [monacoMarkers, setMonacoMarkers] = useState([]);
+
+  // ✅ CORREGIDO: Deshabilitar ReactFlow cuando el modal esté abierto
   useEffect(() => {
     if (isOpen) {
       const reactFlowWrapper = document.querySelector('.react-flow');
@@ -67,106 +71,8 @@ const ScriptProcessor = ({
     }
   }, [isOpen]);
 
-  // ✅ NUEVO: Auto-detectar variables del script
-  const detectOutputVariables = useCallback((scriptCode) => {
-    if (!autoDetectEnabled || !scriptCode) return;
-
-    try {
-      // Buscar patrones de return
-      const returnMatches = scriptCode.match(/return\s*{([^}]*)}/s);
-      if (returnMatches) {
-        const returnContent = returnMatches[1];
-        
-        // Extraer propiedades del objeto return
-        const propertyPattern = /(\w+)\s*:/g;
-        const detected = [];
-        let match;
-        
-        while ((match = propertyPattern.exec(returnContent)) !== null) {
-          const varName = match[1];
-          if (!detected.find(v => v.name === varName)) {
-            detected.push({
-              id: Date.now() + Math.random(),
-              name: varName,
-              type: 'auto',
-              dataType: 'unknown',
-              description: `Auto-detectado desde return`,
-              enabled: true,
-              source: 'auto-detect'
-            });
-          }
-        }
-
-        // Solo actualizar si hay cambios
-        if (detected.length > 0) {
-          setOutputSchema(prev => {
-            const manual = prev.filter(v => v.source !== 'auto-detect');
-            return [...manual, ...detected];
-          });
-        }
-      }
-    } catch (error) {
-      console.warn('Error auto-detecting variables:', error);
-    }
-  }, [autoDetectEnabled]);
-
-  // ✅ NUEVO: Auto-detectar cuando cambie el script
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      detectOutputVariables(script);
-    }, 1000); // Debounce de 1 segundo
-
-    return () => clearTimeout(timeoutId);
-  }, [script, detectOutputVariables]);
-
-  // ✅ NUEVO: Generar preview en tiempo real
-  const generatePreview = useCallback(async () => {
-    if (!script || Object.keys(availableData).length === 0) return;
-
-    try {
-      const expandedData = expandInputData(availableData);
-      const sandboxedFunction = new Function('input', 'console', script);
-      
-      const mockConsole = {
-        log: () => {},
-        error: () => {},
-        warn: () => {}
-      };
-      
-      const result = await sandboxedFunction(expandedData, mockConsole);
-      
-      if (result && typeof result === 'object') {
-        setPreviewData(result);
-        
-        // Actualizar tipos detectados automáticamente
-        setOutputSchema(prev => prev.map(variable => {
-          if (variable.source === 'auto-detect' && result.hasOwnProperty(variable.name)) {
-            return {
-              ...variable,
-              dataType: inferType(result[variable.name]),
-              previewValue: result[variable.name]
-            };
-          }
-          return variable;
-        }));
-      }
-    } catch (error) {
-      console.warn('Preview generation failed:', error);
-      setPreviewData({});
-    }
-  }, [script, availableData]);
-
-  // ✅ NUEVO: Preview automático
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      generatePreview();
-    }, 1500); // Debounce de 1.5 segundos
-
-    return () => clearTimeout(timeoutId);
-  }, [generatePreview]);
-
-  // Función para expandir datos (reutilizada)
-  const expandInputData = (data, level = 0) => {
+  // ✅ CORREGIDO: Función segura para expandir datos de entrada
+  const expandInputData = useCallback((data, level = 0) => {
     const result = {};
     
     Object.entries(data).forEach(([key, value]) => {
@@ -204,132 +110,493 @@ const ScriptProcessor = ({
     });
     
     return result;
-  };
+  }, []);
 
-  // ✅ NUEVO: Renderizar árbol JSON expandible
-  const renderJsonTree = (obj, path = '', level = 0) => {
-    if (obj === null || obj === undefined) {
-      return <span style={{ color: '#6b7280', fontStyle: 'italic' }}>null</span>;
-    }
+  // ✅ MEJORADO: Auto-detectar variables del script de forma más robusta
+  const detectOutputVariables = useCallback((scriptCode) => {
+    if (!autoDetectEnabled || !scriptCode) return;
 
-    if (typeof obj !== 'object') {
-      const color = typeof obj === 'string' ? '#16a34a' : 
-                   typeof obj === 'number' ? '#2563eb' : 
-                   typeof obj === 'boolean' ? '#dc2626' : '#6b7280';
-      return (
-        <span style={{ color }}>
-          {typeof obj === 'string' ? `"${obj}"` : String(obj)}
-        </span>
-      );
-    }
-
-    if (Array.isArray(obj)) {
-      const nodeKey = `array-${path}`;
-      const isExpanded = expandedNodes.has(nodeKey);
+    try {
+      console.log('🔍 Auto-detecting variables from script:', scriptCode);
       
-      return (
-        <div style={{ marginLeft: level * 16 }}>
-          <div 
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              cursor: 'pointer',
-              padding: '2px 0'
-            }}
-            onClick={() => {
-              const newExpanded = new Set(expandedNodes);
-              if (isExpanded) {
-                newExpanded.delete(nodeKey);
-              } else {
-                newExpanded.add(nodeKey);
+      // Buscar múltiples patrones de return
+      const patterns = [
+        /return\s*{([^}]*)}/s,           // return { ... }
+        /return\s+(\w+)/g,              // return variable
+        /return\s*\(\s*{([^}]*)}\s*\)/s // return ({ ... })
+      ];
+      
+      const detected = [];
+      
+      patterns.forEach(pattern => {
+        const matches = scriptCode.match(pattern);
+        if (matches) {
+          console.log('🎯 Found return pattern:', matches[0]);
+          
+          if (pattern.source.includes('{')) {
+            // Extraer propiedades del objeto return
+            const returnContent = matches[1];
+            const propertyPattern = /(\w+)\s*:/g;
+            let match;
+            
+            while ((match = propertyPattern.exec(returnContent)) !== null) {
+              const varName = match[1];
+              if (!detected.find(v => v.name === varName)) {
+                detected.push({
+                  id: Date.now() + Math.random(),
+                  name: varName,
+                  type: 'auto',
+                  dataType: 'unknown',
+                  description: `Auto-detectado desde return statement`,
+                  enabled: true,
+                  source: 'auto-detect'
+                });
+                console.log('✅ Auto-detected variable:', varName);
               }
-              setExpandedNodes(newExpanded);
-            }}
-          >
-            {obj.length > 0 && (
-              isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />
-            )}
-            <span style={{ color: '#7c3aed', fontWeight: '500', marginLeft: 4 }}>
-              Array[{obj.length}]
-            </span>
-          </div>
-          {isExpanded && obj.map((item, index) => (
-            <div key={index} style={{ marginLeft: 16 }}>
-              <span style={{ color: '#6b7280' }}>[{index}]: </span>
-              {renderJsonTree(item, `${path}[${index}]`, level + 1)}
-            </div>
-          ))}
-        </div>
-      );
-    }
-
-    const keys = Object.keys(obj);
-    const nodeKey = `object-${path}`;
-    const isExpanded = expandedNodes.has(nodeKey);
-
-    return (
-      <div style={{ marginLeft: level * 16 }}>
-        <div 
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            cursor: 'pointer',
-            padding: '2px 0'
-          }}
-          onClick={() => {
-            const newExpanded = new Set(expandedNodes);
-            if (isExpanded) {
-              newExpanded.delete(nodeKey);
-            } else {
-              newExpanded.add(nodeKey);
             }
-            setExpandedNodes(newExpanded);
-          }}
-        >
-          {keys.length > 0 && (
-            isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />
-          )}
-          <span style={{ color: '#f59e0b', fontWeight: '500', marginLeft: 4 }}>
-            Object{keys.length > 0 ? `{${keys.length}}` : '{}'}
-          </span>
-        </div>
-        {isExpanded && keys.map(key => (
-          <div key={key} style={{ marginLeft: 16, padding: '1px 0' }}>
-            <span style={{ color: '#1f2937', fontWeight: '500' }}>{key}: </span>
-            {renderJsonTree(obj[key], `${path}.${key}`, level + 1)}
-          </div>
-        ))}
-      </div>
-    );
-  };
+          }
+        }
+      });
 
-  // ✅ NUEVO: Agregar variable manual al schema
-  const addOutputVariable = () => {
-    const newVariable = {
-      id: Date.now() + Math.random(),
-      name: '',
-      type: 'manual',
-      dataType: 'string',
-      description: '',
-      enabled: true,
-      source: 'manual'
+      // Solo actualizar si hay cambios
+      if (detected.length > 0) {
+        setOutputSchema(prev => {
+          const manual = prev.filter(v => v.source !== 'auto-detect');
+          const updated = [...manual, ...detected];
+          console.log('📝 Updated schema with auto-detected variables:', updated);
+          return updated;
+        });
+        
+        // Log para debug
+        setLogs(prev => [...prev, {
+          type: 'info',
+          message: `🔍 Auto-detectadas ${detected.length} variables: ${detected.map(v => v.name).join(', ')}`,
+          timestamp: new Date().toISOString()
+        }]);
+      } else {
+        console.log('ℹ️ No variables auto-detected');
+        setLogs(prev => [...prev, {
+          type: 'warn',
+          message: '🔍 No se encontraron variables en el return statement',
+          timestamp: new Date().toISOString()
+        }]);
+      }
+    } catch (error) {
+      console.warn('Error auto-detecting variables:', error);
+      setLogs(prev => [...prev, {
+        type: 'error',
+        message: `❌ Error en auto-detección: ${error.message}`,
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  }, [autoDetectEnabled]);
+
+  // ✅ MEJORADO: Generar preview en tiempo real de forma más segura
+  const generatePreview = useCallback(async () => {
+    if (!script || Object.keys(availableData).length === 0) return;
+
+    try {
+      const expandedData = expandInputData(availableData);
+      
+      console.log('🔄 Generating preview with data:', expandedData);
+      
+      // ✅ MEJORADO: Función más segura que captura todos los errores
+      const createSafeFunction = (code) => {
+        // Crear un contexto sandboxed más seguro
+        const safeInput = JSON.parse(JSON.stringify(expandedData));
+        
+        const mockConsole = {
+          log: (...args) => {
+            setLogs(prev => [...prev, {
+              type: 'log',
+              message: `[Preview] ${args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+              ).join(' ')}`,
+              timestamp: new Date().toISOString()
+            }]);
+          },
+          error: (...args) => {
+            setLogs(prev => [...prev, {
+              type: 'error',
+              message: `[Preview Error] ${args.map(arg => String(arg)).join(' ')}`,
+              timestamp: new Date().toISOString()
+            }]);
+          },
+          warn: (...args) => {
+            setLogs(prev => [...prev, {
+              type: 'warn',
+              message: `[Preview Warning] ${args.map(arg => String(arg)).join(' ')}`,
+              timestamp: new Date().toISOString()
+            }]);
+          }
+        };
+        
+        try {
+          // ✅ CORREGIDO: Detectar errores comunes antes de ejecutar
+          if (code.includes('.toString;') && !code.includes('.toString();')) {
+            const suggestion = code.replace(/\.toString;/g, '.toString();');
+            setLogs(prev => [...prev, {
+              type: 'warn',
+              message: `⚠️ Posible error: usa .toString() en lugar de .toString - Sugerencia: ${suggestion}`,
+              timestamp: new Date().toISOString()
+            }]);
+            
+            // Corregir automáticamente para preview
+            code = suggestion;
+          }
+          
+          // Envolver el código en try-catch interno
+          const wrappedCode = `
+            try {
+              ${code}
+            } catch (previewError) {
+              console.error('Error en preview:', previewError.message);
+              return { 
+                _error: true,
+                _errorMessage: previewError.message,
+                _suggestion: previewError.message.includes('toString') ? 
+                  'Usa .toString() con paréntesis, no .toString sin paréntesis' : 
+                  'Revisa la sintaxis de tu código',
+                timestamp: new Date().toISOString() 
+              };
+            }
+          `;
+          
+          const sandboxedFunction = new Function('input', 'console', wrappedCode);
+          return sandboxedFunction(safeInput, mockConsole);
+        } catch (error) {
+          console.warn('Preview function creation failed:', error);
+          setLogs(prev => [...prev, {
+            type: 'error',
+            message: `❌ Error creando función de preview: ${error.message}`,
+            timestamp: new Date().toISOString()
+          }]);
+          return { 
+            _error: true, 
+            _errorMessage: error.message,
+            _isCreationError: true
+          };
+        }
+      };
+      
+      const result = createSafeFunction(script);
+      
+      if (result && typeof result === 'object') {
+        if (result._error) {
+          // Mostrar error en preview pero no romper la aplicación
+          setPreviewData({ 
+            error: result._errorMessage,
+            suggestion: result._suggestion,
+            timestamp: result.timestamp 
+          });
+          
+          console.warn('Preview execution error:', result._errorMessage);
+        } else {
+          setPreviewData(result);
+          
+          // Actualizar tipos detectados automáticamente
+          setOutputSchema(prev => prev.map(variable => {
+            if (variable.source === 'auto-detect' && result.hasOwnProperty(variable.name)) {
+              return {
+                ...variable,
+                dataType: inferType(result[variable.name]),
+                previewValue: result[variable.name]
+              };
+            }
+            return variable;
+          }));
+          
+          console.log('✅ Preview generated successfully');
+        }
+      } else {
+        setPreviewData({});
+      }
+    } catch (error) {
+      console.warn('Preview generation failed:', error);
+      setPreviewData({ 
+        error: error.message,
+        suggestion: 'Revisa la sintaxis de tu código JavaScript'
+      });
+      
+      setLogs(prev => [...prev, {
+        type: 'error',
+        message: `❌ Error generando preview: ${error.message}`,
+        timestamp: new Date().toISOString()
+      }]);
+    }
+  }, [script, availableData, expandInputData]);
+
+  // ✅ NUEVO: Manejar inserción de código desde el Output Schema
+  useEffect(() => {
+    const handleInsertInEditor = (event) => {
+      const { text, type, suggestion } = event.detail;
+      
+      if (type === 'variable' && suggestion) {
+        // Insertar sugerencia de código
+        const currentScript = script;
+        let newScript;
+        
+        if (currentScript.includes('return {')) {
+          // Si ya hay un return object, insertar la variable dentro
+          newScript = currentScript.replace(
+            /return\s*{([^}]*)}/, 
+            (match, content) => {
+              const trimmedContent = content.trim();
+              const separator = trimmedContent ? ',\n    ' : '\n    ';
+              return `return {${trimmedContent}${separator}${suggestion.replace('//', '').trim()}\n  }`;
+            }
+          );
+        } else if (currentScript.includes('return ')) {
+          // Si hay return pero no es objeto, agregarlo al final
+          newScript = currentScript + '\n\n// Variable agregada desde Output Schema:\n' + suggestion;
+        } else {
+          // Si no hay return, crear estructura básica
+          newScript = currentScript + (currentScript ? '\n\n' : '') + 
+            `// Estructura de retorno con variable desde Output Schema:
+return {
+    ${suggestion.replace('//', '').replace('// Asignar valor a ', '').trim()}
+};`;
+        }
+        
+        setScript(newScript);
+        
+        // Log de la acción
+        setLogs(prev => [...prev, {
+          type: 'info',
+          message: `📝 Variable "${text}" insertada en el editor`,
+          timestamp: new Date().toISOString()
+        }]);
+      }
     };
-    setOutputSchema(prev => [...prev, newVariable]);
+
+    window.addEventListener('insertInEditor', handleInsertInEditor);
+    
+    return () => {
+      window.removeEventListener('insertInEditor', handleInsertInEditor);
+    };
+  }, [script]);
+
+  // Auto-detectar cuando cambie el script (con debounce)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      detectOutputVariables(script);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [script, detectOutputVariables]);
+
+  // Preview automático (con debounce)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      generatePreview();
+    }, 1500);
+    return () => clearTimeout(timeoutId);
+  }, [generatePreview]);
+
+  // ✅ MEJORADO: Ejecutar script de forma más segura con mejor manejo de errores
+  const executeScript = async () => {
+    setIsExecuting(true);
+    setExecutionError(null);
+    setLogs([]);
+    
+    try {
+      const inputData = expandInputData(availableData);
+      console.log('🔄 Executing script with expanded input:', inputData);
+      
+      // Log de inicio
+      setLogs(prev => [...prev, {
+        type: 'info',
+        message: '🚀 Iniciando ejecución del script...',
+        timestamp: new Date().toISOString()
+      }]);
+      
+      // ✅ FUNCIÓN MÁS SEGURA: Detectar errores comunes antes de ejecutar
+      let processedScript = script;
+      
+      // Detectar y corregir errores comunes
+      if (script.includes('.toString;') && !script.includes('.toString();')) {
+        const correctedScript = script.replace(/\.toString;/g, '.toString();');
+        setLogs(prev => [...prev, {
+          type: 'warn',
+          message: '⚠️ Auto-corrección: .toString; → .toString()',
+          timestamp: new Date().toISOString()
+        }]);
+        processedScript = correctedScript;
+      }
+      
+      // Crear función con mejor manejo de errores
+      const createExecutionFunction = (code, input) => {
+        const mockConsole = {
+          log: (...args) => {
+            const logEntry = {
+              type: 'log',
+              message: `📝 ${args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+              ).join(' ')}`,
+              timestamp: new Date().toISOString()
+            };
+            setLogs(prev => [...prev, logEntry]);
+          },
+          error: (...args) => {
+            const logEntry = {
+              type: 'error',
+              message: `❌ ${args.map(arg => String(arg)).join(' ')}`,
+              timestamp: new Date().toISOString()
+            };
+            setLogs(prev => [...prev, logEntry]);
+          },
+          warn: (...args) => {
+            const logEntry = {
+              type: 'warn',
+              message: `⚠️ ${args.map(arg => String(arg)).join(' ')}`,
+              timestamp: new Date().toISOString()
+            };
+            setLogs(prev => [...prev, logEntry]);
+          },
+          info: (...args) => {
+            const logEntry = {
+              type: 'info',
+              message: `ℹ️ ${args.map(arg => String(arg)).join(' ')}`,
+              timestamp: new Date().toISOString()
+            };
+            setLogs(prev => [...prev, logEntry]);
+          }
+        };
+        
+        // Crear una copia segura del input para evitar mutaciones
+        const safeInput = JSON.parse(JSON.stringify(input));
+        
+        try {
+          // Añadir validaciones adicionales
+          if (!code.trim()) {
+            throw new Error('El script está vacío');
+          }
+          
+          if (!code.includes('return')) {
+            setLogs(prev => [...prev, {
+              type: 'warn',
+              message: '⚠️ El script no contiene un statement "return". No se generarán variables de salida.',
+              timestamp: new Date().toISOString()
+            }]);
+          }
+          
+          // ✅ CORREGIDO: Evaluar todo el código, no solo return
+          // Esto permite que console.log funcione correctamente
+          const sandboxedFunction = new Function('input', 'console', 
+            `
+            ${code}
+            `
+          );
+          
+          const result = sandboxedFunction(safeInput, mockConsole);
+          
+          setLogs(prev => [...prev, {
+            type: 'info',
+            message: '✅ Script ejecutado exitosamente',
+            timestamp: new Date().toISOString()
+          }]);
+          
+          return result;
+        } catch (error) {
+          // Mejor análisis del error
+          let errorMessage = error.message;
+          let suggestion = '';
+          
+          if (error.message.includes('toString') && error.message.includes('requires')) {
+            errorMessage = 'Error con .toString - falta paréntesis ()';
+            suggestion = 'Usa .toString() en lugar de .toString';
+          } else if (error.message.includes('is not defined')) {
+            errorMessage = `Variable no definida: ${error.message}`;
+            suggestion = 'Verifica que todas las variables estén disponibles en input';
+          } else if (error.message.includes('Cannot read property')) {
+            errorMessage = `Propiedad inexistente: ${error.message}`;
+            suggestion = 'Verifica que las propiedades del objeto existan antes de acceder';
+          }
+          
+          setLogs(prev => [...prev, {
+            type: 'error',
+            message: `💥 ${errorMessage}`,
+            timestamp: new Date().toISOString()
+          }]);
+          
+          if (suggestion) {
+            setLogs(prev => [...prev, {
+              type: 'info',
+              message: `💡 Sugerencia: ${suggestion}`,
+              timestamp: new Date().toISOString()
+            }]);
+          }
+          
+          throw new Error(`${errorMessage}${suggestion ? ` - ${suggestion}` : ''}`);
+        }
+      };
+      
+      const result = createExecutionFunction(processedScript, inputData);
+      setExecutionResult(result);
+      
+      if (result && typeof result === 'object') {
+        const newOutputVariables = {};
+        
+        const processObject = (obj, prefix = '') => {
+          Object.entries(obj).forEach(([key, value]) => {
+            const fullKey = prefix ? `${prefix}.${key}` : key;
+            
+            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+              processObject(value, fullKey);
+            } else {
+              newOutputVariables[fullKey] = {
+                type: inferType(value),
+                value: value,
+                displayValue: String(value).length > 50 
+                  ? String(value).substring(0, 50) + '...'
+                  : String(value)
+              };
+            }
+          });
+        };
+        
+        processObject(result);
+        setOutputVariables(newOutputVariables);
+        
+        setLogs(prev => [...prev, {
+          type: 'info',
+          message: `📊 Generadas ${Object.keys(newOutputVariables).length} variables de salida`,
+          timestamp: new Date().toISOString()
+        }]);
+      }
+      
+    } catch (error) {
+      const errorMessage = error.message || 'Error desconocido en la ejecución';
+      setExecutionError(errorMessage);
+      setLogs(prev => [...prev, {
+        type: 'error',
+        message: `❌ Error de Ejecución: ${errorMessage}`,
+        timestamp: new Date().toISOString()
+      }]);
+    } finally {
+      setIsExecuting(false);
+      setLogs(prev => [...prev, {
+        type: 'info',
+        message: '🏁 Ejecución finalizada',
+        timestamp: new Date().toISOString()
+      }]);
+    }
   };
 
-  // ✅ NUEVO: Actualizar variable del schema
-  const updateOutputVariable = (id, updates) => {
-    setOutputSchema(prev => prev.map(variable => 
-      variable.id === id ? { ...variable, ...updates } : variable
-    ));
+  // Función para inferir tipos
+  const inferType = (value) => {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    if (typeof value === 'object') return 'object';
+    if (typeof value === 'boolean') return 'boolean';
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'string') {
+      if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
+      return 'string';
+    }
+    return 'unknown';
   };
 
-  // ✅ NUEVO: Eliminar variable del schema
-  const removeOutputVariable = (id) => {
-    setOutputSchema(prev => prev.filter(variable => variable.id !== id));
-  };
-
-  // Generar autocompletado (función existente simplificada)
+  // Generar autocompletado
   const generateAutocompleteSuggestions = () => {
     const expandedData = expandInputData(availableData);
     const suggestions = [];
@@ -383,101 +650,15 @@ const ScriptProcessor = ({
     return suggestions.sort((a, b) => (a.priority || 5) - (b.priority || 5));
   };
 
-  const executeScript = async () => {
-    setIsExecuting(true);
-    setExecutionError(null);
-    setLogs([]);
-    
-    try {
-      const inputData = expandInputData(availableData);
-      console.log('🔄 Executing script with expanded input:', inputData);
-      
-      const sandboxedFunction = new Function('input', 'console', script);
-      
-      const mockConsole = {
-        log: (...args) => {
-          const logEntry = {
-            type: 'log',
-            message: args.map(arg => 
-              typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-            ).join(' '),
-            timestamp: new Date().toISOString()
-          };
-          setLogs(prev => [...prev, logEntry]);
-        },
-        error: (...args) => {
-          const logEntry = {
-            type: 'error',
-            message: args.map(arg => String(arg)).join(' '),
-            timestamp: new Date().toISOString()
-          };
-          setLogs(prev => [...prev, logEntry]);
-        },
-        warn: (...args) => {
-          const logEntry = {
-            type: 'warn',
-            message: args.map(arg => String(arg)).join(' '),
-            timestamp: new Date().toISOString()
-          };
-          setLogs(prev => [...prev, logEntry]);
-        }
-      };
-      
-      const result = await sandboxedFunction(inputData, mockConsole);
-      setExecutionResult(result);
-      
-      if (result && typeof result === 'object') {
-        const newOutputVariables = {};
-        
-        const processObject = (obj, prefix = '') => {
-          Object.entries(obj).forEach(([key, value]) => {
-            const fullKey = prefix ? `${prefix}.${key}` : key;
-            
-            if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-              processObject(value, fullKey);
-            } else {
-              newOutputVariables[fullKey] = {
-                type: inferType(value),
-                value: value,
-                displayValue: String(value).length > 50 
-                  ? String(value).substring(0, 50) + '...'
-                  : String(value)
-              };
-            }
-          });
-        };
-        
-        processObject(result);
-        setOutputVariables(newOutputVariables);
-      }
-      
-    } catch (error) {
-      setExecutionError(error.message);
-      setLogs(prev => [...prev, {
-        type: 'error',
-        message: `Execution Error: ${error.message}`,
-        timestamp: new Date().toISOString()
-      }]);
-    } finally {
-      setIsExecuting(false);
+  // ✅ MANEJADORES PARA LOS COMPONENTES HIJO
+  const handleScriptTemplate = (templateKey) => {
+    const template = scriptTemplates[templateKey];
+    if (template) {
+      setScript(template);
     }
-  };
-
-  const inferType = (value) => {
-    if (value === null) return 'null';
-    if (Array.isArray(value)) return 'array';
-    if (typeof value === 'object') return 'object';
-    if (typeof value === 'boolean') return 'boolean';
-    if (typeof value === 'number') return 'number';
-    if (typeof value === 'string') {
-      if (/^\d{4}-\d{2}-\d{2}/.test(value)) return 'date';
-      return 'string';
-    }
-    return 'unknown';
   };
 
   const handleSave = () => {
-    // ✅ NUEVO: Incluir output schema en el guardado
     const savedData = {
       script,
       executionResult,
@@ -492,7 +673,6 @@ const ScriptProcessor = ({
     onClose();
   };
 
-  // ✅ NUEVO: Generar variables de salida desde el schema
   const generateOutputVariablesFromSchema = () => {
     const variables = {};
     
@@ -521,19 +701,14 @@ const ScriptProcessor = ({
   };
 
   const handleClose = () => {
-    setScript(getDefaultScript());
+    setScript(''); // ✅ LIMPIO: Sin template por defecto
     setExecutionResult(null);
     setExecutionError(null);
-    setLogs([]);
+    setLogs([]); // ✅ NUEVO: Limpiar logs también
     setOutputVariables({});
     setOutputSchema([]);
     setPreviewData({});
     onClose();
-  };
-
-  const copyInputToClipboard = () => {
-    const inputData = expandInputData(availableData);
-    navigator.clipboard.writeText(JSON.stringify(inputData, null, 2));
   };
 
   if (!isOpen) return null;
@@ -578,687 +753,141 @@ const ScriptProcessor = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
-          borderBottom: '2px solid #e5e7eb',
-          paddingBottom: '16px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '12px',
-              padding: '8px',
-              color: 'white'
-            }}>
-              <Code size={20} />
-            </div>
-            <h2 style={{
-              margin: 0,
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1f2937'
-            }}>
-              Script Processor
-            </h2>
-            <span style={{
-              fontSize: '11px',
-              background: '#e0f2fe',
-              color: '#0369a1',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              fontWeight: '500'
-            }}>
-              Con Output Schema
-            </span>
-          </div>
-          
-          <div style={{
-            fontSize: '12px',
-            color: '#6b7280',
-            fontFamily: 'monospace',
-            textAlign: 'center',
-            background: '#f3f4f6',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
-          }}>
-            <div><strong>Input:</strong> {Object.keys(expandedData).length} variables</div>
-            <div><strong>Output Schema:</strong> {outputSchema.filter(v => v.enabled).length} variables</div>
-            <div><strong>Status:</strong> {executionResult ? '✅ Executed' : outputSchema.length > 0 ? '📋 Schema Defined' : '⏸️ Ready'}</div>
-          </div>
-          
-          <button 
-            onClick={handleClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '8px',
-              borderRadius: '8px',
-              color: '#6b7280',
-              fontSize: '20px',
-              fontWeight: 'bold',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.background = '#f3f4f6'}
-            onMouseOut={(e) => e.target.style.background = 'none'}
-          >
-            ✕
-          </button>
-        </div>
+        <ScriptHeader 
+          expandedData={expandedData}
+          outputSchema={outputSchema}
+          executionResult={executionResult}
+          onClose={handleClose}
+        />
 
         {/* Toolbar */}
-        <div style={{
-          display: 'flex',
-          gap: '12px',
-          marginBottom: '24px',
-          flexWrap: 'wrap',
-          padding: '16px',
-          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0'
-        }}>
-          <Button
-            variant="success"
-            icon={<Play size={16} />}
-            onClick={executeScript}
-            disabled={isExecuting}
-            loading={isExecuting}
-            size="large"
-          >
-            {isExecuting ? 'Ejecutando...' : '▶️ Ejecutar & Test'}
-          </Button>
-          
-          <Button
-            variant="secondary"
-            icon={<RefreshCw size={16} />}
-            onClick={() => detectOutputVariables(script)}
-          >
-            🔍 Auto-detectar
-          </Button>
-          
-          <Button
-            variant="secondary"
-            icon={<Plus size={16} />}
-            onClick={addOutputVariable}
-          >
-            ➕ Variable
-          </Button>
-          
-          <Button
-            variant="secondary"
-            icon={<RotateCcw size={16} />}
-            onClick={() => setScript(getDefaultScript())}
-          >
-            🔄 Reset
-          </Button>
-          
-          <select
-            onChange={(e) => setScript(scriptTemplates[e.target.value] || getDefaultScript())}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              fontSize: '13px',
-              background: 'white',
-              cursor: 'pointer'
-            }}
-          >
-            <option value="">📄 Templates...</option>
-            <option value="basic">🚀 Básico</option>
-            <option value="dataMapper">🗂️ Data Mapper</option>
-            <option value="workflowData">🔄 Workflow</option>
-            <option value="dataTransform">⚡ Transformación</option>
-            <option value="validation">✅ Validación</option>
-            <option value="calculations">🧮 Cálculos</option>
-          </select>
-          
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <Button
-              variant="secondary"
-              icon={showInputData ? <EyeOff size={16} /> : <Eye size={16} />}
-              onClick={() => setShowInputData(!showInputData)}
-            >
-              {showInputData ? '👁️‍🗨️ Input' : '👁️ Input'}
-            </Button>
-            
-            <Button
-              variant="secondary"
-              icon={showOutputPanel ? <EyeOff size={16} /> : <Settings size={16} />}
-              onClick={() => setShowOutputPanel(!showOutputPanel)}
-            >
-              {showOutputPanel ? '📋 Schema' : '📋 Schema'}
-            </Button>
-          </div>
-        </div>
+        <ScriptToolbar 
+          isExecuting={isExecuting}
+          showInputData={showInputData}
+          showOutputPanel={showOutputPanel}
+          onExecute={executeScript}
+          onAutoDetect={() => detectOutputVariables(script)}
+          onAddVariable={() => {
+            const newVariable = {
+              id: Date.now() + Math.random(),
+              name: '',
+              type: 'manual',
+              dataType: 'string',
+              description: '',
+              enabled: true,
+              source: 'manual'
+            };
+            setOutputSchema(prev => [...prev, newVariable]);
+          }}
+          onReset={() => {
+            setScript('');
+            setLogs([]);
+            setExecutionError(null);
+            setExecutionResult(null);
+            setPreviewData({});
+          }}
+          onTemplateSelect={handleScriptTemplate}
+          onToggleInput={() => setShowInputData(!showInputData)}
+          onToggleSchema={() => setShowOutputPanel(!showOutputPanel)}
+        />
 
         {/* Main Content */}
         <div style={{ display: 'flex', gap: '20px', flex: 1, minHeight: 0 }}>
           
-          {/* Left Panel - Script Editor */}
-          <div style={{ flex: showOutputPanel ? '1 1 50%' : '1 1 70%', display: 'flex', flexDirection: 'column' }}>
+          {/* ✅ CORREGIDO: Editor se redimensiona correctamente con cálculo dinámico */}
+          <div style={{ 
+            flex: showOutputPanel ? '1 1 45%' : '1 1 65%', 
+            display: 'flex', 
+            flexDirection: 'column',
+            transition: 'flex-basis 0.3s ease', // Transición más específica
+            minWidth: '300px' // Ancho mínimo para evitar colapso
+          }}>
             <MonacoScriptEditor
               script={script}
               onScriptChange={setScript}
               executionError={executionError}
               availableData={expandedData}
               autocompleteSuggestions={generateAutocompleteSuggestions()}
+              onValidationChange={(markers) => {
+                // ✅ NUEVO: Capturar errores de validación de Monaco
+                setMonacoMarkers(markers || []);
+                
+                if (markers && markers.length > 0) {
+                  const errors = markers.filter(m => m.severity === 8); // Error severity
+                  const warnings = markers.filter(m => m.severity === 4); // Warning severity
+                  
+                  if (errors.length > 0) {
+                    console.log('🔍 Monaco errors detected:', errors);
+                  }
+                  
+                  if (warnings.length > 0) {
+                    console.log('⚠️ Monaco warnings detected:', warnings);
+                  }
+                }
+              }}
             />
           </div>
 
-          {/* Middle Panel - Output Schema */}
+          {/* Output Schema Panel - ✅ CORREGIDO: Tamaño fijo para evitar problemas */}
           {showOutputPanel && (
-            <div style={{ flex: '1 1 25%', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
-              
-              {/* Output Schema Panel */}
-              <div style={{
-                flex: 1,
-                border: '2px solid #e5e7eb',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                background: 'white',
-                minHeight: 0
-              }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                  padding: '12px 16px',
-                  color: 'white',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexShrink: 0
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Settings size={16} />
-                    Output Schema ({outputSchema.filter(v => v.enabled).length})
-                  </div>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      onClick={() => setAutoDetectEnabled(!autoDetectEnabled)}
-                      style={{
-                        background: autoDetectEnabled ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '4px 6px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '10px'
-                      }}
-                    >
-                      {autoDetectEnabled ? '🔍 AUTO' : '⏸️ OFF'}
-                    </button>
-                    <button
-                      onClick={addOutputVariable}
-                      style={{
-                        background: 'rgba(255,255,255,0.2)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '4px 6px',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: '10px'
-                      }}
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </div>
-                </div>
-                
-                <div style={{
-                  flex: 1,
-                  padding: '12px',
-                  overflow: 'auto',
-                  fontSize: '12px'
-                }}>
-                  {outputSchema.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {outputSchema.map((variable) => (
-                        <div 
-                          key={variable.id}
-                          style={{
-                            border: '1px solid #e5e7eb',
-                            borderRadius: '8px',
-                            padding: '10px',
-                            background: variable.enabled ? '#f8fafc' : '#f3f4f6'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                            <input
-                              type="checkbox"
-                              checked={variable.enabled}
-                              onChange={(e) => updateOutputVariable(variable.id, { enabled: e.target.checked })}
-                            />
-                            <span style={{
-                              fontSize: '10px',
-                              background: variable.source === 'auto-detect' ? '#dbeafe' : '#f3e8ff',
-                              color: variable.source === 'auto-detect' ? '#1e40af' : '#7c3aed',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontWeight: '500'
-                            }}>
-                              {variable.source === 'auto-detect' ? '🔍 AUTO' : '✋ MANUAL'}
-                            </span>
-                            <button
-                              onClick={() => removeOutputVariable(variable.id)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#dc2626',
-                                cursor: 'pointer',
-                                padding: '2px',
-                                marginLeft: 'auto'
-                              }}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                          
-                          <input
-                            type="text"
-                            placeholder="Variable name"
-                            value={variable.name}
-                            onChange={(e) => updateOutputVariable(variable.id, { name: e.target.value })}
-                            style={{
-                              width: '100%',
-                              padding: '4px 6px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              marginBottom: '4px'
-                            }}
-                          />
-                          
-                          <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
-                            <select
-                              value={variable.dataType}
-                              onChange={(e) => updateOutputVariable(variable.id, { dataType: e.target.value })}
-                              style={{
-                                flex: 1,
-                                padding: '2px 4px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                fontSize: '10px'
-                              }}
-                            >
-                              <option value="string">String</option>
-                              <option value="number">Number</option>
-                              <option value="boolean">Boolean</option>
-                              <option value="array">Array</option>
-                              <option value="object">Object</option>
-                              <option value="date">Date</option>
-                            </select>
-                          </div>
-                          
-                          {variable.previewValue !== undefined && (
-                            <div style={{
-                              background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
-                              borderRadius: '4px',
-                              padding: '4px 6px',
-                              fontSize: '10px',
-                              color: '#166534',
-                              fontFamily: 'monospace'
-                            }}>
-                              Preview: {JSON.stringify(variable.previewValue)}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      padding: '20px',
-                      fontStyle: 'italic'
-                    }}>
-                      <Settings size={24} style={{ opacity: 0.5, marginBottom: '8px' }} />
-                      <div>No output variables defined</div>
-                      <div style={{ fontSize: '10px', marginTop: '4px' }}>
-                        Add manually or write a return statement
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+            <div style={{ 
+              flex: '0 0 280px', // Flex fijo en lugar de porcentaje
+              display: 'flex', 
+              flexDirection: 'column',
+              transition: 'opacity 0.3s ease',
+              minWidth: '280px',
+              maxWidth: '320px'
+            }}>
+              <OutputSchemaPanel 
+                outputSchema={outputSchema}
+                autoDetectEnabled={autoDetectEnabled}
+                previewData={previewData}
+                onSchemaChange={setOutputSchema}
+                onAutoDetectToggle={setAutoDetectEnabled}
+              />
             </div>
           )}
 
-          {/* Right Panel - Data & Results */}
-          <div style={{ flex: '1 1 25%', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
+          {/* Input & Results Panel */}
+          <div style={{ 
+            flex: showOutputPanel ? '1 1 300px' : '1 1 35%', 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: '16px', 
+            minHeight: 0,
+            minWidth: '280px'
+          }}>
             
             {/* Input Data */}
             {showInputData && Object.keys(expandedData).length > 0 && (
-              <div style={{
-                flex: '0 0 200px',
-                border: '2px solid #e5e7eb',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                background: 'white'
-              }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  padding: '12px 16px',
-                  color: 'white',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexShrink: 0
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Database size={16} />
-                    Input Data ({Object.keys(expandedData).length})
-                  </div>
-                  <button
-                    onClick={copyInputToClipboard}
-                    style={{
-                      background: 'rgba(255,255,255,0.2)',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '4px 8px',
-                      color: 'white',
-                      cursor: 'pointer',
-                      fontSize: '11px'
-                    }}
-                  >
-                    <Copy size={12} />
-                  </button>
-                </div>
-                <div style={{
-                  padding: '12px',
-                  background: '#f8fafc',
-                  flex: 1,
-                  overflow: 'auto',
-                  fontSize: '12px',
-                  fontFamily: '"Fira Code", "SF Mono", "Monaco", monospace'
-                }}>
-                  {Object.keys(expandedData).length > 0 ? (
-                    Object.entries(expandedData).map(([key, value]) => (
-                      <div key={key} style={{ marginBottom: '8px' }}>
-                        <span style={{ color: '#1f2937', fontWeight: '600' }}>{key}: </span>
-                        {renderJsonTree(value, key, 0)}
-                      </div>
-                    ))
-                  ) : (
-                    <div style={{
-                      color: '#6b7280',
-                      fontStyle: 'italic',
-                      textAlign: 'center',
-                      padding: '20px'
-                    }}>
-                      No input data available
-                    </div>
-                  )}
-                </div>
-              </div>
+              <InputDataPanel 
+                expandedData={expandedData}
+                expandedNodes={expandedNodes}
+                onExpandedNodesChange={setExpandedNodes}
+              />
             )}
 
-            {/* Preview Results */}
-            <div style={{
-              flex: 1,
-              border: '2px solid #e5e7eb',
-              borderRadius: '12px',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'white',
-              minHeight: 0
-            }}>
-              <div style={{
-                background: Object.keys(previewData).length > 0
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
-                  : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
-                padding: '12px 16px',
-                color: 'white',
-                fontSize: '13px',
-                fontWeight: '600',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                flexShrink: 0
-              }}>
-                {Object.keys(previewData).length > 0 ? <CheckCircle size={16} /> : <FileText size={16} />}
-                {Object.keys(previewData).length > 0 ? 'Live Preview' : 'Preview Result'}
-              </div>
-              
-              <div style={{
-                flex: 1,
-                padding: '12px',
-                background: '#ffffff',
-                overflow: 'auto',
-                fontSize: '12px',
-                fontFamily: '"Fira Code", "SF Mono", "Monaco", monospace'
-              }}>
-                {Object.keys(previewData).length > 0 ? (
-                  <pre style={{ 
-                    margin: 0, 
-                    whiteSpace: 'pre-wrap',
-                    color: '#1f2937'
-                  }}>
-                    {JSON.stringify(previewData, null, 2)}
-                  </pre>
-                ) : (
-                  <div style={{
-                    color: '#6b7280',
-                    fontStyle: 'italic',
-                    textAlign: 'center',
-                    padding: '40px 20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <Code size={24} style={{ opacity: 0.5 }} />
-                    Write a script with return statement to see preview
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Console Logs */}
-            {logs.length > 0 && (
-              <div style={{
-                flex: '0 0 120px',
-                border: '2px solid #e5e7eb',
-                borderRadius: '12px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                background: 'white'
-              }}>
-                <div style={{
-                  background: 'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-                  padding: '12px 16px',
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  flexShrink: 0
-                }}>
-                  <Code size={16} />
-                  Console Output ({logs.length})
-                </div>
-                <div style={{
-                  padding: '8px',
-                  background: '#111827',
-                  flex: 1,
-                  overflow: 'auto',
-                  fontSize: '11px',
-                  fontFamily: '"Fira Code", "SF Mono", "Monaco", monospace'
-                }}>
-                  {logs.map((log, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        color: log.type === 'error' ? '#ef4444' : 
-                               log.type === 'warn' ? '#f59e0b' : '#10b981',
-                        marginBottom: '4px',
-                        whiteSpace: 'pre-wrap',
-                        padding: '2px 0'
-                      }}
-                    >
-                      <span style={{ color: '#6b7280', fontSize: '9px' }}>
-                        [{new Date(log.timestamp).toLocaleTimeString()}]
-                      </span> {log.message}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Results Panel */}
+            <ResultsPanel 
+              previewData={previewData}
+              logs={logs}
+            />
+            
+            {/* ✅ NUEVO: Consola de Debug */}
+            <DebugConsole 
+              logs={logs}
+              executionError={executionError}
+              onClearLogs={() => setLogs([])}
+            />
           </div>
         </div>
-
-        {/* Output Variables Summary */}
-        {outputSchema.filter(v => v.enabled).length > 0 && (
-          <div style={{
-            marginTop: '20px',
-            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-            border: '2px solid #bbf7d0',
-            borderRadius: '12px',
-            padding: '16px'
-          }}>
-            <h5 style={{
-              margin: '0 0 12px 0',
-              fontSize: '14px',
-              color: '#15803d',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontWeight: '600'
-            }}>
-              <Zap size={16} />
-              Variables de Salida Definidas ({outputSchema.filter(v => v.enabled).length})
-            </h5>
-            
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-              gap: '12px',
-              maxHeight: '120px',
-              overflowY: 'auto'
-            }}>
-              {outputSchema.filter(v => v.enabled && v.name).map((variable) => (
-                <div
-                  key={variable.id}
-                  style={{
-                    fontSize: '12px',
-                    padding: '8px 12px',
-                    background: '#f0fdf4',
-                    color: '#166534',
-                    borderRadius: '8px',
-                    border: '1px solid #bbf7d0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <strong>{variable.name}</strong>
-                    <span style={{ 
-                      fontSize: '10px',
-                      background: '#dcfce7',
-                      padding: '2px 6px',
-                      borderRadius: '4px'
-                    }}>
-                      {variable.dataType}
-                    </span>
-                    <span style={{ 
-                      fontSize: '9px',
-                      background: variable.source === 'auto-detect' ? '#dbeafe' : '#f3e8ff',
-                      color: variable.source === 'auto-detect' ? '#1e40af' : '#7c3aed',
-                      padding: '1px 4px',
-                      borderRadius: '3px'
-                    }}>
-                      {variable.source === 'auto-detect' ? 'AUTO' : 'MANUAL'}
-                    </span>
-                  </div>
-                  {variable.previewValue !== undefined && (
-                    <div style={{ 
-                      fontSize: '10px',
-                      color: '#15803d',
-                      fontFamily: 'monospace',
-                      background: '#dcfce7',
-                      padding: '2px 4px',
-                      borderRadius: '3px',
-                      maxWidth: '100%',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }}>
-                      Preview: {JSON.stringify(variable.previewValue)}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Footer */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '24px',
-          paddingTop: '20px',
-          borderTop: '2px solid #e5e7eb'
-        }}>
-          <div style={{
-            fontSize: '13px',
-            color: '#6b7280',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Info size={14} />
-              <span>Define variables en Output Schema • Auto-detección disponible • Preview en tiempo real</span>
-            </div>
-            {outputSchema.filter(v => v.enabled).length > 0 && (
-              <div style={{ 
-                color: '#8b5cf6',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <Settings size={14} />
-                <strong>{outputSchema.filter(v => v.enabled).length}</strong> variables configuradas
-              </div>
-            )}
-          </div>
-          
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <Button
-              variant="secondary"
-              onClick={handleClose}
-              size="large"
-            >
-              ❌ Cancelar
-            </Button>
-            
-            <Button
-              variant="primary"
-              onClick={handleSave}
-              size="large"
-              icon={<Save size={18} />}
-            >
-              💾 Guardar Schema
-            </Button>
-          </div>
-        </div>
+        <ScriptFooter 
+          outputSchema={outputSchema}
+          onCancel={handleClose}
+          onSave={handleSave}
+        />
       </div>
     </div>,
     document.body

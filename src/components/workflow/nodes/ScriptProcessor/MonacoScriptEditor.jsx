@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/ScriptProcessor/MonacoScriptEditor.jsx - CON MONACO EDITOR
+// src/components/workflow/nodes/ScriptProcessor/MonacoScriptEditor.jsx - CON VALIDACIÓN MEJORADA
 import React, { useRef, useEffect } from 'react';
 import { AlertCircle, Lightbulb, Zap } from 'lucide-react';
 
@@ -7,7 +7,8 @@ const MonacoScriptEditor = ({
   onScriptChange, 
   executionError,
   availableData = {},
-  autocompleteSuggestions = []
+  autocompleteSuggestions = [],
+  onValidationChange = () => {} // ✅ NUEVO: Callback para validación
 }) => {
   const editorRef = useRef(null);
   const containerRef = useRef(null);
@@ -41,7 +42,7 @@ const MonacoScriptEditor = ({
     const initializeEditor = () => {
       if (!containerRef.current || editorRef.current) return;
 
-      // Crear el editor
+      // ✅ MEJORADO: Configuración más completa de Monaco
       editorRef.current = window.monaco.editor.create(containerRef.current, {
         value: script,
         language: 'javascript',
@@ -87,7 +88,65 @@ const MonacoScriptEditor = ({
         }
       });
 
-      // Registrar provider de autocompletado
+      // ✅ CORREGIDO: Configurar validación en tiempo real más estricta
+      window.monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,  // Habilitar validación semántica
+        noSyntaxValidation: false,    // Habilitar validación de sintaxis
+        noSuggestionDiagnostics: false,
+        // ✅ REDUCIDO: Menos códigos a ignorar para detectar más errores
+        diagnosticCodesToIgnore: [
+          80001 // Archivo no referenciado
+        ]
+      });
+
+      // ✅ MEJORADO: Configuraciones más estrictas de TypeScript
+      window.monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: window.monaco.languages.typescript.ScriptTarget.ES2020,
+        allowNonTsExtensions: true,
+        moduleResolution: window.monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: window.monaco.languages.typescript.ModuleKind.CommonJS,
+        noEmit: true,
+        esModuleInterop: true,
+        jsx: window.monaco.languages.typescript.JsxEmit.React,
+        reactNamespace: 'React',
+        allowJs: true,
+        typeRoots: ['node_modules/@types'],
+        // ✅ MEJORADO: Verificaciones más estrictas para detectar errores
+        strict: false, // Mantener false para evitar errores innecesarios
+        noImplicitAny: true,        // ✅ Detectar variables sin tipo
+        strictNullChecks: false,
+        strictFunctionTypes: true,   // ✅ Verificación estricta de tipos de función
+        noImplicitReturns: false,
+        noFallthroughCasesInSwitch: true,
+        // ✅ NUEVO: Detectar problemas comunes
+        noUnusedLocals: true,        // ✅ Variables no usadas
+        noUnusedParameters: false,   // Parámetros no usados (mantenemos false)
+        noImplicitOverride: false,
+        noPropertyAccessFromIndexSignature: true, // ✅ Acceso a propiedades más estricto
+        noUncheckedIndexedAccess: false,
+        // ✅ NUEVO: Configuraciones adicionales para mejor detección
+        alwaysStrict: true,
+        exactOptionalPropertyTypes: false,
+        noImplicitThis: true,        // ✅ Detectar uso incorrecto de 'this'
+        useUnknownInCatchVariables: false
+      });
+
+      // ✅ NUEVO: Listener para cambios en marcadores (errores/warnings)
+      const model = editorRef.current.getModel();
+      const updateMarkers = () => {
+        const markers = window.monaco.editor.getModelMarkers({ resource: model.uri });
+        console.log('🔍 Monaco markers updated:', markers);
+        onValidationChange(markers);
+      };
+
+      // Escuchar cambios en marcadores
+      window.monaco.editor.onDidChangeMarkers(([uri]) => {
+        if (model && uri.toString() === model.uri.toString()) {
+          updateMarkers();
+        }
+      });
+
+      // ✅ NUEVO: Registrar provider de autocompletado mejorado
       window.monaco.languages.registerCompletionItemProvider('javascript', {
         provideCompletionItems: (model, position) => {
           console.log('🎯 Monaco completion triggered at position:', position);
@@ -138,18 +197,57 @@ const MonacoScriptEditor = ({
             range: range
           });
 
-          // ✅ Métodos JavaScript comunes
+          // ✅ Métodos JavaScript comunes con snippets
           const jsMethods = [
-            { label: 'console.log', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'console.log(${1:value})', detail: 'Log to console' },
-            { label: 'console.error', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'console.error(${1:value})', detail: 'Error to console' },
-            { label: 'JSON.stringify', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'JSON.stringify(${1:obj}, null, 2)', detail: 'Convert to JSON' },
-            { label: 'JSON.parse', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'JSON.parse(${1:str})', detail: 'Parse JSON' },
-            { label: 'Object.keys', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'Object.keys(${1:obj})', detail: 'Get object keys' },
-            { label: 'Object.values', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'Object.values(${1:obj})', detail: 'Get object values' },
-            { label: 'Object.entries', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'Object.entries(${1:obj})', detail: 'Get key-value pairs' },
-            { label: 'typeof', kind: window.monaco.languages.CompletionItemKind.Keyword, insertText: 'typeof ${1:value}', detail: 'Get type' },
-            { label: 'new Date', kind: window.monaco.languages.CompletionItemKind.Constructor, insertText: 'new Date(${1:})', detail: 'Create new date' },
-            { label: 'Date.now', kind: window.monaco.languages.CompletionItemKind.Method, insertText: 'Date.now()', detail: 'Current timestamp' }
+            { 
+              label: 'console.log', 
+              kind: window.monaco.languages.CompletionItemKind.Method, 
+              insertText: 'console.log(${1:value})', 
+              detail: 'Log to console',
+              documentation: 'Imprime un mensaje en la consola de debug'
+            },
+            { 
+              label: 'console.error', 
+              kind: window.monaco.languages.CompletionItemKind.Method, 
+              insertText: 'console.error(${1:value})', 
+              detail: 'Error to console',
+              documentation: 'Imprime un error en la consola de debug'
+            },
+            { 
+              label: 'JSON.stringify', 
+              kind: window.monaco.languages.CompletionItemKind.Method, 
+              insertText: 'JSON.stringify(${1:obj}, null, 2)', 
+              detail: 'Convert to JSON',
+              documentation: 'Convierte un objeto a string JSON'
+            },
+            { 
+              label: 'JSON.parse', 
+              kind: window.monaco.languages.CompletionItemKind.Method, 
+              insertText: 'JSON.parse(${1:str})', 
+              detail: 'Parse JSON',
+              documentation: 'Convierte un string JSON a objeto'
+            },
+            { 
+              label: 'Object.keys', 
+              kind: window.monaco.languages.CompletionItemKind.Method, 
+              insertText: 'Object.keys(${1:obj})', 
+              detail: 'Get object keys',
+              documentation: 'Obtiene las llaves de un objeto'
+            },
+            { 
+              label: 'toString()', 
+              kind: window.monaco.languages.CompletionItemKind.Method, 
+              insertText: 'toString()', 
+              detail: 'Convert to string (with parentheses)',
+              documentation: 'Convierte un valor a string - IMPORTANTE: usar con paréntesis'
+            },
+            { 
+              label: 'return', 
+              kind: window.monaco.languages.CompletionItemKind.Snippet, 
+              insertText: 'return {\n\t${1:variable}: ${2:value}\n};', 
+              detail: 'Return object template',
+              documentation: 'Template para retornar un objeto con variables'
+            }
           ];
 
           jsMethods.forEach(method => {
@@ -165,26 +263,28 @@ const MonacoScriptEditor = ({
         }
       });
 
-      // Listener para cambios en el contenido
-      editorRef.current.onDidChangeModelContent(() => {
-        const value = editorRef.current.getValue();
-        onScriptChange(value);
-      });
-
-      // Configurar validación personalizada
-      window.monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-        noSemanticValidation: false,
-        noSyntaxValidation: false
-      });
-
-      // Agregar tipos personalizados para mejor IntelliSense
+      // ✅ NUEVO: Agregar tipos personalizados para mejor IntelliSense y validación
       const inputTypeDefinition = `
         declare const input: {
           ${Object.keys(availableData).map(key => {
             const value = availableData[key];
-            const type = typeof value === 'object' && value !== null ? 'object' : typeof value;
-            return `${key}: ${type};`;
-          }).join('\n          ')}
+            let type = 'any';
+            
+            if (typeof value === 'string') type = 'string';
+            else if (typeof value === 'number') type = 'number';
+            else if (typeof value === 'boolean') type = 'boolean';
+            else if (Array.isArray(value)) type = 'any[]';
+            else if (typeof value === 'object' && value !== null) type = 'object';
+            
+            return `  ${key}: ${type};`;
+          }).join('\n')}
+        };
+        
+        declare const console: {
+          log(message?: any, ...optionalParams: any[]): void;
+          error(message?: any, ...optionalParams: any[]): void;
+          warn(message?: any, ...optionalParams: any[]): void;
+          info(message?: any, ...optionalParams: any[]): void;
         };
       `;
 
@@ -193,7 +293,133 @@ const MonacoScriptEditor = ({
         'ts:workflow-types.d.ts'
       );
 
-      console.log('✅ Monaco Editor initialized with', suggestions.length, 'custom suggestions');
+      // ✅ CORREGIDO: Agregar validación personalizada para errores comunes
+      const setupCustomValidation = () => {
+        const model = editorRef.current.getModel();
+        if (!model) return;
+        
+        console.log('🔧 Setting up custom validation for model:', model.uri.toString());
+        
+        const validateToString = () => {
+          const value = model.getValue();
+          const lines = value.split('\n');
+          const markers = [];
+          
+          console.log('🔍 Validating content:', value);
+          
+          lines.forEach((line, index) => {
+            // Detectar .toString sin paréntesis
+            const toStringRegex = /\.toString(?!\()/g;
+            let match;
+            
+            while ((match = toStringRegex.exec(line)) !== null) {
+              console.log('❌ Found .toString without parentheses at line', index + 1, 'column', match.index + 1);
+              
+              markers.push({
+                severity: window.monaco.MarkerSeverity.Error,
+                startLineNumber: index + 1,
+                startColumn: match.index + 1,
+                endLineNumber: index + 1,
+                endColumn: match.index + match[0].length + 1,
+                message: 'Usa .toString() con paréntesis, no .toString',
+                code: 'missing-parentheses',
+                source: 'custom-validation'
+              });
+            }
+            
+            // ✅ NUEVO: Detectar otros errores comunes
+            
+            // Variables no definidas (que no están en input)
+            const varRegex = /\b(\w+)(?!\s*[:(])/g;
+            let varMatch;
+            while ((varMatch = varRegex.exec(line)) !== null) {
+              const varName = varMatch[1];
+              
+              // Excluir palabras reservadas y variables conocidas
+              const excludeList = ['return', 'console', 'input', 'const', 'let', 'var', 'function', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'undefined', 'this', 'Object', 'JSON', 'Date', 'Math', 'Array', 'String', 'Number', 'Boolean'];
+              
+              if (!excludeList.includes(varName) && 
+                  !Object.keys(availableData).includes(varName) && 
+                  !line.includes(`input.${varName}`) &&
+                  !line.includes(`${varName}:`)) {
+                
+                // Solo marcar si no es parte de una declaración o propiedad
+                if (!line.match(new RegExp(`\\b(const|let|var)\\s+${varName}\\b`)) &&
+                    !line.match(new RegExp(`${varName}\\s*:`))) {
+                  
+                  console.log('⚠️ Found potentially undefined variable:', varName);
+                  
+                  markers.push({
+                    severity: window.monaco.MarkerSeverity.Warning,
+                    startLineNumber: index + 1,
+                    startColumn: varMatch.index + 1,
+                    endLineNumber: index + 1,
+                    endColumn: varMatch.index + varMatch[0].length + 1,
+                    message: `Variable '${varName}' puede no estar definida. ¿Quisiste decir 'input.${varName}'?`,
+                    code: 'undefined-variable',
+                    source: 'custom-validation'
+                  });
+                }
+              }
+            }
+          });
+          
+          // ✅ CORREGIDO: Aplicar marcadores personalizados con owner específico
+          console.log('📌 Setting markers:', markers);
+          window.monaco.editor.setModelMarkers(model, 'custom-validation', markers);
+          
+          // También notificar al componente padre
+          setTimeout(() => {
+            const allMarkers = window.monaco.editor.getModelMarkers({ resource: model.uri });
+            console.log('📊 All markers after custom validation:', allMarkers);
+            onValidationChange(allMarkers);
+          }, 100);
+        };
+        
+        // ✅ CORREGIDO: Listener para cambios en el contenido
+        const contentChangeDisposable = model.onDidChangeContent(() => {
+          console.log('📝 Content changed, triggering validation...');
+          // Pequeño delay para mejor rendimiento
+          setTimeout(validateToString, 200);
+        });
+        
+        // Validación inicial
+        setTimeout(validateToString, 500);
+        
+        // Devolver función de limpieza
+        return () => {
+          contentChangeDisposable.dispose();
+        };
+      };
+
+      // ✅ CORREGIDO: Configurar validación después de que el editor esté listo
+      setTimeout(() => {
+        setupCustomValidation();
+      }, 1000);
+
+      // Listener para cambios en el contenido
+      editorRef.current.onDidChangeModelContent(() => {
+        const value = editorRef.current.getValue();
+        onScriptChange(value);
+      });
+
+      // ✅ NUEVO: Forzar validación inicial después de configurar todo
+      setTimeout(() => {
+        const model = editorRef.current.getModel();
+        if (model) {
+          // Forzar re-validación del modelo
+          window.monaco.editor.setModelLanguage(model, 'javascript');
+          
+          // Obtener marcadores iniciales
+          setTimeout(() => {
+            const markers = window.monaco.editor.getModelMarkers({ resource: model.uri });
+            console.log('🚀 Initial markers after setup:', markers);
+            onValidationChange(markers);
+          }, 200);
+        }
+      }, 1500);
+
+      console.log('✅ Monaco Editor initialized with enhanced validation');
     };
 
     loadMonaco();
@@ -279,6 +505,50 @@ const MonacoScriptEditor = ({
           }}>
             .: Auto-propiedades
           </span>
+          <span style={{
+            background: '#fef3c7',
+            color: '#92400e',
+            padding: '4px 8px',
+            borderRadius: '6px',
+            fontFamily: 'monospace',
+            fontSize: '10px'
+          }}>
+            ⚡ Validación en vivo
+          </span>
+          
+          {/* ✅ NUEVO: Botón para forzar validación */}
+          <button
+            onClick={() => {
+              if (editorRef.current) {
+                const model = editorRef.current.getModel();
+                if (model) {
+                  console.log('🔄 Forcing validation...');
+                  
+                  // Forzar re-validación
+                  window.monaco.editor.setModelLanguage(model, 'javascript');
+                  
+                  // Obtener marcadores
+                  setTimeout(() => {
+                    const markers = window.monaco.editor.getModelMarkers({ resource: model.uri });
+                    console.log('🔍 Forced validation markers:', markers);
+                    onValidationChange(markers);
+                  }, 100);
+                }
+              }
+            }}
+            style={{
+              background: '#fef3c7',
+              color: '#92400e',
+              border: '1px solid #fcd34d',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              fontSize: '10px',
+              cursor: 'pointer',
+              fontFamily: 'monospace'
+            }}
+          >
+            🔍 Validar
+          </button>
         </div>
       </div>
       
