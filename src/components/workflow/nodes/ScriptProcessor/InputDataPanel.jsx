@@ -10,10 +10,86 @@ const InputDataPanel = ({
   const [viewMode, setViewMode] = React.useState('tree'); // 'tree' o 'json'
 
   const copyInputToClipboard = () => {
-    navigator.clipboard.writeText(JSON.stringify(expandedData, null, 2));
+    navigator.clipboard.writeText(JSON.stringify(transformedData, null, 2));
   };
 
+  // ✅ NUEVA: Función para transformar datos planos a estructura jerárquica
+  const transformToNestedStructure = (data) => {
+    const result = {};
+    
+    Object.entries(data).forEach(([key, value]) => {
+      try {
+        // ✅ FILTRO: Solo procesar claves que realmente tienen underscore Y valores válidos
+        if (key.includes('_') && key.length > 2) { // Mínimo 3 caracteres para tener sentido
+          const parts = key.split('_').filter(part => part.length > 0); // Filtrar partes vacías
+          
+          // ✅ VALIDACIÓN: Solo proceder si tenemos al menos 2 partes válidas
+          if (parts.length < 2) {
+            result[key] = value; // Mantener como está si no se puede dividir apropiadamente
+            return;
+          }
+          
+          let current = result;
+          
+          // Navegar/crear la estructura anidada
+          for (let i = 0; i < parts.length - 1; i++) {
+            const part = parts[i];
+            
+            // ✅ VALIDACIÓN: Verificar que part sea una string válida
+            if (!part || typeof part !== 'string' || part.length === 0) {
+              console.warn(`Invalid part "${part}" in key "${key}"`);
+              result[key] = value; // Fallback: mantener clave original
+              return;
+            }
+            
+            // ✅ SEGURIDAD: Verificar que current sea un objeto antes de crear propiedades
+            if (!current || typeof current !== 'object' || Array.isArray(current)) {
+              console.warn(`Cannot create nested structure at ${key}: current is not an object`);
+              result[key] = value; // Fallback: mantener clave original
+              return;
+            }
+            
+            // ✅ Crear objeto solo si no existe o si existe pero no es objeto
+            if (!current[part] || typeof current[part] !== 'object' || Array.isArray(current[part])) {
+              current[part] = {};
+            }
+            
+            current = current[part];
+            
+            // ✅ VERIFICACIÓN: Asegurar que current siga siendo un objeto válido
+            if (!current || typeof current !== 'object' || Array.isArray(current)) {
+              console.warn(`Lost object reference at ${parts.slice(0, i + 1).join('.')} in key "${key}"`);
+              result[key] = value; // Fallback: mantener clave original
+              return;
+            }
+          }
+          
+          // ✅ ASIGNACIÓN FINAL: Solo si current es un objeto válido
+          const finalKey = parts[parts.length - 1];
+          if (current && typeof current === 'object' && !Array.isArray(current) && finalKey) {
+            current[finalKey] = value;
+          } else {
+            console.warn(`Cannot assign final value for key "${key}"`);
+            result[key] = value; // Fallback: mantener clave original
+          }
+        } else {
+          // Mantener campos sin underscore o con underscore inválido como están
+          result[key] = value;
+        }
+      } catch (error) {
+        console.warn(`Error processing key "${key}":`, error);
+        result[key] = value; // Fallback: mantener clave original en caso de error
+      }
+    });
+    
+    return result;
+  };
+
+  // ✅ Datos transformados para mostrar estructura jerárquica real
+  const transformedData = transformToNestedStructure(expandedData);
+
   const renderJsonTree = (obj, path = '', level = 0) => {
+    // ✅ VALIDACIÓN: Manejar valores null, undefined o problemáticos
     if (obj === null || obj === undefined) {
       return (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -27,6 +103,25 @@ const InputDataPanel = ({
             fontWeight: '500'
           }}>
             null
+          </span>
+        </span>
+      );
+    }
+
+    // ✅ VALIDACIÓN: Verificar tipos problemáticos
+    if (typeof obj === 'string' && (obj === 'Object' || obj === 'Array' || obj === '[object Object]')) {
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ color: '#dc2626', fontStyle: 'italic' }}>"{obj}" (invalid)</span>
+          <span style={{ 
+            fontSize: '8px', 
+            background: '#fef2f2', 
+            color: '#dc2626', 
+            padding: '1px 3px', 
+            borderRadius: '2px',
+            fontWeight: '500'
+          }}>
+            invalid
           </span>
         </span>
       );
@@ -137,6 +232,15 @@ const InputDataPanel = ({
       );
     }
 
+    // ✅ VALIDACIÓN EXTRA: Verificar que obj sea realmente un objeto
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
+      return (
+        <span style={{ color: '#dc2626', fontStyle: 'italic' }}>
+          Invalid object: {String(obj)}
+        </span>
+      );
+    }
+
     const keys = Object.keys(obj);
     const nodeKey = `object-${path}`;
     const isExpanded = expandedNodes.has(nodeKey);
@@ -220,7 +324,7 @@ const InputDataPanel = ({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Database size={16} />
-          Input Data ({Object.keys(expandedData).length})
+          Input Data ({Object.keys(transformedData).length}) {/* ✅ Usar datos transformados para el conteo */}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {/* ✅ Toggle para cambiar vista */}
@@ -265,28 +369,23 @@ const InputDataPanel = ({
         fontFamily: '"Fira Code", "SF Mono", "Monaco", monospace',
         minHeight: 0 // ✅ Permite que el contenido se reduzca
       }}>
-        {Object.keys(expandedData).length > 0 ? (
+        {Object.keys(transformedData).length > 0 ? (
           viewMode === 'tree' ? (
-            // ✅ Vista en árbol con tipos de datos y dot notation
-            Object.entries(expandedData).map(([key, value]) => {
-              // ✅ Convertir user_id a user.id, user_name a user.name, etc.
-              const displayKey = key.includes('_') ? key.replace(/_/g, '.') : key;
-              
-              return (
-                <div key={key} style={{ marginBottom: '8px' }}>
-                  <span style={{ 
-                    color: '#1f2937', 
-                    fontWeight: '600',
-                    marginRight: '4px'
-                  }}>
-                    {displayKey}:
-                  </span>
-                  {renderJsonTree(value, displayKey, 0)}
-                </div>
-              );
-            })
+            // ✅ Vista en árbol con estructura jerárquica real
+            Object.entries(transformedData).map(([key, value]) => (
+              <div key={key} style={{ marginBottom: '8px' }}>
+                <span style={{ 
+                  color: '#1f2937', 
+                  fontWeight: '600',
+                  marginRight: '4px'
+                }}>
+                  {key}:
+                </span>
+                {renderJsonTree(value, key, 0)}
+              </div>
+            ))
           ) : (
-            // ✅ Vista JSON pura con dot notation
+            // ✅ Vista JSON con estructura jerárquica real
             <pre style={{ 
               margin: 0, 
               whiteSpace: 'pre-wrap',
@@ -295,15 +394,7 @@ const InputDataPanel = ({
               fontSize: '11px',
               lineHeight: '1.4'
             }}>
-              {(() => {
-                // Transformar las claves para dot notation en JSON view
-                const transformedData = {};
-                Object.entries(expandedData).forEach(([key, value]) => {
-                  const displayKey = key.includes('_') ? key.replace(/_/g, '.') : key;
-                  transformedData[displayKey] = value;
-                });
-                return JSON.stringify(transformedData, null, 2);
-              })()}
+              {JSON.stringify(transformedData, null, 2)}
             </pre>
           )
         ) : (

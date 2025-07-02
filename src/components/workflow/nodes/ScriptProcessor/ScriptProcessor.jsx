@@ -79,6 +79,7 @@ const ScriptProcessor = ({
     Object.entries(data).forEach(([key, value]) => {
       let realValue = value;
       
+      // ✅ MEJORADO: Mejor manejo de valores complejos
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         if (value.hasOwnProperty('value')) {
           realValue = value.value;
@@ -97,17 +98,66 @@ const ScriptProcessor = ({
         }
       }
       
+      // ✅ CORREGIDO: Manejar strings que podrían ser JSON o valores especiales
       if (typeof realValue === 'string') {
         try {
-          if (realValue.startsWith('{') || realValue.startsWith('[')) {
+          // Intentar parsear como JSON solo si se ve como JSON
+          if ((realValue.startsWith('{') && realValue.endsWith('}')) || 
+              (realValue.startsWith('[') && realValue.endsWith(']'))) {
             realValue = JSON.parse(realValue);
           }
         } catch {
-          // Mantener como string
+          // Si falla el parsing, mantener como string
+          // ✅ IMPORTANTE: No intentar convertir strings como "Object" o "Array"
         }
       }
       
+      // ✅ FILTRO: Evitar valores problemáticos
+      if (realValue === 'Object' || realValue === 'Array' || realValue === '[object Object]') {
+        console.warn(`Skipping problematic value for key ${key}:`, realValue);
+        realValue = null; // O un valor por defecto más seguro
+      }
+      
       result[key] = realValue;
+    });
+    
+    return result;
+  }, []);
+
+  // ✅ NUEVA: Función para transformar datos planos a estructura jerárquica
+  const transformToNestedStructure = useCallback((data) => {
+    const result = {};
+    
+    Object.entries(data).forEach(([key, value]) => {
+      if (key.includes('_')) {
+        // Convertir user_id -> user.id -> estructura anidada
+        const parts = key.split('_');
+        let current = result;
+        
+        // Navegar/crear la estructura anidada
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          // ✅ CORREGIDO: Verificar que current sea un objeto antes de crear propiedades
+          if (!current[part] || typeof current[part] !== 'object' || Array.isArray(current[part])) {
+            current[part] = {};
+          }
+          current = current[part];
+          
+          // ✅ SEGURIDAD: Verificar que current siga siendo un objeto
+          if (typeof current !== 'object' || Array.isArray(current) || current === null) {
+            console.warn(`Cannot create nested structure at ${parts.slice(0, i + 1).join('.')}: current value is not an object`);
+            return; // Saltar esta entrada si no podemos crear la estructura
+          }
+        }
+        
+        // ✅ SEGURIDAD: Solo asignar si current es un objeto válido
+        if (current && typeof current === 'object' && !Array.isArray(current)) {
+          current[parts[parts.length - 1]] = value;
+        }
+      } else {
+        // Mantener campos sin underscore como están
+        result[key] = value;
+      }
     });
     
     return result;
@@ -194,11 +244,12 @@ const ScriptProcessor = ({
 
     try {
       const expandedData = expandInputData(availableData);
+      const nestedData = transformToNestedStructure(expandedData); // ✅ Usar estructura anidada
       
-      console.log('🔄 Generating preview with data:', expandedData);
+      console.log('🔄 Generating preview with nested data:', nestedData);
       
       const createSafeFunction = (code) => {
-        const safeInput = JSON.parse(JSON.stringify(expandedData));
+        const safeInput = JSON.parse(JSON.stringify(nestedData)); // ✅ Usar datos anidados
         
         const mockConsole = {
           log: (...args) => {
@@ -314,7 +365,7 @@ const ScriptProcessor = ({
         timestamp: new Date().toISOString()
       }]);
     }
-  }, [script, availableData, expandInputData]);
+  }, [script, availableData, expandInputData, transformToNestedStructure]);
 
   // Ejecutar script
   const executeScript = async () => {
@@ -324,7 +375,8 @@ const ScriptProcessor = ({
     
     try {
       const inputData = expandInputData(availableData);
-      console.log('🔄 Executing script with expanded input:', inputData);
+      const nestedInputData = transformToNestedStructure(inputData); // ✅ Usar estructura anidada
+      console.log('🔄 Executing script with nested input:', nestedInputData);
       
       setLogs(prev => [...prev, {
         type: 'info',
@@ -382,7 +434,7 @@ const ScriptProcessor = ({
           }
         };
         
-        const safeInput = JSON.parse(JSON.stringify(input));
+        const safeInput = JSON.parse(JSON.stringify(nestedInputData)); // ✅ Usar datos anidados
         
         try {
           if (!code.trim()) {
@@ -445,7 +497,7 @@ const ScriptProcessor = ({
         }
       };
       
-      const result = createExecutionFunction(processedScript, inputData);
+      const result = createExecutionFunction(processedScript, nestedInputData); // ✅ Usar datos anidados
       setExecutionResult(result);
       
       if (result && typeof result === 'object') {
@@ -573,75 +625,80 @@ return {
 
   // Generar autocompletado
   const generateAutocompleteSuggestions = () => {
-    const expandedData = expandInputData(availableData);
-    const suggestions = [];
+    try {
+      const expandedData = expandInputData(availableData);
+      console.log('🔍 Expanded data for autocomplete:', expandedData);
+      
+      const nestedData = transformToNestedStructure(expandedData);
+      console.log('🏗️ Nested data for autocomplete:', nestedData);
+      
+      const suggestions = [];
 
-    const extractProperties = (obj, prefix = '', depth = 0) => {
-      if (!obj || typeof obj !== 'object' || depth > 3) return;
+      const extractProperties = (obj, prefix = '', depth = 0) => {
+        if (!obj || typeof obj !== 'object' || Array.isArray(obj) || depth > 3) return;
 
-      Object.keys(obj).forEach(key => {
-        // ✅ Convertir user_id a user.id en las sugerencias
-        const displayKey = key.includes('_') ? key.replace(/_/g, '.') : key;
-        const fullPath = prefix ? `${prefix}.${displayKey}` : displayKey;
-        const value = obj[key];
-        
-        suggestions.push({
-          label: fullPath,
-          kind: 'variable',
-          detail: `${typeof value} ${Array.isArray(value) ? `[${value.length}]` : ''}`,
-          insertText: fullPath,
-          documentation: `Variable del workflow: ${typeof value}`,
-          priority: prefix ? 2 : 1
+        Object.keys(obj).forEach(key => {
+          try {
+            const fullPath = prefix ? `${prefix}.${key}` : key;
+            const value = obj[key];
+            
+            // ✅ SEGURIDAD: Verificar que value no sea problemático
+            if (value === 'Object' || value === 'Array' || value === '[object Object]') {
+              console.warn(`Skipping problematic value at ${fullPath}:`, value);
+              return;
+            }
+            
+            suggestions.push({
+              label: fullPath,
+              kind: 'variable',
+              detail: `${typeof value} ${Array.isArray(value) ? `[${value.length}]` : ''}`,
+              insertText: fullPath,
+              documentation: `Variable del workflow: ${typeof value}`,
+              priority: prefix ? 2 : 1
+            });
+
+            // ✅ Agregar acceso vía input
+            if (!prefix) {
+              suggestions.push({
+                label: `input.${key}`,
+                kind: 'variable',
+                detail: `${typeof value} via input`,
+                insertText: `input.${key}`,
+                documentation: `Acceso vía input: ${typeof value}`,
+                priority: 1
+              });
+            }
+
+            if (value && typeof value === 'object' && !Array.isArray(value) && depth < 2) {
+              extractProperties(value, fullPath, depth + 1);
+            }
+          } catch (error) {
+            console.warn(`Error processing property ${key}:`, error);
+          }
         });
+      };
 
-        // ✅ También agregar acceso vía input con dot notation
-        if (!prefix && typeof value === 'object' && !Array.isArray(value)) {
-          suggestions.push({
-            label: `input.${displayKey}`,
-            kind: 'variable',
-            detail: `object via input`,
-            insertText: `input.${displayKey}`,
-            documentation: `Acceso vía input: ${typeof value}`,
-            priority: 1
-          });
-        }
+      extractProperties(nestedData);
 
-        if (value && typeof value === 'object' && !Array.isArray(value) && depth < 2) {
-          extractProperties(value, fullPath, depth + 1);
-        }
-      });
-    };
-
-    extractProperties(expandedData);
-
-    // ✅ Agregar input con dot notation también
-    if (Object.keys(expandedData).length > 0) {
-      suggestions.push({
-        label: 'input',
-        kind: 'variable',
-        detail: 'object - input data',
-        insertText: 'input',
-        documentation: 'Objeto con todos los datos de entrada',
-        priority: 1
-      });
-
-      // ✅ Agregar sugerencias directas con dot notation
-      Object.keys(expandedData).forEach(key => {
-        const displayKey = key.includes('_') ? key.replace(/_/g, '.') : key;
-        const value = expandedData[key];
-        
+      // ✅ Agregar input principal
+      if (Object.keys(nestedData).length > 0) {
         suggestions.push({
-          label: displayKey,
+          label: 'input',
           kind: 'variable',
-          detail: `${typeof value} - direct access`,
-          insertText: `input.${displayKey}`,
-          documentation: `Acceso directo: input.${displayKey}`,
+          detail: 'object - input data',
+          insertText: 'input',
+          documentation: 'Objeto con todos los datos de entrada',
           priority: 1
         });
-      });
-    }
+      }
 
-    return suggestions.sort((a, b) => (a.priority || 5) - (b.priority || 5));
+      console.log('📝 Generated suggestions:', suggestions.length);
+      return suggestions.sort((a, b) => (a.priority || 5) - (b.priority || 5));
+      
+    } catch (error) {
+      console.error('Error generating autocomplete suggestions:', error);
+      return [];
+    }
   };
 
   // Manejadores para los componentes hijo
