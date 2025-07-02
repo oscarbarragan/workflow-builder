@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/DataMapper/DataMapperTabs.jsx
+// src/components/workflow/nodes/DataMapper/DataMapperTabs.jsx - CORREGIDO
 import React from 'react';
 import { Link2, Database, FileText } from 'lucide-react';
 
@@ -17,14 +17,35 @@ const DataMapperTabs = ({ state, actions, availableData }) => {
     { id: 'preview', label: '👁️ Vista Previa', icon: <FileText size={14} /> }
   ];
 
+  // ✅ MEJORADO: Container style para usar todo el espacio disponible
+  const containerStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+    overflow: 'hidden'
+  };
+
+  // ✅ MEJORADO: Tabs navigation style
+  const tabsNavigationStyle = {
+    display: 'flex',
+    borderBottom: '2px solid #e5e7eb',
+    marginBottom: '20px',
+    flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
+  };
+
+  // ✅ MEJORADO: Content area style
+  const contentAreaStyle = {
+    flex: 1,
+    minHeight: 0, // ✅ CRÍTICO: Permite que el contenido use flexbox correctamente
+    overflow: 'hidden', // ✅ AGREGADO: El overflow se maneja en cada tab
+    display: 'flex',
+    flexDirection: 'column'
+  };
+
   return (
-    <>
+    <div style={containerStyle}>
       {/* Tabs Navigation */}
-      <div style={{
-        display: 'flex',
-        borderBottom: '2px solid #e5e7eb',
-        marginBottom: '20px'
-      }}>
+      <div style={tabsNavigationStyle}>
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -51,7 +72,7 @@ const DataMapperTabs = ({ state, actions, availableData }) => {
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={contentAreaStyle}>
         {state.activeTab === 'source' && (
           <SourceTab 
             state={state} 
@@ -76,7 +97,7 @@ const DataMapperTabs = ({ state, actions, availableData }) => {
           />
         )}
       </div>
-    </>
+    </div>
   );
 };
 

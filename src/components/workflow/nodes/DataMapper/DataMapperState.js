@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/DataMapper/DataMapperState.js - SIMPLIFICADO
+// src/components/workflow/nodes/DataMapper/DataMapperState.js - LIMPIO (sin debug)
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
   validateJsonInput,
@@ -15,7 +15,7 @@ const useDataMapperState = (initialData, availableData) => {
   const [mappings, setMappings] = useState(initialData.mappings || []);
   const [jsonError, setJsonError] = useState(null);
   
-  // CORREGIDO: Determinar selectedSource basado en si hay uploadedFile en initialData
+  // Determinar selectedSource basado en si hay uploadedFile en initialData
   const [selectedSource, setSelectedSource] = useState(() => {
     if (initialData.uploadedFile) {
       return 'file';
@@ -23,7 +23,7 @@ const useDataMapperState = (initialData, availableData) => {
     return initialData.selectedSource || 'manual';
   });
   
-  // File upload state - CORREGIDO: Restaurar archivo si existe en initialData
+  // File upload state - Restaurar archivo si existe en initialData
   const [uploadedFile, setUploadedFile] = useState(() => {
     if (initialData.uploadedFile) {
       // Crear un objeto File-like desde los datos guardados
@@ -38,11 +38,10 @@ const useDataMapperState = (initialData, availableData) => {
   });
   const [isProcessingFile, setIsProcessingFile] = useState(false);
 
-  // ANÁLISIS: Detectar HTTP Input conectado
+  // ANÁLISIS: Detectar HTTP Input conectado - SIMPLIFICADO
   const httpInputAnalysis = useMemo(() => {
     console.log('🔍 Analyzing available data for HTTP Input:', availableData);
     
-    // Asegurar que availableData existe
     if (!availableData || typeof availableData !== 'object') {
       return {
         hasHttpInput: false,
@@ -65,7 +64,6 @@ const useDataMapperState = (initialData, availableData) => {
     
     const httpInputData = availableData[httpInputKeys[0]];
     
-    // Asegurar que httpInputData existe
     if (!httpInputData || typeof httpInputData !== 'object') {
       return {
         hasHttpInput: false,
@@ -91,7 +89,7 @@ const useDataMapperState = (initialData, availableData) => {
     };
   }, [availableData]);
 
-  // Handle source change - SIMPLIFICADO
+  // Handle source change
   const handleSourceChange = (newSource) => {
     console.log(`🔄 Changing source to: ${newSource}`);
     
@@ -166,7 +164,7 @@ const useDataMapperState = (initialData, availableData) => {
     if (validation.isValid) {
       setParsedJson(validation.parsed);
       
-      // MEJORADO: Generar mappings combinando JSON + Headers
+      // Generar mappings combinando JSON + Headers
       const jsonMappings = generateMappingsFromJson(validation.parsed, selectedSource);
       const headerMappings = generateHeaderMappings();
       
@@ -185,7 +183,7 @@ const useDataMapperState = (initialData, availableData) => {
     }
   };
 
-  // NUEVO: Generar mappings para headers
+  // Generar mappings para headers
   const generateHeaderMappings = () => {
     if (!httpInputAnalysis || !httpInputAnalysis.hasHttpInput || !httpInputAnalysis.headers) {
       return [];
@@ -278,7 +276,7 @@ const useDataMapperState = (initialData, availableData) => {
       uploadedFile,
       isProcessingFile,
       
-      // NUEVO: HTTP Input analysis
+      // HTTP Input analysis
       httpInputAnalysis,
       hasHttpInputsAvailable: httpInputAnalysis.hasHttpInput
     },

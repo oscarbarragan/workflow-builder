@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/DataMapper/tabs/SourceTab.jsx - SIMPLIFICADO
+// src/components/workflow/nodes/DataMapper/tabs/SourceTab.jsx - CORREGIDO
 import React, { useRef } from 'react';
 import { 
   Code, 
@@ -7,7 +7,6 @@ import {
   CheckCircle, 
   X, 
   AlertCircle,
-  AlertTriangle,
   Globe,
   Database
 } from 'lucide-react';
@@ -47,8 +46,18 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
     }
   };
 
+  // ✅ MEJORADO: Container style para scroll correcto
+  const containerStyle = {
+    display: 'flex', 
+    flexDirection: 'column', 
+    gap: '20px',
+    height: '100%',
+    overflow: 'auto', // ✅ AGREGADO: Permitir scroll en el contenido
+    paddingRight: '8px' // ✅ AGREGADO: Espacio para la scrollbar
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={containerStyle}>
       
       {/* HTTP Input Connection Status - SOLO SI ESTÁ CONECTADO */}
       {httpInputInfo && (
@@ -56,7 +65,8 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
           background: '#f0fdf4',
           border: '2px solid #16a34a',
           borderRadius: '8px',
-          padding: '16px'
+          padding: '16px',
+          flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
         }}>
           <div style={{
             display: 'flex',
@@ -143,7 +153,7 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             fontSize: '11px',
             color: '#15803d'
           }}>
-            <strong>📋 Flujo:</strong>             El body de este HTTP Input se parseará usando la estructura JSON que definas abajo.
+            <strong>📋 Flujo:</strong> El body de este HTTP Input se parseará usando la estructura JSON que definas abajo.
             Los headers estarán disponibles como variables adicionales en el mapeo final.
           </div>
         </div>
@@ -154,7 +164,8 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
         background: '#f0f9ff',
         padding: '16px',
         borderRadius: '8px',
-        border: '1px solid #bae6fd'
+        border: '1px solid #bae6fd',
+        flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
       }}>
         <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600', color: '#0c4a6e' }}>
           📋 Definir Estructura del Body JSON
@@ -229,7 +240,7 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
 
       {/* File Upload Section */}
       {state.selectedSource === 'file' && (
-        <div>
+        <div style={{ flexShrink: 0 }}> {/* ✅ AGREGADO: Evitar que se encoja */}
           <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '600' }}>
             📁 Cargar Estructura desde Archivo
           </h4>
@@ -291,7 +302,7 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             )}
           </div>
           
-          {/* NUEVO: Mostrar estado de archivo cargado desde datos guardados */}
+          {/* Estado de archivo cargado desde datos guardados */}
           {state.uploadedFile && state.jsonInput && (
             <div style={{
               marginTop: '12px',
@@ -313,14 +324,20 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
         </div>
       )}
 
-      {/* JSON Input */}
+      {/* JSON Input - ✅ MEJORADO: Contenedor que se puede expandir */}
       {(state.selectedSource === 'manual' || (state.selectedSource === 'file' && state.uploadedFile)) && (
-        <div>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          flex: 1, // ✅ AGREGADO: Permitir que este contenedor se expanda
+          minHeight: 0 // ✅ AGREGADO: Crucial para flexbox
+        }}>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '12px'
+            marginBottom: '12px',
+            flexShrink: 0 // ✅ AGREGADO: Evitar que el header se encoja
           }}>
             <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
               {state.selectedSource === 'file' ? 
@@ -349,6 +366,7 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             )}
           </div>
           
+          {/* ✅ MEJORADO: Textarea que usa el espacio disponible */}
           <textarea
             value={state.jsonInput}
             onChange={(e) => state.selectedSource === 'manual' ? actions.handleJsonInput(e.target.value) : null}
@@ -360,13 +378,14 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             readOnly={state.selectedSource === 'file'}
             style={{
               width: '100%',
-              minHeight: '300px',
+              flex: 1, // ✅ CAMBIADO: Usar flex en lugar de minHeight fijo
+              minHeight: '200px', // ✅ AGREGADO: Altura mínima
               padding: '12px',
               border: `1px solid ${state.jsonError ? '#dc2626' : '#d1d5db'}`,
               borderRadius: '6px',
               fontSize: '12px',
               fontFamily: 'monospace',
-              resize: 'vertical',
+              resize: 'none', // ✅ CAMBIADO: No permitir resize manual
               boxSizing: 'border-box',
               background: state.selectedSource === 'manual' ? 'white' : '#f8fafc',
               cursor: state.selectedSource === 'manual' ? 'text' : 'default'
@@ -380,7 +399,8 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
               marginTop: '8px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
             }}>
               <AlertCircle size={14} />
               Error JSON: {state.jsonError}
@@ -394,7 +414,8 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
               marginTop: '8px',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px'
+              gap: '4px',
+              flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
             }}>
               <CheckCircle size={14} />
               Estructura válida - {state.mappings.length} campos detectados para mapeo
@@ -412,7 +433,8 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
             padding: '12px',
             background: '#eff6ff',
             border: '1px solid #bfdbfe',
-            borderRadius: '6px'
+            borderRadius: '6px',
+            flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
           }}>
             <div style={{
               fontSize: '13px',
@@ -443,7 +465,8 @@ const SourceTab = ({ state, actions, availableData = {} }) => {
           background: '#fefbf3',
           border: '1px solid #fed7aa',
           borderRadius: '8px',
-          padding: '16px'
+          padding: '16px',
+          flexShrink: 0 // ✅ AGREGADO: Evitar que se encoja
         }}>
           <h5 style={{
             margin: '0 0 8px 0',

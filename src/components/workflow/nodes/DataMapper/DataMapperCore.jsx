@@ -1,13 +1,12 @@
 // src/components/workflow/nodes/DataMapper/DataMapperCore.jsx - CORREGIDO
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle } from 'lucide-react';
 import Button from '../../../common/Button/Button';
 import DataMapperTabs from './DataMapperTabs';
 import useDataMapperState from './DataMapperState';
 import { validateDataMapperConfig } from './DataMapperUtils';
 import { createSavedData } from './DataMapperUtils';
-import DataMapperDebugPanel from './DataMapperDebugPanel';
+// ✅ REMOVIDO: DataMapperDebugPanel import
 
 const DataMapperCore = ({ 
   isOpen, 
@@ -75,6 +74,7 @@ const DataMapperCore = ({
 
   if (!isOpen) return null;
 
+  // ✅ MEJORADO: Modal overlay con mejor posicionamiento
   const modalOverlayStyle = {
     position: 'fixed',
     top: 0,
@@ -86,20 +86,54 @@ const DataMapperCore = ({
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 999999,
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif',
+    padding: '20px', // ✅ AGREGADO: Padding para evitar que el modal toque los bordes
+    boxSizing: 'border-box'
   };
 
+  // ✅ MEJORADO: Modal content con mejor estructura
   const modalContentStyle = {
     background: 'white',
     borderRadius: '12px',
-    width: '95vw',
-    height: '90vh',
+    width: '100%',
+    height: '100%',
     maxWidth: '1400px',
+    maxHeight: '90vh', // ✅ CAMBIADO: Altura máxima para evitar overflow
     display: 'flex',
     flexDirection: 'column',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    padding: '24px',
-    position: 'relative'
+    position: 'relative',
+    overflow: 'hidden' // ✅ AGREGADO: Prevenir overflow del contenedor principal
+  };
+
+  // ✅ MEJORADO: Header style
+  const headerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '24px 24px 16px 24px', // ✅ AJUSTADO: Padding más específico
+    borderBottom: '2px solid #e5e7eb',
+    flexShrink: 0 // ✅ AGREGADO: Evitar que el header se encoja
+  };
+
+  // ✅ NUEVO: Content area style
+  const contentAreaStyle = {
+    flex: 1,
+    padding: '0 24px',
+    overflow: 'hidden', // ✅ IMPORTANTE: El overflow se maneja en los tabs
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0 // ✅ CRÍTICO: Permite que flex funcione correctamente
+  };
+
+  // ✅ MEJORADO: Footer style
+  const footerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 24px 24px 24px', // ✅ AJUSTADO: Padding más específico
+    borderTop: '2px solid #e5e7eb',
+    flexShrink: 0 // ✅ AGREGADO: Evitar que el footer se encoja
   };
 
   const modalContent = (
@@ -117,14 +151,7 @@ const DataMapperCore = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '20px',
-          borderBottom: '2px solid #e5e7eb',
-          paddingBottom: '16px'
-        }}>
+        <div style={headerStyle}>
           <h2 style={{
             margin: 0,
             fontSize: '24px',
@@ -168,22 +195,17 @@ const DataMapperCore = ({
           </button>
         </div>
 
-        {/* Tabs Content */}
-        <DataMapperTabs 
-          state={state}
-          actions={actions}
-          availableData={availableData}
-        />
+        {/* ✅ MEJORADO: Content Area */}
+        <div style={contentAreaStyle}>
+          <DataMapperTabs 
+            state={state}
+            actions={actions}
+            availableData={availableData}
+          />
+        </div>
 
         {/* Footer */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '20px',
-          paddingTop: '16px',
-          borderTop: '2px solid #e5e7eb'
-        }}>
+        <div style={footerStyle}>
           <div style={{
             fontSize: '14px',
             color: '#6b7280',
@@ -226,11 +248,7 @@ const DataMapperCore = ({
         </div>
       </div>
       
-      {/* Debug Panel - Solo visible en desarrollo */}
-      <DataMapperDebugPanel 
-        availableData={availableData} 
-        state={state} 
-      />
+      {/* ✅ REMOVIDO: DataMapperDebugPanel completamente eliminado */}
     </div>
   );
 
