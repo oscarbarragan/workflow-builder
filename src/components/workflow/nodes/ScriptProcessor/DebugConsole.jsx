@@ -1,9 +1,9 @@
-// src/components/workflow/nodes/ScriptProcessor/DebugConsole.jsx
+// src/components/workflow/nodes/ScriptProcessor/DebugConsole.jsx - VERSIÓN CORREGIDA
 import React, { useState, useRef, useEffect } from 'react';
 import { Terminal, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 
 const DebugConsole = ({ logs, executionError, onClearLogs }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // ✅ CAMBIADO: Expandido por defecto
+  const [isExpanded, setIsExpanded] = useState(false);
   const consoleRef = useRef(null);
 
   // Auto-scroll al final cuando hay nuevos logs
@@ -39,14 +39,17 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
 
   return (
     <div style={{
-      flex: isExpanded ? '0 0 250px' : '0 0 40px',
+      height: isExpanded ? '180px' : '36px',
       border: '2px solid #e5e7eb',
       borderRadius: '12px',
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
       background: 'white',
-      transition: 'flex-basis 0.3s ease'
+      transition: 'height 0.3s ease',
+      width: '100%',
+      position: 'relative',
+      zIndex: 10
     }}>
       {/* Header colapsable */}
       <div 
@@ -55,28 +58,32 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
             'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' :
             warningCount > 0 ?
             'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' :
-            'linear-gradient(135deg, #1f2937 0%, #111827 100%)',
-          padding: '8px 12px',
-          fontSize: '12px',
+            totalLogs > 0 ?
+            'linear-gradient(135deg, #10b981 0%, #059669 100%)' :
+            'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)',
+          padding: '6px 12px',
+          fontSize: '11px',
           fontWeight: '600',
           color: 'white',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           cursor: 'pointer',
-          flexShrink: 0
+          flexShrink: 0,
+          position: 'relative',
+          zIndex: 11
         }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Terminal size={14} />
+          <Terminal size={12} />
           <span>Debug Console</span>
           {totalLogs > 0 && (
-            <div style={{ display: 'flex', gap: '8px', fontSize: '10px' }}>
+            <div style={{ display: 'flex', gap: '6px', fontSize: '9px' }}>
               {errorCount > 0 && (
                 <span style={{ 
                   background: 'rgba(255,255,255,0.2)', 
-                  padding: '2px 6px', 
+                  padding: '1px 4px', 
                   borderRadius: '3px' 
                 }}>
                   ❌ {errorCount}
@@ -85,7 +92,7 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
               {warningCount > 0 && (
                 <span style={{ 
                   background: 'rgba(255,255,255,0.2)', 
-                  padding: '2px 6px', 
+                  padding: '1px 4px', 
                   borderRadius: '3px' 
                 }}>
                   ⚠️ {warningCount}
@@ -93,7 +100,7 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
               )}
               <span style={{ 
                 background: 'rgba(255,255,255,0.2)', 
-                padding: '2px 6px', 
+                padding: '1px 4px', 
                 borderRadius: '3px' 
               }}>
                 Total: {totalLogs}
@@ -102,7 +109,7 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
           )}
         </div>
         
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           {totalLogs > 0 && (
             <button
               onClick={(e) => {
@@ -112,17 +119,17 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
               style={{
                 background: 'rgba(255,255,255,0.2)',
                 border: 'none',
-                borderRadius: '4px',
-                padding: '4px 6px',
+                borderRadius: '3px',
+                padding: '2px 4px',
                 color: 'white',
                 cursor: 'pointer',
-                fontSize: '10px'
+                fontSize: '9px'
               }}
             >
-              <Trash2 size={10} />
+              <Trash2 size={8} />
             </button>
           )}
-          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </div>
       </div>
       
@@ -135,25 +142,27 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
             padding: '8px',
             background: '#111827',
             overflow: 'auto',
-            fontSize: '11px',
+            fontSize: '10px',
             fontFamily: '"Fira Code", "SF Mono", "Monaco", monospace',
-            maxHeight: '200px'
+            maxHeight: '140px',
+            position: 'relative',
+            zIndex: 10
           }}
         >
           {/* Error de ejecución global */}
           {executionError && (
             <div style={{
               color: '#ef4444',
-              marginBottom: '8px',
-              padding: '6px 8px',
+              marginBottom: '6px',
+              padding: '4px 6px',
               background: 'rgba(239, 68, 68, 0.1)',
-              borderRadius: '4px',
+              borderRadius: '3px',
               border: '1px solid rgba(239, 68, 68, 0.3)'
             }}>
-              <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '2px', fontSize: '9px' }}>
                 ❌ EXECUTION ERROR:
               </div>
-              <div style={{ whiteSpace: 'pre-wrap' }}>
+              <div style={{ whiteSpace: 'pre-wrap', fontSize: '9px' }}>
                 {executionError}
               </div>
             </div>
@@ -166,21 +175,21 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
                 key={index}
                 style={{
                   color: getLogColor(log.type),
-                  marginBottom: '4px',
+                  marginBottom: '2px',
                   whiteSpace: 'pre-wrap',
-                  padding: '2px 0',
+                  padding: '1px 0',
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: '6px'
+                  gap: '4px'
                 }}
               >
-                <span style={{ flexShrink: 0, fontSize: '10px' }}>
+                <span style={{ flexShrink: 0, fontSize: '8px' }}>
                   {getLogIcon(log.type)}
                 </span>
-                <span style={{ color: '#6b7280', fontSize: '9px', flexShrink: 0 }}>
+                <span style={{ color: '#6b7280', fontSize: '8px', flexShrink: 0 }}>
                   [{new Date(log.timestamp).toLocaleTimeString()}]
                 </span>
-                <span style={{ flex: 1, wordBreak: 'break-word' }}>
+                <span style={{ flex: 1, wordBreak: 'break-word', fontSize: '9px' }}>
                   {log.message}
                 </span>
               </div>
@@ -190,8 +199,9 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
               color: '#6b7280',
               fontStyle: 'italic',
               textAlign: 'center',
-              padding: '20px',
-              opacity: 0.7
+              padding: '15px',
+              opacity: 0.7,
+              fontSize: '9px'
             }}>
               {totalLogs === 0 ? 
                 '📝 Console output will appear here...' : 
@@ -202,21 +212,51 @@ const DebugConsole = ({ logs, executionError, onClearLogs }) => {
         </div>
       )}
       
-      {/* Mini indicador cuando está colapsado */}
+      {/* Indicador compacto cuando está colapsado */}
       {!isExpanded && totalLogs > 0 && (
         <div style={{
           position: 'absolute',
-          top: '8px',
-          right: '40px',
-          fontSize: '10px',
+          top: '6px',
+          right: '35px',
+          fontSize: '9px',
           color: 'white',
           background: errorCount > 0 ? '#dc2626' : warningCount > 0 ? '#f59e0b' : '#10b981',
-          borderRadius: '10px',
-          padding: '2px 6px',
-          minWidth: '16px',
-          textAlign: 'center'
+          borderRadius: '8px',
+          padding: '1px 4px',
+          minWidth: '14px',
+          textAlign: 'center',
+          zIndex: 12
         }}>
           {errorCount > 0 ? errorCount : warningCount > 0 ? warningCount : totalLogs}
+        </div>
+      )}
+      
+      {/* Resumen horizontal cuando está colapsado */}
+      {!isExpanded && totalLogs > 0 && (
+        <div style={{
+          padding: '4px 12px',
+          background: '#f8fafc',
+          borderTop: '1px solid #e5e7eb',
+          fontSize: '9px',
+          color: '#6b7280',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          position: 'relative',
+          zIndex: 11
+        }}>
+          <span>
+            {logs.length > 0 && (
+              <>
+                {errorCount > 0 && <span style={{color: '#dc2626'}}>❌ {errorCount} </span>}
+                {warningCount > 0 && <span style={{color: '#f59e0b'}}>⚠️ {warningCount} </span>}
+                <span style={{color: '#10b981'}}>📝 {logs.filter(l => l.type === 'log').length}</span>
+              </>
+            )}
+          </span>
+          <span style={{ fontStyle: 'italic' }}>
+            {logs.length > 0 ? logs[logs.length - 1].message.substring(0, 50) + '...' : 'Sin logs'}
+          </span>
         </div>
       )}
     </div>

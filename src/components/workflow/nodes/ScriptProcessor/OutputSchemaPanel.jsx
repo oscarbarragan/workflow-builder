@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/ScriptProcessor/OutputSchemaPanel.jsx
+// src/components/workflow/nodes/ScriptProcessor/OutputSchemaPanel.jsx - BORDES CORREGIDOS
 import React from 'react';
 import { Settings, Plus, Trash2 } from 'lucide-react';
 
@@ -33,7 +33,12 @@ const OutputSchemaPanel = ({
   };
 
   return (
-    <div style={{ flex: '1 1 25%', display: 'flex', flexDirection: 'column', gap: '16px', minHeight: 0 }}>
+    <div style={{ 
+      height: '100%', // ✅ Altura completa
+      display: 'flex', 
+      flexDirection: 'column', 
+      minHeight: 0 
+    }}>
       <div style={{
         flex: 1,
         border: '2px solid #e5e7eb',
@@ -44,6 +49,7 @@ const OutputSchemaPanel = ({
         background: 'white',
         minHeight: 0
       }}>
+        {/* Header fijo */}
         <div style={{
           background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
           padding: '12px 16px',
@@ -91,29 +97,42 @@ const OutputSchemaPanel = ({
           </div>
         </div>
         
+        {/* ✅ Contenido con scroll y padding interno corregido */}
         <div style={{
           flex: 1,
-          padding: '12px',
+          padding: '12px', // ✅ Padding consistente
           overflow: 'auto',
-          fontSize: '12px'
+          fontSize: '12px',
+          minHeight: 0 // ✅ Permite reducirse
         }}>
           {outputSchema.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {outputSchema.map((variable) => (
                 <div 
                   key={variable.id}
                   style={{
                     border: '1px solid #e5e7eb',
                     borderRadius: '8px',
-                    padding: '10px',
-                    background: variable.enabled ? '#f8fafc' : '#f3f4f6'
+                    padding: '12px', // ✅ Padding interno de la tarjeta
+                    background: variable.enabled ? '#f8fafc' : '#f3f4f6',
+                    // ✅ IMPORTANTE: Evitar que se salga del contenedor
+                    boxSizing: 'border-box',
+                    width: '100%'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  {/* Header de la variable */}
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '6px', 
+                    marginBottom: '8px',
+                    flexWrap: 'wrap' // ✅ Permite que los elementos se envuelvan
+                  }}>
                     <input
                       type="checkbox"
                       checked={variable.enabled}
                       onChange={(e) => updateOutputVariable(variable.id, { enabled: e.target.checked })}
+                      style={{ flexShrink: 0 }}
                     />
                     <span style={{
                       fontSize: '10px',
@@ -121,7 +140,8 @@ const OutputSchemaPanel = ({
                       color: variable.source === 'auto-detect' ? '#1e40af' : '#7c3aed',
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      fontWeight: '500'
+                      fontWeight: '500',
+                      flexShrink: 0
                     }}>
                       {variable.source === 'auto-detect' ? '🔍 AUTO' : '✋ MANUAL'}
                     </span>
@@ -133,38 +153,41 @@ const OutputSchemaPanel = ({
                         color: '#dc2626',
                         cursor: 'pointer',
                         padding: '2px',
-                        marginLeft: 'auto'
+                        marginLeft: 'auto',
+                        flexShrink: 0
                       }}
                     >
                       <Trash2 size={12} />
                     </button>
                   </div>
                   
-                  <input
-                    type="text"
-                    placeholder="Variable name"
-                    value={variable.name}
-                    onChange={(e) => updateOutputVariable(variable.id, { name: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '4px 6px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '11px',
-                      marginBottom: '4px'
-                    }}
-                  />
-                  
-                  <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                  {/* ✅ Campos de entrada con width corregido */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder="Variable name"
+                      value={variable.name}
+                      onChange={(e) => updateOutputVariable(variable.id, { name: e.target.value })}
+                      style={{
+                        width: '100%', // ✅ Ancho completo
+                        padding: '6px 8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        boxSizing: 'border-box' // ✅ IMPORTANTE: Include padding in width
+                      }}
+                    />
+                    
                     <select
                       value={variable.dataType}
                       onChange={(e) => updateOutputVariable(variable.id, { dataType: e.target.value })}
                       style={{
-                        flex: 1,
-                        padding: '2px 4px',
+                        width: '100%', // ✅ Ancho completo
+                        padding: '6px 8px',
                         border: '1px solid #d1d5db',
                         borderRadius: '4px',
-                        fontSize: '10px'
+                        fontSize: '11px',
+                        boxSizing: 'border-box' // ✅ IMPORTANTE
                       }}
                     >
                       <option value="string">String</option>
@@ -174,83 +197,84 @@ const OutputSchemaPanel = ({
                       <option value="object">Object</option>
                       <option value="date">Date</option>
                     </select>
+                    
+                    <input
+                      type="text"
+                      placeholder="Description (optional)"
+                      value={variable.description || ''}
+                      onChange={(e) => updateOutputVariable(variable.id, { description: e.target.value })}
+                      style={{
+                        width: '100%', // ✅ Ancho completo
+                        padding: '6px 8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        boxSizing: 'border-box' // ✅ IMPORTANTE
+                      }}
+                    />
+                    
+                    <input
+                      type="text"
+                      placeholder="Default/Example value"
+                      value={variable.defaultValue || ''}
+                      onChange={(e) => updateOutputVariable(variable.id, { defaultValue: e.target.value })}
+                      style={{
+                        width: '100%', // ✅ Ancho completo
+                        padding: '6px 8px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontFamily: 'monospace',
+                        boxSizing: 'border-box' // ✅ IMPORTANTE
+                      }}
+                    />
+                    
+                    {/* Botón para insertar en el editor */}
+                    <button
+                      onClick={() => {
+                        if (variable.name) {
+                          window.dispatchEvent(new CustomEvent('insertInEditor', {
+                            detail: { 
+                              text: variable.name,
+                              type: 'variable',
+                              suggestion: `// Asignar valor a ${variable.name}\n${variable.name}: ${variable.defaultValue || 'valor'},`
+                            }
+                          }));
+                        }
+                      }}
+                      disabled={!variable.name}
+                      style={{
+                        width: '100%', // ✅ Ancho completo
+                        padding: '6px 8px',
+                        border: '1px solid #3b82f6',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        background: variable.name ? '#dbeafe' : '#f3f4f6',
+                        color: variable.name ? '#1e40af' : '#9ca3af',
+                        cursor: variable.name ? 'pointer' : 'not-allowed',
+                        boxSizing: 'border-box' // ✅ IMPORTANTE
+                      }}
+                    >
+                      📝 Insertar en Editor
+                    </button>
+                    
+                    {/* Preview del valor */}
+                    {variable.previewValue !== undefined && (
+                      <div style={{
+                        background: '#f0fdf4',
+                        border: '1px solid #bbf7d0',
+                        borderRadius: '4px',
+                        padding: '6px 8px',
+                        fontSize: '10px',
+                        color: '#166534',
+                        fontFamily: 'monospace',
+                        wordBreak: 'break-all', // ✅ Rompe palabras largas
+                        boxSizing: 'border-box'
+                      }}>
+                        Preview: {JSON.stringify(variable.previewValue)}
+                      </div>
+                    )}
                   </div>
-                  
-                  <input
-                    type="text"
-                    placeholder="Description (optional)"
-                    value={variable.description || ''}
-                    onChange={(e) => updateOutputVariable(variable.id, { description: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '4px 6px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      marginBottom: '4px'
-                    }}
-                  />
-                  
-                  {/* ✅ NUEVO: Campo para valor por defecto/ejemplo */}
-                  <input
-                    type="text"
-                    placeholder="Default/Example value"
-                    value={variable.defaultValue || ''}
-                    onChange={(e) => updateOutputVariable(variable.id, { defaultValue: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '4px 6px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      marginBottom: '4px',
-                      fontFamily: 'monospace'
-                    }}
-                  />
-                  
-                  {/* ✅ NUEVO: Botón para insertar en el editor */}
-                  <button
-                    onClick={() => {
-                      if (variable.name) {
-                        // Disparar evento personalizado para insertar en el editor
-                        window.dispatchEvent(new CustomEvent('insertInEditor', {
-                          detail: { 
-                            text: variable.name,
-                            type: 'variable',
-                            suggestion: `// Asignar valor a ${variable.name}\n${variable.name}: ${variable.defaultValue || 'valor'},`
-                          }
-                        }));
-                      }
-                    }}
-                    disabled={!variable.name}
-                    style={{
-                      width: '100%',
-                      padding: '4px 6px',
-                      border: '1px solid #3b82f6',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      background: variable.name ? '#dbeafe' : '#f3f4f6',
-                      color: variable.name ? '#1e40af' : '#9ca3af',
-                      cursor: variable.name ? 'pointer' : 'not-allowed',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    📝 Insertar en Editor
-                  </button>
-                  
-                  {variable.previewValue !== undefined && (
-                    <div style={{
-                      background: '#f0fdf4',
-                      border: '1px solid #bbf7d0',
-                      borderRadius: '4px',
-                      padding: '4px 6px',
-                      fontSize: '10px',
-                      color: '#166534',
-                      fontFamily: 'monospace'
-                    }}>
-                      Preview: {JSON.stringify(variable.previewValue)}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
@@ -258,7 +282,7 @@ const OutputSchemaPanel = ({
             <div style={{
               textAlign: 'center',
               color: '#6b7280',
-              padding: '20px',
+              padding: '40px 20px',
               fontStyle: 'italic'
             }}>
               <Settings size={24} style={{ opacity: 0.5, marginBottom: '8px' }} />

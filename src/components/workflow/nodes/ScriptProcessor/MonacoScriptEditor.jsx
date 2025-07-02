@@ -1,6 +1,6 @@
-// src/components/workflow/nodes/ScriptProcessor/MonacoScriptEditor.jsx - CON VALIDACIÓN MEJORADA
+// src/components/workflow/nodes/ScriptProcessor/MonacoScriptEditor.jsx - SIN PANEL DE VARIABLES
 import React, { useRef, useEffect } from 'react';
-import { AlertCircle, Lightbulb, Zap } from 'lucide-react';
+import { AlertCircle, Zap } from 'lucide-react';
 
 const MonacoScriptEditor = ({ 
   script, 
@@ -8,7 +8,7 @@ const MonacoScriptEditor = ({
   executionError,
   availableData = {},
   autocompleteSuggestions = [],
-  onValidationChange = () => {} // ✅ NUEVO: Callback para validación
+  onValidationChange = () => {}
 }) => {
   const editorRef = useRef(null);
   const containerRef = useRef(null);
@@ -42,7 +42,7 @@ const MonacoScriptEditor = ({
     const initializeEditor = () => {
       if (!containerRef.current || editorRef.current) return;
 
-      // ✅ MEJORADO: Configuración más completa de Monaco
+      // Configuración completa de Monaco
       editorRef.current = window.monaco.editor.create(containerRef.current, {
         value: script,
         language: 'javascript',
@@ -88,18 +88,15 @@ const MonacoScriptEditor = ({
         }
       });
 
-      // ✅ CORREGIDO: Configurar validación en tiempo real más estricta
+      // Configurar validación en tiempo real
       window.monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-        noSemanticValidation: false,  // Habilitar validación semántica
-        noSyntaxValidation: false,    // Habilitar validación de sintaxis
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
         noSuggestionDiagnostics: false,
-        // ✅ REDUCIDO: Menos códigos a ignorar para detectar más errores
-        diagnosticCodesToIgnore: [
-          80001 // Archivo no referenciado
-        ]
+        diagnosticCodesToIgnore: [80001]
       });
 
-      // ✅ MEJORADO: Configuraciones más estrictas de TypeScript
+      // Configuraciones de TypeScript
       window.monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
         target: window.monaco.languages.typescript.ScriptTarget.ES2020,
         allowNonTsExtensions: true,
@@ -111,27 +108,24 @@ const MonacoScriptEditor = ({
         reactNamespace: 'React',
         allowJs: true,
         typeRoots: ['node_modules/@types'],
-        // ✅ MEJORADO: Verificaciones más estrictas para detectar errores
-        strict: false, // Mantener false para evitar errores innecesarios
-        noImplicitAny: true,        // ✅ Detectar variables sin tipo
+        strict: false,
+        noImplicitAny: true,
         strictNullChecks: false,
-        strictFunctionTypes: true,   // ✅ Verificación estricta de tipos de función
+        strictFunctionTypes: true,
         noImplicitReturns: false,
         noFallthroughCasesInSwitch: true,
-        // ✅ NUEVO: Detectar problemas comunes
-        noUnusedLocals: true,        // ✅ Variables no usadas
-        noUnusedParameters: false,   // Parámetros no usados (mantenemos false)
+        noUnusedLocals: true,
+        noUnusedParameters: false,
         noImplicitOverride: false,
-        noPropertyAccessFromIndexSignature: true, // ✅ Acceso a propiedades más estricto
+        noPropertyAccessFromIndexSignature: true,
         noUncheckedIndexedAccess: false,
-        // ✅ NUEVO: Configuraciones adicionales para mejor detección
         alwaysStrict: true,
         exactOptionalPropertyTypes: false,
-        noImplicitThis: true,        // ✅ Detectar uso incorrecto de 'this'
+        noImplicitThis: true,
         useUnknownInCatchVariables: false
       });
 
-      // ✅ NUEVO: Listener para cambios en marcadores (errores/warnings)
+      // Listener para cambios en marcadores
       const model = editorRef.current.getModel();
       const updateMarkers = () => {
         const markers = window.monaco.editor.getModelMarkers({ resource: model.uri });
@@ -139,18 +133,15 @@ const MonacoScriptEditor = ({
         onValidationChange(markers);
       };
 
-      // Escuchar cambios en marcadores
       window.monaco.editor.onDidChangeMarkers(([uri]) => {
         if (model && uri.toString() === model.uri.toString()) {
           updateMarkers();
         }
       });
 
-      // ✅ NUEVO: Registrar provider de autocompletado mejorado
+      // Registrar provider de autocompletado mejorado
       window.monaco.languages.registerCompletionItemProvider('javascript', {
         provideCompletionItems: (model, position) => {
-          console.log('🎯 Monaco completion triggered at position:', position);
-          
           const word = model.getWordUntilPosition(position);
           const range = {
             startLineNumber: position.lineNumber,
@@ -161,7 +152,7 @@ const MonacoScriptEditor = ({
 
           const suggestions = [];
 
-          // ✅ Agregar variables del workflow
+          // Agregar variables del workflow
           Object.keys(availableData).forEach(varName => {
             suggestions.push({
               label: varName,
@@ -187,7 +178,7 @@ const MonacoScriptEditor = ({
             }
           });
 
-          // ✅ Agregar input como variable especial
+          // Agregar input como variable especial
           suggestions.push({
             label: 'input',
             kind: window.monaco.languages.CompletionItemKind.Variable,
@@ -197,7 +188,7 @@ const MonacoScriptEditor = ({
             range: range
           });
 
-          // ✅ Métodos JavaScript comunes con snippets
+          // Métodos JavaScript comunes con snippets
           const jsMethods = [
             { 
               label: 'console.log', 
@@ -258,12 +249,11 @@ const MonacoScriptEditor = ({
             });
           });
 
-          console.log('📋 Monaco suggestions generated:', suggestions.length);
           return { suggestions };
         }
       });
 
-      // ✅ NUEVO: Agregar tipos personalizados para mejor IntelliSense y validación
+      // Agregar tipos personalizados para mejor IntelliSense
       const inputTypeDefinition = `
         declare const input: {
           ${Object.keys(availableData).map(key => {
@@ -276,7 +266,9 @@ const MonacoScriptEditor = ({
             else if (Array.isArray(value)) type = 'any[]';
             else if (typeof value === 'object' && value !== null) type = 'object';
             
-            return `  ${key}: ${type};`;
+            // ✅ Convertir user_id a "user.id" para TypeScript
+            const displayKey = key.includes('_') ? `"${key.replace(/_/g, '.')}"` : key;
+            return `  ${displayKey}: ${type};`;
           }).join('\n')}
         };
         
@@ -293,19 +285,15 @@ const MonacoScriptEditor = ({
         'ts:workflow-types.d.ts'
       );
 
-      // ✅ CORREGIDO: Agregar validación personalizada para errores comunes
+      // Configurar validación personalizada para errores comunes
       const setupCustomValidation = () => {
         const model = editorRef.current.getModel();
         if (!model) return;
-        
-        console.log('🔧 Setting up custom validation for model:', model.uri.toString());
         
         const validateToString = () => {
           const value = model.getValue();
           const lines = value.split('\n');
           const markers = [];
-          
-          console.log('🔍 Validating content:', value);
           
           lines.forEach((line, index) => {
             // Detectar .toString sin paréntesis
@@ -313,8 +301,6 @@ const MonacoScriptEditor = ({
             let match;
             
             while ((match = toStringRegex.exec(line)) !== null) {
-              console.log('❌ Found .toString without parentheses at line', index + 1, 'column', match.index + 1);
-              
               markers.push({
                 severity: window.monaco.MarkerSeverity.Error,
                 startLineNumber: index + 1,
@@ -327,15 +313,12 @@ const MonacoScriptEditor = ({
               });
             }
             
-            // ✅ NUEVO: Detectar otros errores comunes
-            
-            // Variables no definidas (que no están en input)
+            // Detectar variables no definidas
             const varRegex = /\b(\w+)(?!\s*[:(])/g;
             let varMatch;
             while ((varMatch = varRegex.exec(line)) !== null) {
               const varName = varMatch[1];
               
-              // Excluir palabras reservadas y variables conocidas
               const excludeList = ['return', 'console', 'input', 'const', 'let', 'var', 'function', 'if', 'else', 'for', 'while', 'true', 'false', 'null', 'undefined', 'this', 'Object', 'JSON', 'Date', 'Math', 'Array', 'String', 'Number', 'Boolean'];
               
               if (!excludeList.includes(varName) && 
@@ -343,11 +326,8 @@ const MonacoScriptEditor = ({
                   !line.includes(`input.${varName}`) &&
                   !line.includes(`${varName}:`)) {
                 
-                // Solo marcar si no es parte de una declaración o propiedad
                 if (!line.match(new RegExp(`\\b(const|let|var)\\s+${varName}\\b`)) &&
                     !line.match(new RegExp(`${varName}\\s*:`))) {
-                  
-                  console.log('⚠️ Found potentially undefined variable:', varName);
                   
                   markers.push({
                     severity: window.monaco.MarkerSeverity.Warning,
@@ -364,35 +344,25 @@ const MonacoScriptEditor = ({
             }
           });
           
-          // ✅ CORREGIDO: Aplicar marcadores personalizados con owner específico
-          console.log('📌 Setting markers:', markers);
           window.monaco.editor.setModelMarkers(model, 'custom-validation', markers);
           
-          // También notificar al componente padre
           setTimeout(() => {
             const allMarkers = window.monaco.editor.getModelMarkers({ resource: model.uri });
-            console.log('📊 All markers after custom validation:', allMarkers);
             onValidationChange(allMarkers);
           }, 100);
         };
         
-        // ✅ CORREGIDO: Listener para cambios en el contenido
         const contentChangeDisposable = model.onDidChangeContent(() => {
-          console.log('📝 Content changed, triggering validation...');
-          // Pequeño delay para mejor rendimiento
           setTimeout(validateToString, 200);
         });
         
-        // Validación inicial
         setTimeout(validateToString, 500);
         
-        // Devolver función de limpieza
         return () => {
           contentChangeDisposable.dispose();
         };
       };
 
-      // ✅ CORREGIDO: Configurar validación después de que el editor esté listo
       setTimeout(() => {
         setupCustomValidation();
       }, 1000);
@@ -403,17 +373,14 @@ const MonacoScriptEditor = ({
         onScriptChange(value);
       });
 
-      // ✅ NUEVO: Forzar validación inicial después de configurar todo
+      // Forzar validación inicial
       setTimeout(() => {
         const model = editorRef.current.getModel();
         if (model) {
-          // Forzar re-validación del modelo
           window.monaco.editor.setModelLanguage(model, 'javascript');
           
-          // Obtener marcadores iniciales
           setTimeout(() => {
             const markers = window.monaco.editor.getModelMarkers({ resource: model.uri });
-            console.log('🚀 Initial markers after setup:', markers);
             onValidationChange(markers);
           }, 200);
         }
@@ -447,7 +414,7 @@ const MonacoScriptEditor = ({
       minHeight: 0,
       position: 'relative'
     }}>
-      {/* Header del Editor */}
+      {/* Header del Editor - SIMPLIFICADO */}
       <div style={{ 
         marginBottom: '16px',
         display: 'flex',
@@ -476,8 +443,8 @@ const MonacoScriptEditor = ({
               gap: '4px',
               border: '1px solid #93c5fd'
             }}>
-              <Lightbulb size={12} />
-              {Object.keys(availableData).length} variables
+              <Zap size={12} />
+              IntelliSense activo
             </span>
           )}
         </h4>
@@ -516,21 +483,16 @@ const MonacoScriptEditor = ({
             ⚡ Validación en vivo
           </span>
           
-          {/* ✅ NUEVO: Botón para forzar validación */}
+          {/* Botón para forzar validación */}
           <button
             onClick={() => {
               if (editorRef.current) {
                 const model = editorRef.current.getModel();
                 if (model) {
-                  console.log('🔄 Forcing validation...');
-                  
-                  // Forzar re-validación
                   window.monaco.editor.setModelLanguage(model, 'javascript');
                   
-                  // Obtener marcadores
                   setTimeout(() => {
                     const markers = window.monaco.editor.getModelMarkers({ resource: model.uri });
-                    console.log('🔍 Forced validation markers:', markers);
                     onValidationChange(markers);
                   }, 100);
                 }
@@ -564,58 +526,6 @@ const MonacoScriptEditor = ({
           minHeight: '400px'
         }}
       />
-
-      {/* Info de Variables Disponibles */}
-      {Object.keys(availableData).length > 0 && (
-        <div style={{
-          marginTop: '12px',
-          padding: '12px',
-          background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-          border: '1px solid #bfdbfe',
-          borderRadius: '8px',
-          fontSize: '12px',
-          color: '#1e40af'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <Zap size={14} />
-            <strong>Variables Disponibles (autocompletado automático):</strong>
-          </div>
-          <div style={{ 
-            display: 'flex', 
-            flexWrap: 'wrap', 
-            gap: '6px',
-            maxHeight: '60px',
-            overflow: 'auto'
-          }}>
-            {Object.keys(availableData).map(varName => (
-              <span 
-                key={varName}
-                style={{
-                  background: '#dbeafe',
-                  color: '#1e40af',
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  fontWeight: '500',
-                  border: '1px solid #93c5fd'
-                }}
-                title={`Variable: ${varName} (${typeof availableData[varName]})`}
-              >
-                {varName}
-              </span>
-            ))}
-          </div>
-          <div style={{
-            marginTop: '8px',
-            fontSize: '10px',
-            color: '#6b7280',
-            fontStyle: 'italic'
-          }}>
-            💡 Tip: Escribe "input." para ver todas las propiedades disponibles
-          </div>
-        </div>
-      )}
       
       {/* Error de Ejecución */}
       {executionError && (
