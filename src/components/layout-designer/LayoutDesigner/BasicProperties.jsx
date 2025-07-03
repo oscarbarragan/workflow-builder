@@ -1,4 +1,4 @@
-// src/components/layout-designer/LayoutDesigner/BasicProperties.jsx
+// src/components/layout-designer/LayoutDesigner/BasicProperties.jsx - CORREGIDO notación de punto
 import React from 'react';
 import { ELEMENT_TYPES } from '../../../utils/constants';
 import { styleManager } from '../../../utils/StyleManager';
@@ -8,6 +8,112 @@ const BasicProperties = ({
   onUpdateSelectedElement, 
   availableData = {} 
 }) => {
+  // ✅ FUNCIÓN NUEVA: Procesar variables para usar notación de punto
+  const processVariablesForOptions = (variables) => {
+    const processed = [];
+    
+    // Función recursiva para aplanar objetos anidados
+    const flattenObject = (obj, prefix = '') => {
+      Object.entries(obj).forEach(([key, value]) => {
+        const newKey = prefix ? `${prefix}.${key}` : key;
+        
+        if (value && typeof value === 'object' && !Array.isArray(value) && value.constructor === Object) {
+          // Es un objeto anidado, seguir aplanando
+          flattenObject(value, newKey);
+        } else if (Array.isArray(value)) {
+          // Es un array
+          processed.push({
+            value: newKey,
+            label: `${newKey} (Array[${value.length}])`,
+            type: 'array',
+            displayValue: `Array[${value.length}]`,
+            actualValue: value
+          });
+          
+          // Si el primer elemento es un objeto, mostrar sus propiedades
+          if (value.length > 0 && typeof value[0] === 'object') {
+            flattenObject(value[0], `${newKey}[0]`);
+          }
+        } else {
+          // Es un valor primitivo
+          const displayValue = value !== null && value !== undefined ? String(value) : '';
+          const truncatedValue = displayValue.length > 30 ? displayValue.substring(0, 30) + '...' : displayValue;
+          
+          processed.push({
+            value: newKey,
+            label: `${newKey} (${typeof value}) - ${truncatedValue}`,
+            type: typeof value,
+            displayValue: displayValue,
+            actualValue: value
+          });
+        }
+      });
+    };
+
+    // Procesar variables existentes
+    Object.entries(variables).forEach(([key, value]) => {
+      // Si ya tiene notación de punto, procesarla directamente
+      if (key.includes('.')) {
+        const displayValue = typeof value === 'object' && value !== null && value.displayValue !== undefined 
+          ? String(value.displayValue) 
+          : String(value || '');
+        const truncatedValue = displayValue.length > 30 ? displayValue.substring(0, 30) + '...' : displayValue;
+        
+        processed.push({
+          value: key,
+          label: `${key} (${typeof value}) - ${truncatedValue}`,
+          type: typeof value,
+          displayValue: displayValue,
+          actualValue: value
+        });
+        return;
+      }
+      
+      // Si tiene guiones bajos, convertir a puntos
+      if (key.includes('_')) {
+        const dotNotationKey = key.replace(/_/g, '.');
+        const displayValue = typeof value === 'string' ? value : String(value || '');
+        const truncatedValue = displayValue.length > 30 ? displayValue.substring(0, 30) + '...' : displayValue;
+        
+        processed.push({
+          value: dotNotationKey,
+          label: `${dotNotationKey} (${typeof value}) - ${truncatedValue}`,
+          type: typeof value,
+          displayValue: displayValue,
+          actualValue: value
+        });
+        return;
+      }
+      
+      // Si es un objeto anidado, aplanarlo
+      if (value && typeof value === 'object' && !Array.isArray(value) && value.constructor === Object) {
+        flattenObject(value, key);
+        return;
+      }
+      
+      // Caso normal
+      const displayValue = typeof value === 'string' ? value : String(value || '');
+      const truncatedValue = displayValue.length > 30 ? displayValue.substring(0, 30) + '...' : displayValue;
+      
+      processed.push({
+        value: key,
+        label: `${key} (${typeof value}) - ${truncatedValue}`,
+        type: typeof value,
+        displayValue: displayValue,
+        actualValue: value
+      });
+    });
+
+    // Ordenar por nombre de variable
+    return processed.sort((a, b) => a.value.localeCompare(b.value));
+  };
+
+  // ✅ NUEVO: Opciones de variables procesadas
+  const variableOptions = React.useMemo(() => {
+    console.log('🔄 Processing variables for select options:', availableData);
+    return processVariablesForOptions(availableData);
+  }, [availableData]);
+
   const renderFormField = (label, field, type = 'text', options = {}) => {
     const fieldStyle = {
       width: '100%',
@@ -141,21 +247,6 @@ const BasicProperties = ({
   const renderElementProperties = () => {
     if (!selectedElement) return null;
 
-    const variableOptions = Object.entries(availableData).map(([key, varData]) => {
-      let displayLabel;
-      if (typeof varData === 'object' && varData !== null && varData.displayValue !== undefined) {
-        displayLabel = `${key} (${varData.type || 'unknown'}) - ${String(varData.displayValue || '')}`;
-      } else {
-        const value = typeof varData === 'string' ? varData : String(varData || '');
-        displayLabel = `${key} - ${value.length > 30 ? value.substring(0, 30) + '...' : value}`;
-      }
-      
-      return {
-        value: key,
-        label: displayLabel
-      };
-    });
-
     switch (selectedElement.type) {
       case ELEMENT_TYPES.TEXT:
         return (
@@ -186,10 +277,104 @@ const BasicProperties = ({
       case ELEMENT_TYPES.VARIABLE:
         return (
           <>
-            {renderFormField('Variable', 'variable', 'select', {
-              placeholder: 'Selecciona una variable del workflow',
-              options: variableOptions
-            })}
+            {/* ✅ MEJORADO: Selector de variables con notación de punto */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                marginBottom: '6px',
+                color: '#374151'
+              }}>
+                Variable
+              </label>
+              
+              {variableOptions.length === 0 ? (
+                <div style={{
+                  padding: '12px',
+                  border: '1px dashed #d1d5db',
+                  borderRadius: '6px',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  fontSize: '14px'
+                }}>
+                  <div style={{ marginBottom: '4px' }}>🔗 No hay variables disponibles</div>
+                  <div style={{ fontSize: '12px' }}>
+                    Conecta nodos para obtener variables
+                  </div>
+                </div>
+              ) : (
+                <select
+                  value={selectedElement.variable || ''}
+                  onChange={(e) => onUpdateSelectedElement('variable', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    boxSizing: 'border-box',
+                    fontFamily: 'monospace'
+                  }}
+                >
+                  <option value="">Selecciona una variable del workflow</option>
+                  {variableOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+              
+              {/* ✅ NUEVO: Vista previa de la variable seleccionada */}
+              {selectedElement.variable && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '8px 12px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '12px'
+                }}>
+                  <div style={{
+                    color: '#374151',
+                    fontWeight: '600',
+                    marginBottom: '4px',
+                    fontFamily: 'monospace'
+                  }}>
+                    📋 Variable seleccionada:
+                  </div>
+                  <div style={{
+                    color: '#3b82f6',
+                    fontFamily: 'monospace',
+                    background: 'white',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #dbeafe'
+                  }}>
+                    {`{{${selectedElement.variable}}}`}
+                  </div>
+                  
+                  {/* ✅ NUEVO: Mostrar valor actual si está disponible */}
+                  {(() => {
+                    const selectedVar = variableOptions.find(v => v.value === selectedElement.variable);
+                    if (selectedVar && selectedVar.displayValue) {
+                      return (
+                        <div style={{
+                          marginTop: '6px',
+                          color: '#6b7280',
+                          fontSize: '11px'
+                        }}>
+                          <strong>Valor actual:</strong> {selectedVar.displayValue}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              )}
+            </div>
+
             {renderFormField('Tamaño de Fuente', 'fontSize', 'number', {
               min: 8,
               max: 72,
@@ -505,6 +690,37 @@ const BasicProperties = ({
             🧲 Ajustar a cuadrícula
           </button>
         </div>
+      </div>
+
+      {/* ✅ NUEVO: Información sobre notación de punto */}
+      <div style={{
+        marginTop: '16px',
+        padding: '12px',
+        background: '#f0fdf4',
+        border: '1px solid #bbf7d0',
+        borderRadius: '6px'
+      }}>
+        <div style={{
+          fontSize: '12px',
+          color: '#15803d',
+          fontWeight: '600',
+          marginBottom: '6px'
+        }}>
+          💡 Variables con Notación de Punto
+        </div>
+        <ul style={{
+          fontSize: '11px',
+          color: '#15803d',
+          margin: 0,
+          paddingLeft: '16px',
+          lineHeight: '1.4'
+        }}>
+          <li><strong>user.id</strong> en lugar de <s>user_id</s></li>
+          <li><strong>data.response.status</strong> para estructuras anidadas</li>
+          <li><strong>items[0].name</strong> para arrays de objetos</li>
+          <li>Compatible con JSON estándar</li>
+          <li>Usa Ctrl+Espacio en edición de texto</li>
+        </ul>
       </div>
     </div>
   );

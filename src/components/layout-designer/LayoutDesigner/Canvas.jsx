@@ -16,7 +16,7 @@ const Canvas = ({
   onTextChange,
   onElementDoubleClick,
   availableVariables = {},
-  showVariableValues = false // ✅ NUEVO: Control para mostrar valores vs nombres
+  showVariableValues = false
 }) => {
   const canvasStyle = {
     flex: '1',
@@ -45,9 +45,6 @@ const Canvas = ({
     msUserSelect: 'none'
   };
 
-  // ✅ REMOVIDO: Indicador de elementos - ya no se muestra según punto 1
-
-  // Handlers con debug
   const handleCanvasMouseDown = useCallback((e) => {
     const isCanvas = e.target.getAttribute('data-canvas') === 'true';
     console.log('🎨 Canvas MouseDown:', isCanvas ? 'canvas' : 'other');
@@ -89,7 +86,6 @@ const Canvas = ({
     onElementMouseDown && onElementMouseDown(e, element);
   }, [onElementMouseDown]);
 
-  // Manejadores para prevenir comportamientos por defecto
   const preventSelect = useCallback((e) => {
     e.preventDefault();
     return false;
@@ -105,10 +101,11 @@ const Canvas = ({
     return false;
   }, []);
 
-  // ✅ MEJORADO: Función para renderizar el elemento apropiado
+  // ✅ CORREGIDO: Función para renderizar el elemento apropiado SIN spread de key
   const renderElement = (element) => {
-    const commonProps = {
-      key: element.id,
+    // ✅ CRÍTICO: Separar key de las otras props
+    const elementKey = element.id;
+    const elementProps = {
       element: element,
       isSelected: selectedElement?.id === element.id,
       isDragging: isDragging && selectedElement?.id === element.id,
@@ -123,15 +120,21 @@ const Canvas = ({
     if (element.type === EXTENDED_ELEMENT_TYPES.TEXT || element.type === 'text') {
       return (
         <EnhancedTextElement
-          {...commonProps}
+          key={elementKey} // ✅ CRÍTICO: key pasado directamente, no en spread
+          {...elementProps}
           availableVariables={availableVariables}
-          showVariableValues={showVariableValues} // ✅ NUEVO: Pasar control de visualización
+          showVariableValues={showVariableValues}
         />
       );
     }
 
     // ✅ Usar LayoutElement para otros tipos
-    return <LayoutElement {...commonProps} />;
+    return (
+      <LayoutElement
+        key={elementKey} // ✅ CRÍTICO: key pasado directamente, no en spread
+        {...elementProps}
+      />
+    );
   };
 
   return (
@@ -195,7 +198,7 @@ const Canvas = ({
           </div>
         )}
 
-        {/* ✅ Canvas info más limpio */}
+        {/* Canvas info */}
         <div style={{
           position: 'absolute',
           bottom: '12px',
@@ -236,7 +239,7 @@ const Canvas = ({
           }} />
         )}
 
-        {/* ✅ MEJORADO: Indicador de funcionalidades más sutil */}
+        {/* Indicador de funcionalidades */}
         <div style={{
           position: 'absolute',
           bottom: '12px',

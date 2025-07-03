@@ -1,4 +1,4 @@
-// src/components/layout-designer/StylesSidebar/StylesSidebar.jsx - CORREGIDO colapso
+// src/components/layout-designer/StylesSidebar/StylesSidebar.jsx - CORREGIDO notación de punto
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Type, 
@@ -27,9 +27,8 @@ const StylesSidebar = ({
   availableVariables = {},
   showVariableValues = false,
   onToggleVariableValues,
-  updateTrigger = 0 // ✅ NUEVO: prop para controlar actualizaciones
+  updateTrigger = 0
 }) => {
-  // ✅ CRÍTICO: Estado persistente que NO se resetea
   const [expandedSections, setExpandedSections] = useState({
     variables: true,
     textStyles: true,
@@ -40,7 +39,6 @@ const StylesSidebar = ({
   const [activeTab, setActiveTab] = useState('styles');
   const fontInputRef = useRef(null);
   
-  // ✅ NUEVO: Estado para datos cacheados
   const [cachedStyles, setCachedStyles] = useState({
     textStyles: [],
     paragraphStyles: [],
@@ -48,7 +46,72 @@ const StylesSidebar = ({
     fillStyles: []
   });
 
-  // ✅ CRÍTICO: Solo actualizar datos, NO resetear UI state
+  // ✅ FUNCIÓN NUEVA: Convertir variables a notación de punto
+  const convertVariablesToDotNotation = (variables) => {
+    const convertedVariables = {};
+    
+    Object.entries(variables).forEach(([key, value]) => {
+      // Convertir guiones bajos a puntos
+      const dotNotationKey = key.replace(/_/g, '.');
+      convertedVariables[dotNotationKey] = value;
+    });
+    
+    return convertedVariables;
+  };
+
+  // ✅ FUNCIÓN NUEVA: Procesar estructura JSON anidada para generar variables con notación de punto
+  const flattenObjectToDotNotation = (obj, prefix = '') => {
+    const flattened = {};
+    
+    Object.entries(obj).forEach(([key, value]) => {
+      const newKey = prefix ? `${prefix}.${key}` : key;
+      
+      if (value && typeof value === 'object' && !Array.isArray(value) && value.constructor === Object) {
+        // Es un objeto anidado, seguir aplanando
+        Object.assign(flattened, flattenObjectToDotNotation(value, newKey));
+      } else if (Array.isArray(value) && value.length > 0) {
+        // Es un array, mostrar el primer elemento y longitud
+        flattened[newKey] = {
+          displayValue: `Array[${value.length}]`,
+          type: 'array',
+          actualValue: value
+        };
+        
+        // Si el primer elemento es un objeto, mostrar sus propiedades
+        if (value[0] && typeof value[0] === 'object') {
+          Object.assign(flattened, flattenObjectToDotNotation(value[0], `${newKey}[0]`));
+        }
+      } else {
+        // Es un valor primitivo
+        flattened[newKey] = {
+          displayValue: value,
+          type: typeof value,
+          actualValue: value
+        };
+      }
+    });
+    
+    return flattened;
+  };
+
+  // ✅ NUEVO: Procesar variables disponibles
+  const processedVariables = React.useMemo(() => {
+    console.log('🔄 Processing variables with dot notation:', availableVariables);
+    
+    // Si ya están en formato correcto, procesarlas
+    if (Object.keys(availableVariables).some(key => key.includes('.'))) {
+      return availableVariables;
+    }
+    
+    // Si es un objeto plano con guiones bajos, convertir
+    if (Object.keys(availableVariables).some(key => key.includes('_'))) {
+      return convertVariablesToDotNotation(availableVariables);
+    }
+    
+    // Si es una estructura JSON anidada, aplanar
+    return flattenObjectToDotNotation(availableVariables);
+  }, [availableVariables]);
+
   useEffect(() => {
     console.log('🔄 StylesSidebar: Updating cached styles due to trigger:', updateTrigger);
     
@@ -58,9 +121,8 @@ const StylesSidebar = ({
       borderStyles: styleManager.getAllBorderStyles(),
       fillStyles: styleManager.getAllFillStyles()
     });
-  }, [updateTrigger]); // Solo depende del trigger
+  }, [updateTrigger]);
 
-  // ✅ Inicializar cache al montar
   useEffect(() => {
     setCachedStyles({
       textStyles: styleManager.getAllTextStyles(),
@@ -109,7 +171,6 @@ const StylesSidebar = ({
     }
   };
 
-  // ✅ MEJORADO: Handler para eliminar con actualización inmediata
   const handleDeleteStyle = (styleType, styleId, styleName) => {
     if (window.confirm(`¿Eliminar el estilo "${styleName}"?`)) {
       try {
@@ -129,7 +190,6 @@ const StylesSidebar = ({
         }
         console.log('✅ Style deleted:', styleId);
         
-        // ✅ CRÍTICO: Actualizar cache inmediatamente
         setCachedStyles({
           textStyles: styleManager.getAllTextStyles(),
           paragraphStyles: styleManager.getAllParagraphStyles(),
@@ -180,10 +240,11 @@ const StylesSidebar = ({
     </div>
   );
 
+  // ✅ MEJORADO: Renderizado de variables con notación de punto
   const renderVariablesSection = () => (
     <div>
       {renderSectionHeader(
-        `Variables (${Object.keys(availableVariables).length})`, 
+        `Variables (${Object.keys(processedVariables).length})`, 
         'variables', 
         <Link2 size={14} />
       )}
@@ -212,7 +273,7 @@ const StylesSidebar = ({
             </button>
           </div>
           
-          {Object.keys(availableVariables).length === 0 ? (
+          {Object.keys(processedVariables).length === 0 ? (
             <div style={{
               padding: '20px 12px',
               textAlign: 'center',
@@ -230,9 +291,10 @@ const StylesSidebar = ({
               maxHeight: '250px',
               overflowY: 'auto'
             }}>
-              {Object.entries(availableVariables).map(([key, varData]) => {
+              {Object.entries(processedVariables).map(([key, varData]) => {
                 let displayValue, typeInfo;
                 
+                // ✅ MEJORADO: Manejo de estructura de datos con notación de punto
                 if (typeof varData === 'object' && varData !== null && varData.displayValue !== undefined) {
                   displayValue = String(varData.displayValue || '');
                   typeInfo = varData.type || 'unknown';
@@ -245,6 +307,12 @@ const StylesSidebar = ({
                   ? `${displayValue.substring(0, 30)}...` 
                   : displayValue;
 
+                // ✅ NUEVO: Indicador visual para estructura anidada
+                const isNestedPath = key.includes('.');
+                const pathParts = key.split('.');
+                const lastPart = pathParts[pathParts.length - 1];
+                const parentPath = pathParts.slice(0, -1).join('.');
+
                 return (
                   <div
                     key={`variable-${key}`}
@@ -252,7 +320,9 @@ const StylesSidebar = ({
                       padding: '8px 12px',
                       borderBottom: '1px solid #f3f4f6',
                       cursor: 'pointer',
-                      transition: 'background-color 0.2s'
+                      transition: 'background-color 0.2s',
+                      paddingLeft: isNestedPath ? `${12 + (pathParts.length - 1) * 8}px` : '12px',
+                      borderLeft: isNestedPath ? '2px solid #e5e7eb' : 'none'
                     }}
                     onMouseOver={(e) => e.target.style.backgroundColor = '#f8fafc'}
                     onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
@@ -272,23 +342,49 @@ const StylesSidebar = ({
                         alignItems: 'center',
                         gap: '4px'
                       }}>
+                        {/* ✅ NUEVO: Indicador visual según tipo y anidamiento */}
                         <span style={{ 
                           color: typeInfo === 'string' ? '#16a34a' : 
                                 typeInfo === 'number' ? '#3b82f6' : 
                                 typeInfo === 'boolean' ? '#f59e0b' : 
                                 typeInfo === 'array' ? '#7c3aed' : 
-                                typeInfo === 'object' ? '#dc2626' : '#6b7280'
+                                typeInfo === 'object' ? '#dc2626' : '#6b7280',
+                          fontSize: '10px'
                         }}>
-                          🔗
+                          {isNestedPath ? '└' : '🔗'}
                         </span>
-                        {`{{${key}}}`}
+                        
+                        {/* ✅ MEJORADO: Mostrar path completo o solo la parte final */}
+                        <span style={{ 
+                          fontFamily: 'monospace',
+                          fontSize: isNestedPath ? '11px' : '12px'
+                        }}>
+                          {showVariableValues && isNestedPath ? (
+                            <>
+                              <span style={{ color: '#9ca3af', fontSize: '10px' }}>{parentPath}.</span>
+                              <span style={{ color: '#374151' }}>{lastPart}</span>
+                            </>
+                          ) : (
+                            `{{${key}}}`
+                          )}
+                        </span>
                       </div>
+                      
                       <span style={{
                         fontSize: '9px',
                         padding: '1px 4px',
-                        background: '#e5e7eb',
+                        background: typeInfo === 'string' ? '#dcfce7' : 
+                                  typeInfo === 'number' ? '#dbeafe' : 
+                                  typeInfo === 'boolean' ? '#fef3c7' : 
+                                  typeInfo === 'array' ? '#f3e8ff' : 
+                                  typeInfo === 'object' ? '#fef2f2' : '#f3f4f6',
                         borderRadius: '3px',
-                        color: '#6b7280'
+                        color: typeInfo === 'string' ? '#16a34a' : 
+                               typeInfo === 'number' ? '#2563eb' : 
+                               typeInfo === 'boolean' ? '#d97706' : 
+                               typeInfo === 'array' ? '#7c3aed' : 
+                               typeInfo === 'object' ? '#dc2626' : '#6b7280',
+                        fontWeight: '500'
                       }}>
                         {String(typeInfo)}
                       </span>
@@ -297,7 +393,8 @@ const StylesSidebar = ({
                     <div style={{
                       color: '#6b7280',
                       fontSize: '11px',
-                      fontFamily: showVariableValues ? 'inherit' : 'monospace'
+                      fontFamily: showVariableValues ? 'inherit' : 'monospace',
+                      paddingLeft: isNestedPath ? '14px' : '0'
                     }}>
                       {showVariableValues ? truncatedValue : `{{${key}}}`}
                     </div>
@@ -414,7 +511,6 @@ const StylesSidebar = ({
         )}
       </div>
       
-      {/* Botones de acción para estilos custom */}
       <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
         {style.isCustom && (
           <button
@@ -481,7 +577,6 @@ const StylesSidebar = ({
     </div>
   );
 
-  // ✅ CORREGIDO: Usar cache en lugar de llamar directamente al styleManager
   const renderTextStyles = () => {
     const currentTextStyleId = selectedElement?.textStyleId;
 
@@ -860,7 +955,6 @@ const StylesSidebar = ({
                       styleManager.importStyles(styles);
                       console.log('✅ Styles imported successfully');
                       
-                      // ✅ Actualizar cache después de importar
                       setCachedStyles({
                         textStyles: styleManager.getAllTextStyles(),
                         paragraphStyles: styleManager.getAllParagraphStyles(),

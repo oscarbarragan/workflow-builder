@@ -1,4 +1,4 @@
-// src/components/layout-designer/elements/EnhancedTextElement.jsx - CORREGIDO inserción variables
+// src/components/layout-designer/elements/EnhancedTextElement.jsx - LIMPIO SIN DUPLICADOS
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { EXTENDED_ELEMENT_TYPES } from '../../../utils/StyleManager';
 import { styleManager } from '../../../utils/StyleManager';
@@ -21,11 +21,142 @@ const EnhancedTextElement = ({
   const [cursorPosition, setCursorPosition] = useState(0);
   const [variableMenuPosition, setVariableMenuPosition] = useState({ x: 0, y: 0 });
   const [showTooltip, setShowTooltip] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(''); // ✅ NUEVO: Estado para búsqueda
   const textareaRef = useRef(null);
   const elementRef = useRef(null);
   const variableMenuRef = useRef(null);
+  const searchInputRef = useRef(null); // ✅ NUEVO: Ref para input de búsqueda
 
-  // Auto-focus cuando entra en modo edición
+  // ✅ FUNCIÓN SIMPLE: Verificar si un valor es primitivo
+  const isPrimitiveValue = (value) => {
+    const type = typeof value;
+    return type === 'string' || type === 'number' || type === 'boolean' || value === null || value === undefined;
+  };
+
+  // ✅ SOLUCIÓN ULTRA SIMPLE: Solo procesar valores directos, ignorar metadatos
+  const processVariablesWithDotNotation = (variables) => {
+    const result = {};
+    
+    console.log('🎯 ULTRA SIMPLE: Input variables:', variables);
+    
+    // ✅ FUNCIÓN SIMPLE: Solo agrega si es realmente un valor primitivo directo
+    const addOnlyDirectPrimitives = (obj, parentKey = '') => {
+      Object.entries(obj).forEach(([key, value]) => {
+        const fullKey = parentKey ? `${parentKey}.${key}` : key;
+        const cleanKey = fullKey.replace(/_/g, '.');
+        
+        // ✅ CRÍTICO: Detectar si el objeto tiene metadatos y SALTARLO COMPLETAMENTE
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          // Si el objeto tiene propiedades como 'type', 'value', 'jsonPath', etc., lo ignoramos
+          const hasMetadataProps = Object.keys(value).some(k => 
+            k === 'type' || k === 'value' || k === 'jsonPath' || k === 'source' || 
+            k === 'displayValue' || k === 'actualValue' || k === 'isInsertable'
+          );
+          
+          if (hasMetadataProps) {
+            console.log(`🚫 SKIPPING object with metadata: ${cleanKey}`, Object.keys(value));
+            // ✅ Si tiene 'value' y es primitivo, usar ese valor
+            if (value.hasOwnProperty('value') && (typeof value.value === 'string' || typeof value.value === 'number' || typeof value.value === 'boolean')) {
+              result[cleanKey] = value.value;
+              console.log(`✅ EXTRACTED value from metadata object: ${cleanKey} = ${value.value}`);
+            }
+            return; // NO procesar las propiedades del objeto
+          } else {
+            // Es un objeto normal, procesar sus propiedades
+            console.log(`📁 Processing normal object: ${cleanKey}`);
+            addOnlyDirectPrimitives(value, cleanKey);
+          }
+        } else if (Array.isArray(value)) {
+          // Para arrays, procesar elementos
+          value.forEach((item, index) => {
+            const arrayKey = `${cleanKey}[${index}]`;
+            if (typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || item === null) {
+              result[arrayKey] = item;
+              console.log(`✅ ADDED array primitive: ${arrayKey} = ${item}`);
+            } else if (typeof item === 'object' && item !== null) {
+              addOnlyDirectPrimitives(item, arrayKey);
+            }
+          });
+        } else if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined) {
+          // Es un valor primitivo directo
+          result[cleanKey] = value;
+          console.log(`✅ ADDED direct primitive: ${cleanKey} = ${value}`);
+        }
+      });
+    };
+    
+    addOnlyDirectPrimitives(variables);
+    
+    console.log('🎯 ULTRA SIMPLE: Final result:', result);
+    return result;
+  };
+
+  // ✅ Variables procesadas MUY SIMPLES
+  const processedVariables = React.useMemo(() => {
+    console.log('🎯 ULTRA SIMPLE: Processing variables for text element:', availableVariables);
+    
+    // Datos de ejemplo sin metadatos confusos
+    let dataToProcess = availableVariables;
+    if (Object.keys(availableVariables).length === 0) {
+      console.log('⚠️ Using ultra simple example data');
+      dataToProcess = {
+        user_name: "Juan Pérez",
+        user_age: 30,
+        user: {
+          id: 123,
+          email: "juan@email.com",
+          active: true
+        },
+        orders: [
+          { id: 1, total: 100.50 },
+          { id: 2, total: 250.75 }
+        ],
+        company: {
+          name: "Mi Empresa",
+          address: {
+            city: "Bogotá"
+          }
+        }
+      };
+    }
+    
+    const processed = processVariablesWithDotNotation(dataToProcess);
+    
+    // ✅ Convertir a formato simple para el componente
+    const formatted = {};
+    Object.entries(processed).forEach(([key, value]) => {
+      formatted[key] = {
+        displayValue: String(value),
+        type: typeof value,
+        actualValue: value
+      };
+    });
+    
+    console.log('🎯 ULTRA SIMPLE: Final formatted:', formatted);
+    return formatted;
+  }, [availableVariables]);
+
+  // ✅ FILTRADO SIMPLE DEFINITIVO
+  const filteredVariables = React.useMemo(() => {
+    console.log('🎯 DEFINITIVA: Filtering variables');
+    
+    if (!searchTerm.trim()) {
+      return processedVariables;
+    }
+    
+    const filtered = {};
+    const searchLower = searchTerm.toLowerCase();
+    
+    Object.entries(processedVariables).forEach(([key, value]) => {
+      // ✅ Buscar solo en el nombre de la variable
+      if (key.toLowerCase().includes(searchLower)) {
+        filtered[key] = value;
+      }
+    });
+    
+    return filtered;
+  }, [processedVariables, searchTerm]);
+
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
@@ -33,7 +164,6 @@ const EnhancedTextElement = ({
     }
   }, [isEditing, cursorPosition]);
 
-  // Cerrar menú de variables al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (variableMenuRef.current && !variableMenuRef.current.contains(event.target)) {
@@ -47,7 +177,6 @@ const EnhancedTextElement = ({
     }
   }, [showVariableMenu]);
 
-  // ✅ Función para obtener estilos aplicados del StyleManager
   const getAppliedStyles = () => {
     const appliedStyles = {
       textStyle: {},
@@ -60,7 +189,6 @@ const EnhancedTextElement = ({
       const textStyle = styleManager.getTextStyle(element.textStyleId);
       if (textStyle) {
         appliedStyles.textStyle = { ...textStyle };
-        console.log('🎨 Applied text style from StyleManager:', textStyle);
       }
     }
 
@@ -68,7 +196,6 @@ const EnhancedTextElement = ({
       const paragraphStyle = styleManager.getParagraphStyle(element.paragraphStyleId);
       if (paragraphStyle) {
         appliedStyles.paragraphStyle = { ...paragraphStyle };
-        console.log('📝 Applied paragraph style from StyleManager:', paragraphStyle);
       }
     }
 
@@ -76,7 +203,6 @@ const EnhancedTextElement = ({
       const borderStyle = styleManager.getBorderStyle(element.borderStyleId);
       if (borderStyle) {
         appliedStyles.borderStyle = { ...borderStyle };
-        console.log('🖼️ Applied border style from StyleManager:', borderStyle);
       }
     }
 
@@ -84,11 +210,9 @@ const EnhancedTextElement = ({
       const fillStyle = styleManager.getFillStyle(element.fillStyleId);
       if (fillStyle) {
         appliedStyles.fillStyle = { ...fillStyle };
-        console.log('🎨 Applied fill style from StyleManager:', fillStyle);
       }
     }
 
-    // Overlay manual styles on top of StyleManager styles
     return {
       textStyle: { ...appliedStyles.textStyle, ...(element.textStyle || {}) },
       paragraphStyle: { ...appliedStyles.paragraphStyle, ...(element.paragraphStyle || {}) },
@@ -97,7 +221,6 @@ const EnhancedTextElement = ({
     };
   };
 
-  // Función para obtener estilos CSS finales
   const getFinalStyles = () => {
     const styles = getAppliedStyles();
     const { textStyle, paragraphStyle, borderStyle, fillStyle } = styles;
@@ -129,20 +252,26 @@ const EnhancedTextElement = ({
     };
   };
 
-  // Función para procesar y mostrar texto con variables
+  // ✅ MEJORADO: Función para procesar texto con variables usando notación de punto
   const processTextWithVariables = (text) => {
     if (!text) return '';
     
     if (showVariableValues) {
       return text.replace(/\{\{([^}]+)\}\}/g, (match, variableName) => {
         const trimmedName = variableName.trim();
-        const variable = availableVariables[trimmedName];
+        const variable = processedVariables[trimmedName];
         
         if (variable !== undefined) {
           if (typeof variable === 'object' && variable !== null && variable.displayValue !== undefined) {
             return String(variable.displayValue);
           }
           return String(variable);
+        }
+        
+        const underscoreVersion = trimmedName.replace(/\./g, '_');
+        const underscoreVariable = availableVariables[underscoreVersion];
+        if (underscoreVariable !== undefined) {
+          return String(underscoreVariable);
         }
         
         return `[${trimmedName}]`;
@@ -152,7 +281,7 @@ const EnhancedTextElement = ({
     return text;
   };
 
-  // Función para renderizar texto con variables destacadas inline
+  // ✅ MEJORADO: Renderizar contenido con variables destacadas
   const renderTextContent = () => {
     const text = element.text || '';
     
@@ -178,10 +307,14 @@ const EnhancedTextElement = ({
         });
       }
       
+      const variableName = match[1].trim();
+      const isValidVariable = processedVariables.hasOwnProperty(variableName);
+      
       parts.push({
         type: 'variable',
         content: match[0],
-        variableName: match[1].trim()
+        variableName: variableName,
+        isValid: isValidVariable
       });
       
       lastIndex = match.index + match[0].length;
@@ -202,17 +335,24 @@ const EnhancedTextElement = ({
               <span 
                 key={`var-${index}`}
                 style={{
-                  background: 'rgba(59, 130, 246, 0.15)',
-                  color: '#1e40af',
+                  background: part.isValid 
+                    ? 'rgba(59, 130, 246, 0.15)' 
+                    : 'rgba(239, 68, 68, 0.15)',
+                  color: part.isValid ? '#1e40af' : '#dc2626',
                   padding: '1px 3px',
                   borderRadius: '3px',
-                  border: '1px solid rgba(59, 130, 246, 0.4)',
+                  border: part.isValid 
+                    ? '1px solid rgba(59, 130, 246, 0.4)' 
+                    : '1px solid rgba(239, 68, 68, 0.4)',
                   fontSize: '0.95em',
                   fontWeight: '600',
                   fontFamily: 'monospace',
                   display: 'inline'
                 }}
-                title={`Variable: ${part.variableName}`}
+                title={part.isValid 
+                  ? `Variable válida: ${part.variableName}` 
+                  : `Variable no encontrada: ${part.variableName}`
+                }
               >
                 {part.content}
               </span>
@@ -275,54 +415,101 @@ const EnhancedTextElement = ({
     return baseStyle;
   };
 
-  // ✅ CORREGIDO: Función para insertar variable mejorada
-  const insertVariable = (variableName) => {
+  // ✅ HANDLERS - Todos definidos en orden correcto
+
+  const handleEditFinish = useCallback(() => {
+    console.log('✅ Finishing edit with value:', editValue);
+    
+    setIsEditing(false);
+    setShowVariableMenu(false);
+    setShowTooltip(false);
+    
+    if (onTextChange && editValue !== element.text) {
+      onTextChange(element.id, 'text', editValue);
+    }
+  }, [editValue, element.id, element.text, onTextChange]);
+
+  const handleTextareaBlur = useCallback((e) => {
+    // ✅ CRÍTICO: Verificar si el foco se movió al input de búsqueda o al menú
+    if (showVariableMenu && variableMenuRef.current) {
+      const clickedElement = e.relatedTarget;
+      
+      // Si se hizo clic en el menú de variables o en el input de búsqueda
+      if (clickedElement && (
+        variableMenuRef.current.contains(clickedElement) ||
+        clickedElement === searchInputRef.current
+      )) {
+        console.log('🎯 Blur ignored - clicked inside variable menu or search');
+        setTimeout(() => {
+          if (textareaRef.current && !document.activeElement.matches('input')) {
+            textareaRef.current.focus();
+          }
+        }, 0);
+        return;
+      }
+    }
+    
+    console.log('📤 Textarea blur - finishing edit');
+    handleEditFinish();
+  }, [showVariableMenu, handleEditFinish]);
+
+  const insertVariable = useCallback((variableName) => {
     const textarea = textareaRef.current;
     if (!textarea) {
       console.warn('❌ Textarea not found for variable insertion');
       return;
     }
 
-    console.log('📝 Inserting variable:', variableName);
+    // ✅ DEBUGGING: Ver exactamente qué se está insertando
+    console.log('📝 DEBUGGING insertVariable:');
+    console.log('   - variableName received:', variableName);
+    console.log('   - typeof variableName:', typeof variableName);
+    console.log('   - variableName content:', JSON.stringify(variableName));
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    const start = cursorPosition;
+    const end = cursorPosition;
     const currentText = editValue;
-    const variableText = `{{${variableName}}}`;
+    
+    // ✅ CRÍTICO: Asegurarse de que solo insertamos la clave limpia
+    const cleanVariableName = String(variableName).trim();
+    const variableText = `{{${cleanVariableName}}}`;
+    
+    console.log('   - cleanVariableName:', cleanVariableName);
+    console.log('   - variableText to insert:', variableText);
     
     const newText = currentText.substring(0, start) + variableText + currentText.substring(end);
     const newCursorPosition = start + variableText.length;
     
-    console.log('✏️ New text:', newText);
-    console.log('📍 New cursor position:', newCursorPosition);
+    console.log('   - newText:', newText);
     
-    // Actualizar el valor
-    setEditValue(newText);
     setShowVariableMenu(false);
+    setEditValue(newText);
     
-    // ✅ CRÍTICO: Usar requestAnimationFrame para asegurar que el DOM se actualice
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
         textareaRef.current.setSelectionRange(newCursorPosition, newCursorPosition);
-        console.log('✅ Variable inserted and cursor positioned');
+        setCursorPosition(newCursorPosition);
+        console.log('✅ Variable inserted at position:', newCursorPosition);
       }
-    });
-  };
+    }, 10);
+  }, [cursorPosition, editValue]);
 
-  // ✅ MEJORADO: Función para mostrar menú de variables con mejor posicionamiento
-  const showVariableMenuAt = (event) => {
+  const showVariableMenuAt = useCallback((event) => {
     if (!textareaRef.current) return;
     
-    console.log('📋 Showing variable menu');
+    console.log('📋 Showing variable menu with dot notation variables');
     
     const textarea = textareaRef.current;
     const textareaRect = textarea.getBoundingClientRect();
+    const currentCursorPos = textarea.selectionStart;
     
-    // Posicionar el menú cerca del cursor
+    console.log('📍 Menu triggered at cursor position:', currentCursorPos);
+    setCursorPosition(currentCursorPos);
+    
     const menuX = Math.min(
       event.clientX - textareaRect.left + 10,
-      textareaRect.width - 200 // Ancho mínimo del menú
+      textareaRect.width - 300 // ✅ AUMENTADO: Más espacio para búsqueda
     );
     
     const menuY = event.clientY - textareaRect.top + 25;
@@ -332,40 +519,45 @@ const EnhancedTextElement = ({
       y: Math.max(0, menuY)
     });
     
+    // ✅ NUEVO: Limpiar búsqueda al abrir menú
+    setSearchTerm('');
     setShowVariableMenu(true);
     setShowTooltip(false);
     
-    console.log('📍 Menu positioned at:', { x: menuX, y: menuY });
-  };
+    // ✅ NUEVO: Enfocar input de búsqueda después de un frame
+    setTimeout(() => {
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+      }
+    }, 100);
+  }, []);
 
-  const handleDoubleClick = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    console.log('👆 Double click - entering edit mode');
-    setIsEditing(true);
-    setEditValue(element.text || '');
-    setCursorPosition(0);
-    setShowTooltip(true);
-  }, [element.text]);
-
-  // ✅ MEJORADO: Handler para teclas con mejor manejo de Ctrl+Espacio
   const handleTextareaKeyDown = useCallback((e) => {
     console.log('⌨️ Key pressed:', e.key, 'Ctrl:', e.ctrlKey, 'Code:', e.code);
 
-    // ✅ CRÍTICO: Detectar Ctrl+Espacio de múltiples formas
     if ((e.ctrlKey && e.code === 'Space') || (e.ctrlKey && e.key === ' ')) {
       e.preventDefault();
       e.stopPropagation();
       
-      console.log('🎯 Ctrl+Space detected - showing variable menu');
-      
-      if (Object.keys(availableVariables).length === 0) {
+      if (Object.keys(processedVariables).length === 0) {
         console.warn('⚠️ No variables available');
         return;
       }
       
-      showVariableMenuAt(e);
+      const textarea = textareaRef.current;
+      if (textarea) {
+        const currentCursorPos = textarea.selectionStart;
+        setCursorPosition(currentCursorPos);
+        
+        const syntheticEvent = {
+          clientX: textarea.getBoundingClientRect().left + 50,
+          clientY: textarea.getBoundingClientRect().top + 30,
+          preventDefault: () => {},
+          stopPropagation: () => {}
+        };
+        
+        showVariableMenuAt(syntheticEvent);
+      }
       return;
     }
 
@@ -387,21 +579,21 @@ const EnhancedTextElement = ({
       
       setTimeout(() => {
         e.target.setSelectionRange(start + 4, start + 4);
+        setCursorPosition(start + 4);
       }, 0);
     }
-  }, [editValue, availableVariables]);
+  }, [editValue, processedVariables, handleEditFinish, element.text, showVariableMenuAt]);
 
-  const handleEditFinish = useCallback(() => {
-    console.log('✅ Finishing edit with value:', editValue);
+  const handleDoubleClick = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
     
-    setIsEditing(false);
-    setShowVariableMenu(false);
-    setShowTooltip(false);
-    
-    if (onTextChange && editValue !== element.text) {
-      onTextChange(element.id, 'text', editValue);
-    }
-  }, [editValue, element.id, element.text, onTextChange]);
+    console.log('👆 Double click - entering edit mode');
+    setIsEditing(true);
+    setEditValue(element.text || '');
+    setCursorPosition(0);
+    setShowTooltip(true);
+  }, [element.text]);
 
   const handleMouseDown = useCallback((e) => {
     if (isEditing) {
@@ -423,11 +615,14 @@ const EnhancedTextElement = ({
     }
   }, [element, onResizeStart]);
 
-  // ✅ MEJORADO: Menú de variables con mejor UX
+  // ✅ MEJORADO: Menú de variables con búsqueda y filtrado estricto
   const renderVariableMenu = () => {
-    if (!showVariableMenu || Object.keys(availableVariables).length === 0) {
+    if (!showVariableMenu) {
       return null;
     }
+
+    const totalVariables = Object.keys(processedVariables).length;
+    const filteredCount = Object.keys(filteredVariables).length;
 
     const menuStyle = {
       position: 'absolute',
@@ -438,27 +633,137 @@ const EnhancedTextElement = ({
       borderRadius: '8px',
       boxShadow: '0 8px 25px -5px rgba(0, 0, 0, 0.25)',
       zIndex: 3000,
-      maxHeight: '250px',
-      overflowY: 'auto',
-      minWidth: '250px',
-      maxWidth: '350px'
+      maxHeight: '300px', // ✅ AUMENTADO: Más espacio
+      minWidth: '320px',  // ✅ AUMENTADO: Más ancho
+      maxWidth: '450px',
+      display: 'flex',
+      flexDirection: 'column'
     };
 
     return (
-      <div ref={variableMenuRef} style={menuStyle}>
+      <div 
+        ref={variableMenuRef} 
+        style={menuStyle}
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        {/* ✅ NUEVO: Header con búsqueda */}
         <div style={{
-          padding: '12px 16px',
+          padding: '12px 16px 8px 16px',
           borderBottom: '1px solid #e5e7eb',
-          fontSize: '12px',
-          fontWeight: '600',
-          color: '#374151',
           background: '#f8fafc',
           borderRadius: '6px 6px 0 0'
         }}>
-          📋 Variables disponibles ({Object.keys(availableVariables).length})
+          <div style={{
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#374151',
+            marginBottom: '8px'
+          }}>
+            📋 Variables insertables ({filteredCount}{filteredCount !== totalVariables ? ` de ${totalVariables}` : ''})
+          </div>
+          
+          {/* ✅ CORREGIDO: Input de búsqueda con manejo de eventos arreglado */}
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchTerm}
+            onChange={(e) => {
+              console.log('🔍 Search term changed:', e.target.value);
+              setSearchTerm(e.target.value);
+            }}
+            placeholder="🔍 Buscar variable..."
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '12px',
+              outline: 'none',
+              boxSizing: 'border-box'
+            }}
+            onMouseDown={(e) => {
+              // ✅ CRÍTICO: Permitir que el input reciba eventos
+              e.stopPropagation();
+            }}
+            onClick={(e) => {
+              // ✅ CRÍTICO: Permitir que el input reciba focus
+              e.stopPropagation();
+            }}
+            onFocus={(e) => {
+              console.log('🔍 Search input focused');
+            }}
+            onKeyDown={(e) => {
+              // ✅ CRÍTICO: Prevenir que se propague a otros handlers
+              e.stopPropagation();
+              
+              if (e.key === 'Escape') {
+                setSearchTerm('');
+                if (textareaRef.current) {
+                  textareaRef.current.focus();
+                  setShowVariableMenu(false);
+                }
+              } else if (e.key === 'Enter') {
+                const firstVariable = Object.keys(filteredVariables)[0];
+                if (firstVariable) {
+                  insertVariable(firstVariable);
+                }
+              }
+            }}
+          />
+          
+          <div style={{
+            fontSize: '10px',
+            color: '#6b7280',
+            fontWeight: '400',
+            marginTop: '4px'
+          }}>
+            Solo valores primitivos (string, number, boolean)
+          </div>
         </div>
-        
-        {Object.entries(availableVariables).map(([key, value]) => {
+
+        {/* ✅ MEJORADO: Lista de variables filtradas */}
+        <div style={{
+          overflowY: 'auto',
+          flex: 1
+        }}>
+          {Object.keys(filteredVariables).length === 0 ? (
+            <div style={{
+              padding: '20px',
+              textAlign: 'center',
+              color: '#9ca3af',
+              fontSize: '12px'
+            }}>
+              {searchTerm ? (
+                <>
+                  🔍 No se encontraron variables con "{searchTerm}"
+                  <br />
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    style={{
+                      marginTop: '8px',
+                      padding: '4px 8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      background: 'white',
+                      fontSize: '11px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Limpiar búsqueda
+                  </button>
+                </>
+              ) : (
+                'No hay variables insertables disponibles'
+              )}
+            </div>
+          ) : (
+            Object.entries(filteredVariables).map(([key, value]) => {
           let displayValue, typeInfo;
           
           if (typeof value === 'object' && value !== null && value.displayValue !== undefined) {
@@ -473,30 +778,42 @@ const EnhancedTextElement = ({
             ? displayValue.substring(0, 40) + '...' 
             : displayValue;
 
+          const isNestedPath = key.includes('.');
+          const pathParts = key.split('.');
+          const indentLevel = Math.max(0, pathParts.length - 1);
+
           return (
             <div
               key={key}
-              onClick={() => {
-                console.log('🎯 Variable clicked:', key);
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🎯 Variable clicked with dot notation:', key);
                 insertVariable(key);
               }}
               style={{
                 padding: '12px 16px',
+                paddingLeft: `${16 + (indentLevel * 12)}px`,
                 cursor: 'pointer',
                 borderBottom: '1px solid #f3f4f6',
                 fontSize: '13px',
                 transition: 'all 0.2s',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '4px'
+                gap: '4px',
+                borderLeft: isNestedPath ? '3px solid #e5e7eb' : 'none'
               }}
               onMouseOver={(e) => {
                 e.currentTarget.style.backgroundColor = '#eff6ff';
-                e.currentTarget.style.borderLeft = '4px solid #3b82f6';
+                e.currentTarget.style.borderLeft = isNestedPath ? '3px solid #3b82f6' : '3px solid #3b82f6';
               }}
               onMouseOut={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.borderLeft = '4px solid transparent';
+                e.currentTarget.style.borderLeft = isNestedPath ? '3px solid #e5e7eb' : 'none';
               }}
             >
               <div style={{
@@ -508,10 +825,39 @@ const EnhancedTextElement = ({
                   fontWeight: '600',
                   color: '#374151',
                   fontFamily: 'monospace',
-                  fontSize: '12px'
+                  fontSize: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
                 }}>
-                  {`{{${key}}}`}
+                  <span style={{ 
+                    color: typeInfo === 'string' ? '#16a34a' : 
+                          typeInfo === 'number' ? '#3b82f6' : 
+                          typeInfo === 'boolean' ? '#f59e0b' : '#6b7280',
+                    fontSize: '10px'
+                  }}>
+                    {/* ✅ NUEVO: Iconos específicos para tipos primitivos */}
+                    {typeInfo === 'string' ? '📝' : 
+                     typeInfo === 'number' ? '🔢' : 
+                     typeInfo === 'boolean' ? '✅' : 
+                     isNestedPath ? '└' : '🔗'}
+                  </span>
+                  
+                  <span style={{ color: '#374151' }}>
+                    {key.split('.').map((part, index, array) => (
+                      <span key={index}>
+                        {index > 0 && <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>.</span>}
+                        <span style={{ 
+                          color: index === array.length - 1 ? '#374151' : '#6b7280',
+                          fontWeight: index === array.length - 1 ? '600' : '400'
+                        }}>
+                          {part}
+                        </span>
+                      </span>
+                    ))}
+                  </span>
                 </div>
+                
                 <span style={{
                   fontSize: '9px',
                   padding: '2px 6px',
@@ -522,23 +868,44 @@ const EnhancedTextElement = ({
                          typeInfo === 'number' ? '#2563eb' : 
                          typeInfo === 'boolean' ? '#d97706' : '#6b7280',
                   borderRadius: '4px',
-                  fontWeight: '500'
+                  fontWeight: '500',
+                  border: '1px solid',
+                  borderColor: typeInfo === 'string' ? '#16a34a' : 
+                              typeInfo === 'number' ? '#2563eb' : 
+                              typeInfo === 'boolean' ? '#d97706' : '#6b7280'
                 }}>
-                  {typeInfo}
+                  {String(typeInfo).toUpperCase()}
                 </span>
               </div>
               
               <div style={{
                 color: '#6b7280',
                 fontSize: '11px',
-                lineHeight: '1.3'
+                lineHeight: '1.3',
+                paddingLeft: '18px',
+                fontStyle: 'italic'
               }}>
                 {truncatedValue || 'Sin valor'}
               </div>
+              
+              <div style={{
+                color: '#3b82f6',
+                fontSize: '10px',
+                fontFamily: 'monospace',
+                paddingLeft: '18px',
+                background: '#f8fafc',
+                padding: '2px 6px',
+                borderRadius: '3px',
+                marginTop: '2px'
+              }}>
+                {`{{${key}}}`}
+              </div>
             </div>
           );
-        })}
-        
+        }))}
+        </div>
+
+        {/* ✅ MEJORADO: Footer con información */}
         <div style={{
           padding: '8px 16px',
           fontSize: '10px',
@@ -548,7 +915,9 @@ const EnhancedTextElement = ({
           borderTop: '1px solid #f1f5f9',
           background: '#fafafa'
         }}>
-          💡 Haz clic en una variable para insertarla
+          💡 Enter para insertar primera variable • Esc para limpiar búsqueda
+          <br />
+          🚫 Objetos y arrays completos están filtrados
         </div>
       </div>
     );
@@ -594,15 +963,22 @@ const EnhancedTextElement = ({
             ref={textareaRef}
             value={editValue}
             onChange={(e) => {
-              setEditValue(e.target.value);
-              setCursorPosition(e.target.selectionStart);
+              const newValue = e.target.value;
+              const cursorPos = e.target.selectionStart;
+              setEditValue(newValue);
+              setCursorPosition(cursorPos);
             }}
-            onBlur={handleEditFinish}
+            onBlur={handleTextareaBlur}
             onKeyDown={handleTextareaKeyDown}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              setCursorPosition(e.target.selectionStart);
+              const cursorPos = e.target.selectionStart;
+              setCursorPosition(cursorPos);
+            }}
+            onSelect={(e) => {
+              const cursorPos = e.target.selectionStart;
+              setCursorPosition(cursorPos);
             }}
             style={{
               position: 'absolute',
@@ -616,7 +992,6 @@ const EnhancedTextElement = ({
               fontSize: elementStyle.fontSize,
               fontWeight: elementStyle.fontWeight,
               fontStyle: elementStyle.fontStyle,
-              color: elementStyle.color,
               textAlign: elementStyle.textAlign,
               lineHeight: elementStyle.lineHeight,
               padding: element.padding || '8px 12px',
@@ -627,7 +1002,7 @@ const EnhancedTextElement = ({
               overflow: 'auto',
               zIndex: 1001
             }}
-            placeholder="Escribe tu texto aquí... (Ctrl+Espacio para variables)"
+            placeholder="Escribe tu texto aquí... (Ctrl+Espacio para variables con notación de punto)"
             autoFocus
           />
         )}
@@ -708,7 +1083,7 @@ const EnhancedTextElement = ({
           zIndex: 2000,
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)'
         }}>
-          ✏️ Editando - Ctrl+Espacio para variables, Ctrl+Enter para guardar
+          ✏️ Editando - Ctrl+Espacio para variables (notación punto), Ctrl+Enter para guardar
         </div>
       )}
     </>
