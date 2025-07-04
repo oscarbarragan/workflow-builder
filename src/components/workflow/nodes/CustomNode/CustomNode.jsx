@@ -1,4 +1,4 @@
-// src/components/workflow/nodes/CustomNode/CustomNode.jsx - CORREGIDO
+// src/components/workflow/nodes/CustomNode/CustomNode.jsx - CORREGIDO LA IMPORTACIÓN
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Handle, Position } from 'reactflow';
 import { FileText, Globe, Database, Code, Zap } from 'lucide-react';
@@ -6,10 +6,11 @@ import { getNodeConfig, getMappedVariablesForLayout, getAvailableData } from '..
 import { NODE_TYPES, STYLES } from '../../../../utils/constants';
 import DataFlow from './DataFlow';
 import NodeTooltip from '../NodeTooltip/NodeTooltip';
-import LayoutDesigner from '../../../layout-designer/LayoutDesigner/LayoutDesigner';
+// ✅ CORREGIDO: Importar como named export
+import { LayoutDesigner } from '../../../layoutDesigner';
 import HttpInput from '../HttpInput/HttpInput';
 import DataMapper from '../DataMapper/DataMapper';
-import DataTransformer from '../DataTransformer/DataTransformer';  // ✅ AGREGADO
+import DataTransformer from '../DataTransformer/DataTransformer';
 import ScriptProcessor from '../ScriptProcessor/ScriptProcessor';
 
 const CustomNode = ({ id, data, selected }) => {
@@ -23,10 +24,10 @@ const CustomNode = ({ id, data, selected }) => {
   const [isLayoutDesignerOpen, setIsLayoutDesignerOpen] = useState(false);
   const [isHttpInputOpen, setIsHttpInputOpen] = useState(false);
   const [isDataMapperOpen, setIsDataMapperOpen] = useState(false);
-  const [isDataTransformerOpen, setIsDataTransformerOpen] = useState(false);  // ✅ AGREGADO
+  const [isDataTransformerOpen, setIsDataTransformerOpen] = useState(false);
   const [isScriptProcessorOpen, setIsScriptProcessorOpen] = useState(false);
   
-  // NUEVO: Estados para el tooltip
+  // Estados para el tooltip
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [isAnchored, setIsAnchored] = useState(data.properties?.isAnchored || false);
@@ -74,7 +75,7 @@ const CustomNode = ({ id, data, selected }) => {
     return getMappedVariablesForLayout(id, data.allNodes || [], data.allEdges || []);
   }, [id, data.allNodes, data.allEdges]);
 
-  // NUEVO: Cleanup del timeout cuando se desmonta el componente
+  // Cleanup del timeout cuando se desmonta el componente
   useEffect(() => {
     return () => {
       if (tooltipTimeoutRef.current) {
@@ -83,7 +84,7 @@ const CustomNode = ({ id, data, selected }) => {
     };
   }, []);
 
-  // NUEVO: Handlers para el tooltip - SIMPLIFIED positioning
+  // Handlers para el tooltip
   const handleMouseEnter = (e) => {
     console.log('🖱️ Mouse enter on node:', id);
     
@@ -93,13 +94,11 @@ const CustomNode = ({ id, data, selected }) => {
     
     tooltipTimeoutRef.current = setTimeout(() => {
       if (nodeRef.current) {
-        // SIMPLIFIED: Use getBoundingClientRect for viewport coordinates
         const rect = nodeRef.current.getBoundingClientRect();
         
-        // Position tooltip to the right and slightly above the node
         setTooltipPosition({
-          x: rect.right + 8,  // 8px to the right
-          y: rect.top - 5     // 5px above
+          x: rect.right + 8,
+          y: rect.top - 5
         });
         setShowTooltip(true);
         console.log('👁️ Tooltip position (viewport):', {
@@ -116,18 +115,16 @@ const CustomNode = ({ id, data, selected }) => {
       clearTimeout(tooltipTimeoutRef.current);
     }
     
-    // FIXED: Longer timeout so user can interact with tooltip
     tooltipTimeoutRef.current = setTimeout(() => {
       setShowTooltip(false);
-    }, 1000); // Increased to 1 second
+    }, 1000);
   };
 
-  // NUEVO: Handlers para las acciones del tooltip - FIXED
+  // Handlers para las acciones del tooltip
   const handleAnchor = (nodeId, shouldAnchor) => {
     console.log(`🔒 ${shouldAnchor ? 'Anchoring' : 'Unanchoring'} node:`, nodeId);
     setIsAnchored(shouldAnchor);
     
-    // Actualizar las propiedades del nodo
     if (handlePropertiesChange) {
       handlePropertiesChange(id, { 
         ...data.properties, 
@@ -167,7 +164,6 @@ const CustomNode = ({ id, data, selected }) => {
   const nodeConfig = getNodeConfig(data.type);
 
   const handleNodeClick = (e) => {
-    // CRÍTICO: Prevenir que el click se propague
     e.stopPropagation();
     e.preventDefault();
     
@@ -181,7 +177,7 @@ const CustomNode = ({ id, data, selected }) => {
       case NODE_TYPES.DATA_MAPPER:
         setIsDataMapperOpen(true);
         break;
-      case NODE_TYPES.DATA_TRANSFORMER:  // ✅ AGREGADO
+      case NODE_TYPES.DATA_TRANSFORMER:
         setIsDataTransformerOpen(true);
         break;
       case NODE_TYPES.SCRIPT_PROCESSOR:
@@ -207,7 +203,7 @@ const CustomNode = ({ id, data, selected }) => {
         return <Globe size={16} color={nodeConfig.color} />;
       case NODE_TYPES.DATA_MAPPER:
         return <Database size={16} color={nodeConfig.color} />;
-      case NODE_TYPES.DATA_TRANSFORMER:  // ✅ AGREGADO
+      case NODE_TYPES.DATA_TRANSFORMER:
         return <Zap size={16} color={nodeConfig.color} />;
       case NODE_TYPES.SCRIPT_PROCESSOR:
         return <Code size={16} color={nodeConfig.color} />;
@@ -226,7 +222,6 @@ const CustomNode = ({ id, data, selected }) => {
   const getNodeStatusInfo = () => {
     const hasProperties = data.properties && Object.keys(data.properties).length > 0;
     
-    // Special status logic for different node types
     switch (data.type) {
       case NODE_TYPES.HTTP_INPUT:
         return {
@@ -246,7 +241,7 @@ const CustomNode = ({ id, data, selected }) => {
             : 'Configurar mapeo'
         };
 
-      case NODE_TYPES.DATA_TRANSFORMER:  // ✅ AGREGADO
+      case NODE_TYPES.DATA_TRANSFORMER:
         const transformationsCount = data.properties?.transformations?.length || 0;
         const enabledTransformations = data.properties?.transformations?.filter(t => t.enabled)?.length || 0;
         const outputVariablesCount = Object.keys(data.properties?.outputVariables || {}).length;
@@ -362,12 +357,10 @@ const CustomNode = ({ id, data, selected }) => {
         style={nodeStyle}
       >
         <div style={contentStyle}>
-          {/* Icon */}
           <div style={iconContainerStyle}>
             {getIcon()}
           </div>
           
-          {/* Content */}
           <div style={{ textAlign: 'center' }}>
             <div style={titleStyle}>
               {nodeConfig.title}
@@ -383,7 +376,6 @@ const CustomNode = ({ id, data, selected }) => {
               <span style={{ fontSize: '8px' }}>
                 {statusInfo.statusText}
               </span>
-              {/* NUEVO: Indicador de anclado */}
               {isAnchored && (
                 <span style={{ 
                   fontSize: '8px', 
@@ -397,7 +389,6 @@ const CustomNode = ({ id, data, selected }) => {
             </div>
           </div>
           
-          {/* Data Flow */}
           <DataFlow 
             nodeId={id} 
             nodes={data.allNodes || []} 
@@ -450,7 +441,7 @@ const CustomNode = ({ id, data, selected }) => {
         />
       )}
 
-      {/* Data Transformer - ✅ AGREGADO */}
+      {/* Data Transformer */}
       {data.type === NODE_TYPES.DATA_TRANSFORMER && isDataTransformerOpen && (
         <DataTransformer
           isOpen={isDataTransformerOpen}
@@ -472,7 +463,7 @@ const CustomNode = ({ id, data, selected }) => {
         />
       )}
 
-      {/* NUEVO: Tooltip del nodo - ALWAYS RENDER but control visibility */}
+      {/* Tooltip del nodo */}
       <NodeTooltip
         nodeId={id}
         isVisible={showTooltip}
