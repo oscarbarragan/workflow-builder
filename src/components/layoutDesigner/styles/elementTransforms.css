@@ -1,0 +1,226 @@
+/* src/components/layoutDesigner/styles/elementTransforms.css */
+
+/* Estilos base para elementos transformables */
+.layout-element {
+    position: absolute;
+    box-sizing: border-box;
+    user-select: none;
+    cursor: pointer;
+    transform-origin: center center;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  
+  /* Elementos de texto */
+  .layout-element--text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    display: inline-block;
+    min-width: 50px;
+    min-height: 20px;
+  }
+  
+  /* Elementos rectángulo */
+  .layout-element--rectangle {
+    min-width: 50px;
+    min-height: 30px;
+  }
+  
+  /* Elementos variable */
+  .layout-element--variable {
+    font-family: 'Courier New', monospace;
+    background-color: #eff6ff;
+    border: 1px dashed #3b82f6;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: #1e40af;
+    font-size: 12px;
+    min-width: 80px;
+  }
+  
+  /* Estados de hover */
+  .layout-element:hover {
+    outline: 1px solid rgba(59, 130, 246, 0.5);
+    outline-offset: 1px;
+  }
+  
+  /* Elemento seleccionado */
+  .layout-element--selected {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px;
+  }
+  
+  /* Elementos con transformaciones */
+  .layout-element--transformed {
+    transform-origin: center center;
+  }
+  
+  /* Elementos rotados */
+  .layout-element--rotated {
+    transform-origin: center center;
+  }
+  
+  /* Elementos escalados */
+  .layout-element--scaled {
+    transform-origin: center center;
+  }
+  
+  /* Elementos ocultos */
+  .layout-element--hidden {
+    display: none !important;
+  }
+  
+  /* Elementos bloqueados */
+  .layout-element--locked {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+  
+  .layout-element--locked:hover {
+    outline: 1px solid rgba(239, 68, 68, 0.5);
+  }
+  
+  /* Elementos con baja opacidad */
+  .layout-element--low-opacity {
+    opacity: 0.5;
+  }
+  
+  /* Animaciones suaves para cambios de transformación */
+  .layout-element--animating {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.3s ease;
+  }
+  
+  /* Estilos para elementos que están siendo arrastrados */
+  .layout-element--dragging {
+    z-index: 9999;
+    transform-origin: center center;
+    transition: none;
+    cursor: grabbing;
+  }
+  
+  /* Estilos de selección múltiple */
+  .layout-element--multi-selected {
+    outline: 2px solid #f59e0b;
+    outline-offset: 2px;
+  }
+  
+  /* Canvas container */
+  .layout-canvas {
+    position: relative;
+    background: white;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Grid de fondo opcional */
+  .layout-canvas--with-grid {
+    background-image: 
+      linear-gradient(to right, #f3f4f6 1px, transparent 1px),
+      linear-gradient(to bottom, #f3f4f6 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  
+  /* Guías de alineación */
+  .layout-guide {
+    position: absolute;
+    background-color: #3b82f6;
+    z-index: 8888;
+    pointer-events: none;
+  }
+  
+  .layout-guide--horizontal {
+    height: 1px;
+    left: 0;
+    right: 0;
+  }
+  
+  .layout-guide--vertical {
+    width: 1px;
+    top: 0;
+    bottom: 0;
+  }
+  
+  /* Handles de redimensionamiento */
+  .resize-handle {
+    position: absolute;
+    background: #3b82f6;
+    border: 2px solid white;
+    border-radius: 3px;
+    width: 8px;
+    height: 8px;
+    z-index: 9000;
+    cursor: pointer;
+  }
+  
+  .resize-handle--nw { top: -4px; left: -4px; cursor: nw-resize; }
+  .resize-handle--ne { top: -4px; right: -4px; cursor: ne-resize; }
+  .resize-handle--sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+  .resize-handle--se { bottom: -4px; right: -4px; cursor: se-resize; }
+  .resize-handle--n { top: -4px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+  .resize-handle--s { bottom: -4px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+  .resize-handle--w { top: 50%; left: -4px; transform: translateY(-50%); cursor: w-resize; }
+  .resize-handle--e { top: 50%; right: -4px; transform: translateY(-50%); cursor: e-resize; }
+  
+  /* Handle de rotación */
+  .rotation-handle {
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: #10b981;
+    border: 2px solid white;
+    border-radius: 50%;
+    cursor: grab;
+    z-index: 9001;
+  }
+  
+  .rotation-handle:active {
+    cursor: grabbing;
+  }
+  
+  /* Línea de conexión del handle de rotación */
+  .rotation-handle::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1px;
+    height: 8px;
+    background: #10b981;
+  }
+  
+  /* Elementos semi-transparentes durante transformación */
+  .layout-element--transforming {
+    opacity: 0.8;
+  }
+  
+  /* Mejoras para elementos con texto muy pequeño */
+  .layout-element--small-text {
+    min-width: 20px;
+    min-height: 12px;
+  }
+  
+  /* Responsive: ajustes para pantallas pequeñas */
+  @media (max-width: 768px) {
+    .resize-handle {
+      width: 12px;
+      height: 12px;
+    }
+    
+    .rotation-handle {
+      width: 16px;
+      height: 16px;
+    }
+  }
+  
+  /* Modo de alta densidad */
+  @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .layout-element {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+  }
