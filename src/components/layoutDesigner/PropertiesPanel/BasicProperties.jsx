@@ -1,10 +1,10 @@
-// src/components/layoutDesigner/PropertiesPanel/BasicProperties.jsx
+// src/components/layoutDesigner/PropertiesPanel/BasicProperties.jsx - SOLUCIONADO
 import React, { useState } from 'react';
 import { ELEMENT_TYPES } from '../utils/constants';
 import { styleManager } from '../utils/StyleManager';
 import { variableProcessor } from '../utils/variableProcessor';
 import { unitsConfig } from '../utils/units.config';
-import { elementTransforms } from '../utils/elementTransforms'; // ✅ IMPORTAR
+import { elementTransforms } from '../utils/elementTransforms';
 
 const BasicProperties = ({ 
   selectedElement, 
@@ -21,21 +21,67 @@ const BasicProperties = ({
   const { units } = unitsConfig;
   const [currentUnit, setCurrentUnit] = useState(unitsConfig.defaults.unit);
 
-  // Funciones de conversión usando la configuración
+  // ✅ NUEVO: Función para detectar si un elemento tiene estilos aplicados del sidebar
+  const hasAppliedStyles = () => {
+    return !!(
+      selectedElement.textStyleId || 
+      selectedElement.paragraphStyleId || 
+      selectedElement.borderStyleId || 
+      selectedElement.fillStyleId
+    );
+  };
+
+  // ✅ NUEVO: Función para desvincular estilos del sidebar antes de editar manualmente
+  const unlinkStylesAndUpdate = (property, value) => {
+    console.log('🔓 Unlinking styles and updating:', property, value);
+    
+    // Primero, desvincular los estilos del sidebar relacionados
+    const updates = { [property]: value };
+    
+    // Determinar qué estilos desvincular según la propiedad
+    if (['fontSize', 'fontFamily', 'color', 'bold', 'italic', 'underline', 'strikethrough'].includes(property)) {
+      if (selectedElement.textStyleId) {
+        updates.textStyleId = null;
+        console.log('🔓 Unlinked textStyleId for manual text editing');
+      }
+    }
+    
+    if (['alignment', 'lineHeight', 'letterSpacing', 'indent'].includes(property)) {
+      if (selectedElement.paragraphStyleId) {
+        updates.paragraphStyleId = null;
+        console.log('🔓 Unlinked paragraphStyleId for manual paragraph editing');
+      }
+    }
+    
+    if (['borderWidth', 'borderStyle', 'borderColor', 'borderRadius'].includes(property)) {
+      if (selectedElement.borderStyleId) {
+        updates.borderStyleId = null;
+        console.log('🔓 Unlinked borderStyleId for manual border editing');
+      }
+    }
+    
+    if (['backgroundColor', 'fillColor', 'opacity'].includes(property)) {
+      if (selectedElement.fillStyleId) {
+        updates.fillStyleId = null;
+        console.log('🔓 Unlinked fillStyleId for manual fill editing');
+      }
+    }
+    
+    // Aplicar todas las actualizaciones de una vez
+    Object.entries(updates).forEach(([key, val]) => {
+      onUpdateSelectedElement(key, val);
+    });
+  };
+
+  // ✅ MEJORADO: Funciones de conversión
   const convertValue = (value, fromUnit, toUnit) => {
     return unitsConfig.utils.convert(value, fromUnit, toUnit, units);
   };
 
-  const formatValue = (value, unit) => {
-    return unitsConfig.utils.formatValue(value, unit);
-  };
-
-  // Función para obtener valor en la unidad actual
   const getValueInUnit = (pixelValue) => {
     return convertValue(pixelValue || 0, 'px', currentUnit);
   };
 
-  // Función para convertir valor de la unidad actual a píxeles
   const setValueFromUnit = (value) => {
     return convertValue(value || 0, currentUnit, 'px');
   };
@@ -51,50 +97,13 @@ const BasicProperties = ({
     })).sort((a, b) => a.value.localeCompare(b.value));
   }, [availableData]);
 
-  // ✅ NUEVA: Función para manejar cambios de transformación
+  // Función para manejar cambios de transformación
   const handleTransformChange = (property, value) => {
     console.log('🔄 Transform change:', property, value);
-    
-    // Actualizar la propiedad del elemento
     onUpdateSelectedElement(property, value);
-    
-    // ✅ IMPORTANTE: Forzar una re-renderización en el próximo frame
-    setTimeout(() => {
-      console.log('✅ Transform applied, element should update');
-    }, 0);
   };
 
-  // Manejar cambio de estilo
-  const handleStyleChange = (styleType, styleId) => {
-    onUpdateSelectedElement(`${styleType}Id`, styleId);
-    
-    if (styleId && styleManager) {
-      let style = null;
-      switch (styleType) {
-        case 'textStyle':
-          style = styleManager.getTextStyle(styleId);
-          break;
-        case 'paragraphStyle':
-          style = styleManager.getParagraphStyle(styleId);
-          break;
-        case 'borderStyle':
-          style = styleManager.getBorderStyle(styleId);
-          break;
-        case 'fillStyle':
-          style = styleManager.getFillStyle(styleId);
-          break;
-      }
-      
-      if (style) {
-        onUpdateSelectedElement(styleType, { ...style });
-        if (onStyleChanged) {
-          onStyleChanged(styleType, style);
-        }
-      }
-    }
-  };
-
-  // Componente de input numérico con unidades
+  // ✅ CORREGIDO: Componente NumericInput con desvinculación automática
   const NumericInput = ({ 
     label, 
     value, 
@@ -105,10 +114,23 @@ const BasicProperties = ({
     showUnit = true,
     icon,
     placeholder = "0",
-    isTransform = false // ✅ NUEVO: Indicador para transformaciones
+    isTransform = false,
+    property = null // ✅ NUEVO: Nombre de la propiedad para desvinculación
   }) => {
-    // Asegurar que el valor se muestre correctamente
-    const displayValue = showUnit && !isTransform ? getValueInUnit(value) : (value || 0);
+    const currentValue = value !== undefined && value !== null ? value : '';
+    const displayValue = showUnit && !isTransform && currentValue !== '' ? getValueInUnit(currentValue) : currentValue;
+    
+    // ✅ NUEVO: Función de actualización con desvinculación
+    const handleUpdate = (newValue) => {
+      if (isTransform) {
+        handleTransformChange(onChange.name, newValue);
+      } else if (property && hasAppliedStyles()) {
+        // Si hay estilos aplicados y estamos editando manualmente, desvincular primero
+        unlinkStylesAndUpdate(property, newValue);
+      } else {
+        onChange(newValue);
+      }
+    };
     
     return (
       <div style={{ marginBottom: '12px' }}>
@@ -123,6 +145,19 @@ const BasicProperties = ({
         }}>
           {icon && <span style={{ marginRight: '4px' }}>{icon}</span>}
           {label}
+          {/* ✅ NUEVO: Indicador de estilo aplicado */}
+          {property && hasAppliedStyles() && (
+            <span style={{ 
+              marginLeft: '4px', 
+              fontSize: '9px', 
+              color: '#f59e0b',
+              background: '#fef3c7',
+              padding: '1px 4px',
+              borderRadius: '2px'
+            }}>
+              🔗 Vinculado
+            </span>
+          )}
         </label>
         <div style={{ 
           display: 'flex', 
@@ -138,14 +173,25 @@ const BasicProperties = ({
             type="number"
             value={displayValue}
             onChange={(e) => {
-              const inputValue = parseFloat(e.target.value) || 0;
-              const finalValue = showUnit && !isTransform ? setValueFromUnit(inputValue) : inputValue;
+              const inputValue = e.target.value;
               
-              // ✅ Usar función específica para transformaciones
-              if (isTransform) {
-                handleTransformChange(onChange.name, finalValue);
-              } else {
-                onChange(finalValue);
+              if (inputValue === '') {
+                handleUpdate('');
+                return;
+              }
+              
+              const numValue = parseFloat(inputValue);
+              if (!isNaN(numValue)) {
+                const finalValue = showUnit && !isTransform ? setValueFromUnit(numValue) : numValue;
+                handleUpdate(finalValue);
+              }
+            }}
+            onBlur={(e) => {
+              const inputValue = e.target.value;
+              if (inputValue === '' || inputValue === null || inputValue === undefined) {
+                const defaultValue = placeholder === "0" ? 0 : parseFloat(placeholder) || 0;
+                const finalValue = showUnit && !isTransform ? setValueFromUnit(defaultValue) : defaultValue;
+                handleUpdate(finalValue);
               }
             }}
             style={{
@@ -229,7 +275,24 @@ const BasicProperties = ({
           ID: {selectedElement.id}
         </div>
         
-        {/* ✅ NUEVO: Mostrar transformaciones activas */}
+        {/* ✅ NUEVO: Mostrar estilos aplicados */}
+        {hasAppliedStyles() && (
+          <div style={{
+            fontSize: '10px',
+            color: '#f59e0b',
+            marginTop: '4px',
+            display: 'flex',
+            gap: '4px',
+            flexWrap: 'wrap'
+          }}>
+            {selectedElement.textStyleId && <span>🔤 TextStyle</span>}
+            {selectedElement.paragraphStyleId && <span>📄 Paragraph</span>}
+            {selectedElement.borderStyleId && <span>🔲 Border</span>}
+            {selectedElement.fillStyleId && <span>🎨 Fill</span>}
+          </div>
+        )}
+        
+        {/* Mostrar transformaciones activas */}
         {elementTransforms.hasTransformations(selectedElement) && (
           <div style={{
             fontSize: '10px',
@@ -243,6 +306,54 @@ const BasicProperties = ({
           </div>
         )}
       </div>
+
+      {/* ✅ NUEVO: Advertencia sobre estilos aplicados */}
+      {hasAppliedStyles() && (
+        <div style={{
+          background: '#fef3c7',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          marginBottom: '16px',
+          border: '1px solid #f59e0b'
+        }}>
+          <div style={{
+            fontSize: '11px',
+            color: '#92400e',
+            fontWeight: '600',
+            marginBottom: '4px'
+          }}>
+            ⚠️ Estilos Vinculados Detectados
+          </div>
+          <div style={{
+            fontSize: '10px',
+            color: '#92400e',
+            marginBottom: '8px'
+          }}>
+            Este elemento tiene estilos del sidebar aplicados. Al editar manualmente se desvinculará automáticamente.
+          </div>
+          <button
+            onClick={() => {
+              // Desvincular todos los estilos manualmente
+              onUpdateSelectedElement('textStyleId', null);
+              onUpdateSelectedElement('paragraphStyleId', null);
+              onUpdateSelectedElement('borderStyleId', null);
+              onUpdateSelectedElement('fillStyleId', null);
+            }}
+            style={{
+              padding: '4px 8px',
+              border: '1px solid #f59e0b',
+              borderRadius: '4px',
+              background: 'white',
+              color: '#f59e0b',
+              fontSize: '10px',
+              cursor: 'pointer',
+              fontWeight: '600'
+            }}
+          >
+            🔓 Desvincular Todos los Estilos
+          </button>
+        </div>
+      )}
 
       {/* Selector de unidades */}
       <div style={{ marginBottom: '20px' }}>
@@ -326,12 +437,14 @@ const BasicProperties = ({
             value={selectedElement.x}
             onChange={(value) => onUpdateSelectedElement('x', value)}
             icon="↔️"
+            property="x"
           />
           <NumericInput
             label="Y"
             value={selectedElement.y}
             onChange={(value) => onUpdateSelectedElement('y', value)}
             icon="↕️"
+            property="y"
           />
         </div>
       </div>
@@ -382,6 +495,7 @@ const BasicProperties = ({
             }}
             min={0}
             icon="↔️"
+            property="width"
           />
           <NumericInput
             label="Alto"
@@ -395,11 +509,12 @@ const BasicProperties = ({
             }}
             min={0}
             icon="↕️"
+            property="height"
           />
         </div>
       </div>
 
-      {/* ✅ MEJORADO: Rotación y Escala con manejo especial */}
+      {/* Rotación y Escala - SIN desvinculación porque son transformaciones separadas */}
       <div style={{ marginBottom: '20px' }}>
         <h4 style={{
           margin: '0 0 12px 0',
@@ -416,28 +531,28 @@ const BasicProperties = ({
           <NumericInput
             label="Rotación"
             value={selectedElement.rotation || 0}
-            onChange={{ name: 'rotation' }} // ✅ Pasar nombre para identificar
+            onChange={{ name: 'rotation' }}
             min={-360}
             max={360}
             step={1}
             showUnit={false}
             icon="🔄"
-            isTransform={true} // ✅ Marcar como transformación
+            isTransform={true}
           />
           <NumericInput
             label="Escala"
             value={selectedElement.scale || 1}
-            onChange={{ name: 'scale' }} // ✅ Pasar nombre para identificar
+            onChange={{ name: 'scale' }}
             min={0.1}
             max={5}
             step={0.1}
             showUnit={false}
             icon="🔍"
-            isTransform={true} // ✅ Marcar como transformación
+            isTransform={true}
           />
         </div>
 
-        {/* Botones de rotación rápida */}
+        {/* Resto de los controles de rotación y escala igual que antes */}
         <div style={{ marginTop: '8px' }}>
           <label style={{
             display: 'block',
@@ -457,7 +572,7 @@ const BasicProperties = ({
             {[0, 90, 180, 270].map(angle => (
               <button
                 key={angle}
-                onClick={() => handleTransformChange('rotation', angle)} // ✅ Usar función especial
+                onClick={() => handleTransformChange('rotation', angle)}
                 style={{
                   padding: '4px 2px',
                   border: '1px solid #e5e7eb',
@@ -475,7 +590,6 @@ const BasicProperties = ({
           </div>
         </div>
 
-        {/* Botones de escala rápida */}
         <div style={{ marginTop: '8px' }}>
           <label style={{
             display: 'block',
@@ -495,7 +609,7 @@ const BasicProperties = ({
             {[0.5, 0.75, 1, 1.5, 2].map(scale => (
               <button
                 key={scale}
-                onClick={() => handleTransformChange('scale', scale)} // ✅ Usar función especial
+                onClick={() => handleTransformChange('scale', scale)}
                 style={{
                   padding: '4px 2px',
                   border: '1px solid #e5e7eb',
@@ -513,7 +627,6 @@ const BasicProperties = ({
           </div>
         </div>
 
-        {/* ✅ NUEVO: Botón de reset transformaciones */}
         <div style={{ marginTop: '8px' }}>
           <button
             onClick={() => {
@@ -543,9 +656,7 @@ const BasicProperties = ({
         </div>
       </div>
 
-      {/* Resto del componente continúa igual... */}
-      {/* [El resto del código permanece sin cambios] */}
-
+      {/* Resto del componente igual que antes... */}
       {/* Visibilidad y Orden */}
       <div style={{ marginBottom: '20px' }}>
         <h4 style={{
@@ -569,6 +680,7 @@ const BasicProperties = ({
             step={1}
             showUnit={false}
             icon="📊"
+            property="zIndex"
           />
           <NumericInput
             label="Opacidad (%)"
@@ -579,6 +691,7 @@ const BasicProperties = ({
             step={1}
             showUnit={false}
             icon="👁️"
+            property="opacity"
           />
         </div>
 
@@ -715,8 +828,6 @@ const BasicProperties = ({
           </button>
         </div>
       </div>
-
-      {/* [Resto del componente TextBox, Variable, Rectangle, etc. permanece igual] */}
     </div>
   );
 };

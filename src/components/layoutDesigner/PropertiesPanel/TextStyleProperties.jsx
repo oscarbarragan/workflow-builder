@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PropertiesPanel/TextStyleProperties.jsx
+// src/components/layoutDesigner/PropertiesPanel/TextStyleProperties.jsx - CORREGIDO
 import React, { useState } from 'react';
 import { styleManager } from '../utils/StyleManager';
 import { propertiesConfig } from './properties.config';
@@ -23,17 +23,21 @@ const TextStyleProperties = ({
       const style = styleManager.getTextStyle(selectedElement.textStyleId);
       if (style) return style;
     }
-    return selectedElement.textStyle || textStyleConfig.properties;
+    return selectedElement.textStyle || {};
   };
 
   const currentStyle = getCurrentTextStyle();
 
-  // Actualizar propiedad del estilo de texto
+  // ✅ CORREGIDO: Actualizar propiedad del estilo de texto
   const updateTextStyleProperty = (property, value) => {
+    console.log('🔤 Updating text property:', property, 'to:', value);
+    
     const newTextStyle = { 
       ...currentStyle, 
       [property]: value 
     };
+    
+    console.log('🔤 New text style:', newTextStyle);
     onUpdateSelectedElement('textStyle', newTextStyle);
   };
 
@@ -81,9 +85,11 @@ const TextStyleProperties = ({
     }
   };
 
-  // Renderizar campo de propiedad
+  // ✅ CORREGIDO: Renderizar campo de propiedad
   const renderProperty = (property, config) => {
-    const value = currentStyle[property] || config.default;
+    const value = currentStyle[property];
+    // ✅ IMPORTANTE: No usar || para valores que pueden ser 0
+    const displayValue = value !== undefined && value !== null ? value : config.default;
 
     return (
       <div key={property} style={{ marginBottom: '12px' }}>
@@ -100,7 +106,7 @@ const TextStyleProperties = ({
 
         {config.type === 'select' && (
           <select
-            value={value}
+            value={displayValue}
             onChange={(e) => updateTextStyleProperty(property, e.target.value)}
             style={{
               width: '100%',
@@ -120,30 +126,31 @@ const TextStyleProperties = ({
 
         {config.type === 'number' && (
           <input
-            type="text"
-            value={currentStyle[property] !== undefined && currentStyle[property] !== null ? currentStyle[property] : ''}
+            type="number"
+            value={displayValue}
             onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || value === null) {
+              const inputValue = e.target.value;
+              
+              // ✅ CORREGIDO: Permitir campos vacíos temporalmente
+              if (inputValue === '') {
                 updateTextStyleProperty(property, '');
-              } else {
-                const numValue = parseFloat(value);
-                if (!isNaN(numValue)) {
-                  updateTextStyleProperty(property, numValue);
-                } else {
-                  updateTextStyleProperty(property, value); // Permitir escribir mientras tipea
-                }
+                return;
+              }
+              
+              // Convertir a número
+              const numValue = parseFloat(inputValue);
+              if (!isNaN(numValue)) {
+                updateTextStyleProperty(property, numValue);
               }
             }}
             onBlur={(e) => {
-              const value = e.target.value;
-              if (value === '' || value === null) {
+              // ✅ CORREGIDO: Al perder el foco, asegurar valor válido
+              const inputValue = e.target.value;
+              if (inputValue === '' || inputValue === null || inputValue === undefined) {
                 updateTextStyleProperty(property, config.default);
               } else {
-                const numValue = parseFloat(value);
-                if (!isNaN(numValue)) {
-                  updateTextStyleProperty(property, numValue);
-                } else {
+                const numValue = parseFloat(inputValue);
+                if (isNaN(numValue)) {
                   updateTextStyleProperty(property, config.default);
                 }
               }
@@ -166,7 +173,7 @@ const TextStyleProperties = ({
           <div style={{ display: 'flex', gap: '6px' }}>
             <input
               type="color"
-              value={value}
+              value={displayValue}
               onChange={(e) => updateTextStyleProperty(property, e.target.value)}
               style={{
                 width: '40px',
@@ -178,7 +185,7 @@ const TextStyleProperties = ({
             />
             <input
               type="text"
-              value={value}
+              value={displayValue}
               onChange={(e) => updateTextStyleProperty(property, e.target.value)}
               style={{
                 flex: 1,
@@ -199,7 +206,7 @@ const TextStyleProperties = ({
                     width: '20px',
                     height: '20px',
                     backgroundColor: preset,
-                    border: value === preset ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                    border: displayValue === preset ? '2px solid #3b82f6' : '1px solid #d1d5db',
                     borderRadius: '3px',
                     cursor: 'pointer'
                   }}
@@ -220,7 +227,7 @@ const TextStyleProperties = ({
           }}>
             <input
               type="checkbox"
-              checked={value || false}
+              checked={displayValue || false}
               onChange={(e) => updateTextStyleProperty(property, e.target.checked)}
               style={{
                 width: '16px',
