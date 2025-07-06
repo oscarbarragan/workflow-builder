@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PropertiesPanel/BasicProperties.jsx - SOLUCIONADO
+// src/components/layoutDesigner/PropertiesPanel/BasicProperties.jsx - CORREGIDO
 import React, { useState } from 'react';
 import { ELEMENT_TYPES } from '../utils/constants';
 import { styleManager } from '../utils/StyleManager';
@@ -17,7 +17,6 @@ const BasicProperties = ({
     sizeLinked: false
   });
 
-  // Configuración de unidades desde config
   const { units } = unitsConfig;
   const [currentUnit, setCurrentUnit] = useState(unitsConfig.defaults.unit);
 
@@ -31,46 +30,136 @@ const BasicProperties = ({
     );
   };
 
-  // ✅ NUEVO: Función para desvincular estilos del sidebar antes de editar manualmente
-  const unlinkStylesAndUpdate = (property, value) => {
-    console.log('🔓 Unlinking styles and updating:', property, value);
-    
-    // Primero, desvincular los estilos del sidebar relacionados
-    const updates = { [property]: value };
-    
-    // Determinar qué estilos desvincular según la propiedad
-    if (['fontSize', 'fontFamily', 'color', 'bold', 'italic', 'underline', 'strikethrough'].includes(property)) {
-      if (selectedElement.textStyleId) {
-        updates.textStyleId = null;
-        console.log('🔓 Unlinked textStyleId for manual text editing');
-      }
+  // ✅ NUEVO: Función para obtener información de estilos aplicados
+  const getAppliedStylesInfo = () => {
+    const styles = [];
+    if (selectedElement.textStyleId) {
+      const style = styleManager.getTextStyle(selectedElement.textStyleId);
+      styles.push({ type: 'textStyle', id: selectedElement.textStyleId, name: style?.name || 'Desconocido' });
     }
-    
-    if (['alignment', 'lineHeight', 'letterSpacing', 'indent'].includes(property)) {
-      if (selectedElement.paragraphStyleId) {
-        updates.paragraphStyleId = null;
-        console.log('🔓 Unlinked paragraphStyleId for manual paragraph editing');
-      }
+    if (selectedElement.paragraphStyleId) {
+      const style = styleManager.getParagraphStyle(selectedElement.paragraphStyleId);
+      styles.push({ type: 'paragraphStyle', id: selectedElement.paragraphStyleId, name: style?.name || 'Desconocido' });
     }
-    
-    if (['borderWidth', 'borderStyle', 'borderColor', 'borderRadius'].includes(property)) {
-      if (selectedElement.borderStyleId) {
-        updates.borderStyleId = null;
-        console.log('🔓 Unlinked borderStyleId for manual border editing');
-      }
+    if (selectedElement.borderStyleId) {
+      const style = styleManager.getBorderStyle(selectedElement.borderStyleId);
+      styles.push({ type: 'borderStyle', id: selectedElement.borderStyleId, name: style?.name || 'Desconocido' });
     }
-    
-    if (['backgroundColor', 'fillColor', 'opacity'].includes(property)) {
-      if (selectedElement.fillStyleId) {
-        updates.fillStyleId = null;
-        console.log('🔓 Unlinked fillStyleId for manual fill editing');
-      }
+    if (selectedElement.fillStyleId) {
+      const style = styleManager.getFillStyle(selectedElement.fillStyleId);
+      styles.push({ type: 'fillStyle', id: selectedElement.fillStyleId, name: style?.name || 'Desconocido' });
     }
+    return styles;
+  };
+
+  // ✅ NUEVO: Función mejorada para manejar edición inteligente
+  const handleSmartEdit = (property, value) => {
+    console.log('🎯 Smart edit:', property, '=', value);
     
-    // Aplicar todas las actualizaciones de una vez
-    Object.entries(updates).forEach(([key, val]) => {
-      onUpdateSelectedElement(key, val);
-    });
+    // Mapeo de propiedades a tipos de estilo
+    const propertyStyleMap = {
+      // Text Style properties
+      'fontSize': 'textStyle',
+      'fontFamily': 'textStyle',
+      'color': 'textStyle',
+      'bold': 'textStyle',
+      'italic': 'textStyle',
+      'underline': 'textStyle',
+      'strikethrough': 'textStyle',
+      
+      // Paragraph Style properties
+      'alignment': 'paragraphStyle',
+      'lineHeight': 'paragraphStyle',
+      'letterSpacing': 'paragraphStyle',
+      'indent': 'paragraphStyle',
+      'spaceBefore': 'paragraphStyle',
+      'spaceAfter': 'paragraphStyle',
+      
+      // Border Style properties
+      'borderWidth': 'borderStyle',
+      'borderStyle': 'borderStyle',
+      'borderColor': 'borderStyle',
+      'borderRadius': 'borderStyle',
+      
+      // Fill Style properties
+      'backgroundColor': 'fillStyle',
+      'fillColor': 'fillStyle',
+      'opacity': 'fillStyle'
+    };
+    
+    const affectedStyleType = propertyStyleMap[property];
+    const styleIdField = affectedStyleType ? `${affectedStyleType}Id` : null;
+    const currentStyleId = styleIdField ? selectedElement[styleIdField] : null;
+    
+    if (currentStyleId && affectedStyleType) {
+      // Hay un estilo aplicado que se vería afectado
+      console.log(`⚠️ Property "${property}" affects applied ${affectedStyleType}: ${currentStyleId}`);
+      
+      const styleInfo = (() => {
+        switch (affectedStyleType) {
+          case 'textStyle': return styleManager.getTextStyle(currentStyleId);
+          case 'paragraphStyle': return styleManager.getParagraphStyle(currentStyleId);
+          case 'borderStyle': return styleManager.getBorderStyle(currentStyleId);
+          case 'fillStyle': return styleManager.getFillStyle(currentStyleId);
+          default: return null;
+        }
+      })();
+      
+      const styleName = styleInfo?.name || 'Estilo aplicado';
+      
+      // Mostrar opciones al usuario
+      const userChoice = window.confirm(
+        `La propiedad "${property}" está controlada por el estilo "${styleName}".\n\n` +
+        `¿Qué deseas hacer?\n\n` +
+        `✅ OK = Desvincular estilo y editar manualmente\n` +
+        `❌ Cancelar = Mantener estilo (no realizar cambios)`
+      );
+      
+      if (userChoice) {
+        console.log(`🔓 User chose to unlink ${affectedStyleType} and edit manually`);
+        
+        // Desvincular el estilo y aplicar el cambio manual
+        const updates = {
+          [styleIdField]: null, // Desvincular estilo
+          [property]: value     // Aplicar cambio manual
+        };
+        
+        // Si es una propiedad de estilo complejo, actualizar el objeto correspondiente
+        if (affectedStyleType === 'textStyle') {
+          const currentTextStyle = selectedElement.textStyle || {};
+          updates.textStyle = { ...currentTextStyle, [property]: value };
+        } else if (affectedStyleType === 'paragraphStyle') {
+          const currentParagraphStyle = selectedElement.paragraphStyle || {};
+          updates.paragraphStyle = { ...currentParagraphStyle, [property]: value };
+        } else if (affectedStyleType === 'borderStyle') {
+          const currentBorderStyle = selectedElement.borderStyle || {};
+          updates.borderStyle = { ...currentBorderStyle, [property]: value };
+        } else if (affectedStyleType === 'fillStyle') {
+          const currentFillStyle = selectedElement.fillStyle || {};
+          updates.fillStyle = { ...currentFillStyle, [property]: value };
+        }
+        
+        // Aplicar todas las actualizaciones
+        Object.entries(updates).forEach(([key, val]) => {
+          onUpdateSelectedElement(key, val);
+        });
+        
+        console.log('✅ Style unlinked and manual edit applied');
+        
+        // Notificar al usuario con un mensaje temporal
+        setTimeout(() => {
+          console.log(`🎉 Estilo "${styleName}" desvinculado. Ahora puedes editar manualmente.`);
+        }, 100);
+        
+      } else {
+        console.log('❌ User cancelled edit to preserve applied style');
+        return; // Usuario canceló, no hacer nada
+      }
+    } else {
+      // No hay estilo aplicado que se vea afectado, edición directa
+      console.log(`✏️ Direct edit for property "${property}" (no style conflict)`);
+      onUpdateSelectedElement(property, value);
+    }
   };
 
   // ✅ MEJORADO: Funciones de conversión
@@ -97,13 +186,13 @@ const BasicProperties = ({
     })).sort((a, b) => a.value.localeCompare(b.value));
   }, [availableData]);
 
-  // Función para manejar cambios de transformación
+  // Función para manejar cambios de transformación (estas no se ven afectadas por estilos)
   const handleTransformChange = (property, value) => {
     console.log('🔄 Transform change:', property, value);
     onUpdateSelectedElement(property, value);
   };
 
-  // ✅ CORREGIDO: Componente NumericInput con desvinculación automática
+  // ✅ MEJORADO: Componente NumericInput con detección de conflictos de estilo
   const NumericInput = ({ 
     label, 
     value, 
@@ -115,18 +204,34 @@ const BasicProperties = ({
     icon,
     placeholder = "0",
     isTransform = false,
-    property = null // ✅ NUEVO: Nombre de la propiedad para desvinculación
+    property = null // ✅ NUEVO: Nombre de la propiedad para detección de conflictos
   }) => {
     const currentValue = value !== undefined && value !== null ? value : '';
     const displayValue = showUnit && !isTransform && currentValue !== '' ? getValueInUnit(currentValue) : currentValue;
     
-    // ✅ NUEVO: Función de actualización con desvinculación
+    // ✅ NUEVO: Detectar si esta propiedad tiene conflicto con estilo aplicado
+    const hasStyleConflict = () => {
+      if (!property || !hasAppliedStyles()) return false;
+      
+      const conflictMap = {
+        'width': false,          // Las dimensiones básicas no conflictúan
+        'height': false,
+        'x': false,
+        'y': false,
+        'fontSize': selectedElement.textStyleId,
+        'borderWidth': selectedElement.borderStyleId,
+        'opacity': selectedElement.fillStyleId
+      };
+      
+      return !!conflictMap[property];
+    };
+    
+    // ✅ NUEVO: Función de actualización con lógica inteligente
     const handleUpdate = (newValue) => {
       if (isTransform) {
         handleTransformChange(onChange.name, newValue);
-      } else if (property && hasAppliedStyles()) {
-        // Si hay estilos aplicados y estamos editando manualmente, desvincular primero
-        unlinkStylesAndUpdate(property, newValue);
+      } else if (property && hasStyleConflict()) {
+        handleSmartEdit(property, newValue);
       } else {
         onChange(newValue);
       }
@@ -145,8 +250,8 @@ const BasicProperties = ({
         }}>
           {icon && <span style={{ marginRight: '4px' }}>{icon}</span>}
           {label}
-          {/* ✅ NUEVO: Indicador de estilo aplicado */}
-          {property && hasAppliedStyles() && (
+          {/* ✅ NUEVO: Indicador de conflicto de estilo */}
+          {property && hasStyleConflict() && (
             <span style={{ 
               marginLeft: '4px', 
               fontSize: '9px', 
@@ -163,7 +268,7 @@ const BasicProperties = ({
           display: 'flex', 
           alignItems: 'center',
           background: 'white',
-          border: '1px solid #d1d5db',
+          border: hasStyleConflict() ? '1px solid #f59e0b' : '1px solid #d1d5db',
           borderRadius: '4px',
           overflow: 'hidden',
           width: '100%',
@@ -274,84 +379,136 @@ const BasicProperties = ({
         }}>
           ID: {selectedElement.id}
         </div>
-        
-        {/* ✅ NUEVO: Mostrar estilos aplicados */}
-        {hasAppliedStyles() && (
-          <div style={{
-            fontSize: '10px',
-            color: '#f59e0b',
-            marginTop: '4px',
-            display: 'flex',
-            gap: '4px',
-            flexWrap: 'wrap'
-          }}>
-            {selectedElement.textStyleId && <span>🔤 TextStyle</span>}
-            {selectedElement.paragraphStyleId && <span>📄 Paragraph</span>}
-            {selectedElement.borderStyleId && <span>🔲 Border</span>}
-            {selectedElement.fillStyleId && <span>🎨 Fill</span>}
-          </div>
-        )}
-        
-        {/* Mostrar transformaciones activas */}
-        {elementTransforms.hasTransformations(selectedElement) && (
-          <div style={{
-            fontSize: '10px',
-            color: '#7c3aed',
-            marginTop: '4px',
-            display: 'flex',
-            gap: '8px'
-          }}>
-            {selectedElement.rotation !== 0 && <span>🔄 {selectedElement.rotation}°</span>}
-            {selectedElement.scale !== 1 && <span>🔍 {selectedElement.scale}x</span>}
-          </div>
-        )}
       </div>
 
-      {/* ✅ NUEVO: Advertencia sobre estilos aplicados */}
+      {/* ✅ NUEVO: Indicador de estilos aplicados con controles */}
       {hasAppliedStyles() && (
         <div style={{
           background: '#fef3c7',
-          padding: '8px 12px',
+          padding: '12px',
           borderRadius: '6px',
           marginBottom: '16px',
           border: '1px solid #f59e0b'
         }}>
           <div style={{
-            fontSize: '11px',
+            fontSize: '12px',
             color: '#92400e',
             fontWeight: '600',
-            marginBottom: '4px'
+            marginBottom: '8px'
           }}>
-            ⚠️ Estilos Vinculados Detectados
+            🎨 Estilos Aplicados del Sidebar
           </div>
+          
+          <div style={{
+            fontSize: '11px',
+            color: '#92400e',
+            marginBottom: '12px',
+            lineHeight: '1.4'
+          }}>
+            {getAppliedStylesInfo().map(style => (
+              <div key={style.type} style={{ marginBottom: '4px' }}>
+                <strong>{style.type === 'textStyle' ? '🔤 Texto' : 
+                         style.type === 'paragraphStyle' ? '📄 Párrafo' :
+                         style.type === 'borderStyle' ? '🔲 Borde' : '🎨 Relleno'}:</strong> {style.name}
+              </div>
+            ))}
+          </div>
+          
           <div style={{
             fontSize: '10px',
             color: '#92400e',
-            marginBottom: '8px'
+            marginBottom: '12px',
+            background: '#fef3c7',
+            padding: '8px',
+            borderRadius: '4px',
+            border: '1px solid #f59e0b'
           }}>
-            Este elemento tiene estilos del sidebar aplicados. Al editar manualmente se desvinculará automáticamente.
+            💡 <strong>Modo Inteligente Activo:</strong> Al editar propiedades que estén vinculadas a estilos, 
+            se te preguntará si quieres desvincular el estilo para edición manual.
           </div>
-          <button
-            onClick={() => {
-              // Desvincular todos los estilos manualmente
-              onUpdateSelectedElement('textStyleId', null);
-              onUpdateSelectedElement('paragraphStyleId', null);
-              onUpdateSelectedElement('borderStyleId', null);
-              onUpdateSelectedElement('fillStyleId', null);
-            }}
-            style={{
-              padding: '4px 8px',
-              border: '1px solid #f59e0b',
-              borderRadius: '4px',
-              background: 'white',
-              color: '#f59e0b',
-              fontSize: '10px',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
-          >
-            🔓 Desvincular Todos los Estilos
-          </button>
+          
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => {
+                const confirmed = window.confirm(
+                  'Esto desvinculará TODOS los estilos aplicados y permitirá edición manual completa.\n\n' +
+                  '¿Continuar?'
+                );
+                
+                if (confirmed) {
+                  // Desvincular todos los estilos
+                  onUpdateSelectedElement('textStyleId', null);
+                  onUpdateSelectedElement('paragraphStyleId', null);
+                  onUpdateSelectedElement('borderStyleId', null);
+                  onUpdateSelectedElement('fillStyleId', null);
+                  console.log('🔓 All styles unlinked for manual editing');
+                }
+              }}
+              style={{
+                padding: '6px 12px',
+                border: '1px solid #f59e0b',
+                borderRadius: '4px',
+                background: 'white',
+                color: '#f59e0b',
+                fontSize: '11px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              🔓 Desvincular Todos
+            </button>
+            
+            <button
+              onClick={() => {
+                alert(
+                  'Modo Inteligente:\n\n' +
+                  '• Al editar una propiedad vinculada a un estilo, se te preguntará qué hacer\n' +
+                  '• Puedes desvincular el estilo para edición manual\n' +
+                  '• O cancelar para mantener el estilo aplicado\n' +
+                  '• Las propiedades no vinculadas (posición, dimensiones, rotación) se editan normalmente'
+                );
+              }}
+              style={{
+                padding: '6px 12px',
+                border: '1px solid #3b82f6',
+                borderRadius: '4px',
+                background: 'white',
+                color: '#3b82f6',
+                fontSize: '11px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              ℹ️ Ayuda
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ NUEVO: Modo manual activo */}
+      {!hasAppliedStyles() && (
+        <div style={{
+          background: '#f0fdf4',
+          padding: '12px',
+          borderRadius: '6px',
+          marginBottom: '16px',
+          border: '1px solid #bbf7d0'
+        }}>
+          <div style={{
+            fontSize: '12px',
+            color: '#15803d',
+            fontWeight: '600',
+            marginBottom: '4px'
+          }}>
+            ✏️ Modo de Edición Manual
+          </div>
+          <div style={{
+            fontSize: '11px',
+            color: '#15803d'
+          }}>
+            Todas las propiedades se editan directamente en el elemento. 
+            Puedes aplicar estilos desde el sidebar izquierdo.
+          </div>
         </div>
       )}
 
@@ -514,7 +671,7 @@ const BasicProperties = ({
         </div>
       </div>
 
-      {/* Rotación y Escala - SIN desvinculación porque son transformaciones separadas */}
+      {/* Rotación y Escala - NO vinculadas a estilos */}
       <div style={{ marginBottom: '20px' }}>
         <h4 style={{
           margin: '0 0 12px 0',
@@ -524,7 +681,7 @@ const BasicProperties = ({
           textTransform: 'uppercase',
           letterSpacing: '0.025em'
         }}>
-          🔄 Rotación y Escala
+          🔄 Transformaciones
         </h4>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
@@ -552,7 +709,7 @@ const BasicProperties = ({
           />
         </div>
 
-        {/* Resto de los controles de rotación y escala igual que antes */}
+        {/* Controles rápidos de rotación */}
         <div style={{ marginTop: '8px' }}>
           <label style={{
             display: 'block',
@@ -590,6 +747,7 @@ const BasicProperties = ({
           </div>
         </div>
 
+        {/* Controles rápidos de escala */}
         <div style={{ marginTop: '8px' }}>
           <label style={{
             display: 'block',
@@ -656,8 +814,7 @@ const BasicProperties = ({
         </div>
       </div>
 
-      {/* Resto del componente igual que antes... */}
-      {/* Visibilidad y Orden */}
+      {/* Visibilidad y Estado */}
       <div style={{ marginBottom: '20px' }}>
         <h4 style={{
           margin: '0 0 12px 0',
@@ -667,7 +824,7 @@ const BasicProperties = ({
           textTransform: 'uppercase',
           letterSpacing: '0.025em'
         }}>
-          👁️ Visibilidad y Orden
+          👁️ Visibilidad y Estado
         </h4>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
@@ -685,7 +842,7 @@ const BasicProperties = ({
           <NumericInput
             label="Opacidad (%)"
             value={(selectedElement.opacity || 1) * 100}
-            onChange={(value) => onUpdateSelectedElement('opacity', (value || 0) / 100)}
+            onChange={(value) => handleSmartEdit('opacity', (value || 0) / 100)}
             min={0}
             max={100}
             step={1}
@@ -799,35 +956,25 @@ const BasicProperties = ({
           >
             🧲 Ajustar a cuadrícula (5{currentUnit})
           </button>
-
-          <button
-            onClick={() => {
-              // Limpiar referencias a estilos del sidebar
-              onUpdateSelectedElement('textStyleId', null);
-              onUpdateSelectedElement('paragraphStyleId', null);
-              onUpdateSelectedElement('borderStyleId', null);
-              onUpdateSelectedElement('fillStyleId', null);
-            }}
-            style={{
-              padding: '8px 12px',
-              border: '1px solid #dc2626',
-              borderRadius: '4px',
-              background: 'white',
-              color: '#dc2626',
-              fontSize: '11px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            onMouseOver={(e) => e.target.style.background = '#fef2f2'}
-            onMouseOut={(e) => e.target.style.background = 'white'}
-          >
-            🗑️ Quitar estilos aplicados
-          </button>
         </div>
       </div>
+
+      {/* ✅ NUEVO: Información de debug (opcional, para desarrollo) */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{
+          marginTop: '20px',
+          padding: '8px',
+          background: '#f8fafc',
+          border: '1px solid #e2e8f0',
+          borderRadius: '4px',
+          fontSize: '10px',
+          color: '#64748b'
+        }}>
+          <strong>🔧 Debug Info:</strong><br/>
+          Applied Styles: {getAppliedStylesInfo().map(s => s.type).join(', ') || 'None'}<br/>
+          Smart Edit Mode: {hasAppliedStyles() ? 'Active' : 'Manual'}
+        </div>
+      )}
     </div>
   );
 };
