@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PropertiesPanel/ParagraphProperties.jsx
+// src/components/layoutDesigner/PropertiesPanel/ParagraphProperties.jsx - MEJORADO
 import React, { useState } from 'react';
 import { styleManager } from '../utils/StyleManager';
 import { propertiesConfig } from './properties.config';
@@ -15,7 +15,7 @@ const ParagraphProperties = ({
 
   const { paragraphConfig } = propertiesConfig;
 
-  // Obtener el estilo actual del párrafo
+  // ✅ MEJORADO: Obtener el estilo actual del párrafo
   const getCurrentParagraphStyle = () => {
     if (selectedElement.paragraphStyleId) {
       const style = styleManager.getParagraphStyle(selectedElement.paragraphStyleId);
@@ -26,13 +26,73 @@ const ParagraphProperties = ({
 
   const currentStyle = getCurrentParagraphStyle();
 
+  // ✅ NUEVO: Verificar si el elemento tiene un estilo aplicado
+  const hasAppliedStyle = () => {
+    return selectedElement.paragraphStyleId && styleManager.getParagraphStyle(selectedElement.paragraphStyleId);
+  };
+
+  // ✅ NUEVO: Obtener información del estilo aplicado
+  const getAppliedStyleInfo = () => {
+    if (!hasAppliedStyle()) return null;
+    return styleManager.getParagraphStyle(selectedElement.paragraphStyleId);
+  };
+
   // Actualizar propiedad del estilo de párrafo
   const updateParagraphStyleProperty = (property, value) => {
+    console.log('📄 Updating paragraph property:', property, 'to:', value);
+    
     const newParagraphStyle = { 
       ...currentStyle, 
       [property]: value 
     };
+    
+    console.log('📄 New paragraph style:', newParagraphStyle);
     onUpdateSelectedElement('paragraphStyle', newParagraphStyle);
+    
+    setTimeout(() => {
+      console.log('✅ Paragraph style should be applied now');
+    }, 0);
+  };
+
+  // ✅ NUEVO: Actualizar estilo existente
+  const handleUpdateExistingStyle = () => {
+    const appliedStyleInfo = getAppliedStyleInfo();
+    if (!appliedStyleInfo) return;
+
+    const updatedStyleData = {
+      ...appliedStyleInfo,
+      ...currentStyle,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      styleManager.updateParagraphStyle(selectedElement.paragraphStyleId, updatedStyleData);
+      
+      if (onStyleCreated) {
+        onStyleCreated('paragraphStyle', selectedElement.paragraphStyleId);
+      }
+      
+      console.log('✅ Paragraph style updated:', selectedElement.paragraphStyleId);
+      alert(`Estilo "${appliedStyleInfo.name}" actualizado correctamente`);
+    } catch (error) {
+      console.error('❌ Error updating paragraph style:', error);
+      alert('Error al actualizar el estilo');
+    }
+  };
+
+  // ✅ NUEVO: Manejar modal de actualización
+  const handleUpdateModal = () => {
+    const appliedStyleInfo = getAppliedStyleInfo();
+    if (!appliedStyleInfo) return;
+
+    const confirmed = window.confirm(
+      `¿Actualizar el estilo "${appliedStyleInfo.name}" con los cambios actuales?\n\n` +
+      `Esto afectará a todos los elementos que usen este estilo.`
+    );
+
+    if (confirmed) {
+      handleUpdateExistingStyle();
+    }
   };
 
   // Crear nuevo estilo
@@ -382,39 +442,95 @@ const ParagraphProperties = ({
         </div>
       </div>
 
-      {/* Botón para crear estilo */}
+      {/* ✅ NUEVO: Información del estilo aplicado */}
+      {hasAppliedStyle() && (
+        <div style={{
+          background: '#f0fdf4',
+          padding: '12px',
+          borderRadius: '6px',
+          marginBottom: '16px',
+          border: '1px solid #bbf7d0'
+        }}>
+          <div style={{
+            fontSize: '12px',
+            color: '#15803d',
+            fontWeight: '600',
+            marginBottom: '4px'
+          }}>
+            ✅ Estilo Aplicado: {getAppliedStyleInfo()?.name}
+          </div>
+          <div style={{
+            fontSize: '11px',
+            color: '#15803d',
+            marginBottom: '8px'
+          }}>
+            Modificaciones en tiempo real. Puedes actualizar el estilo o crear uno nuevo.
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MEJORADO: Botones para crear/actualizar estilo */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '16px'
+        marginBottom: '16px',
+        gap: '8px'
       }}>
         <h4 style={{
           margin: 0,
           fontSize: '14px',
           color: '#374151',
-          fontWeight: '600'
+          fontWeight: '600',
+          flex: 1
         }}>
           Propiedades de Párrafo
         </h4>
         
-        <button
-          onClick={() => setShowCreateModal(true)}
-          style={{
-            background: '#059669',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            padding: '6px 10px',
-            fontSize: '11px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px'
-          }}
-        >
-          💾 Crear Paragraph Style
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {/* Botón Actualizar - Solo si hay estilo aplicado */}
+          {hasAppliedStyle() && (
+            <button
+              onClick={handleUpdateModal}
+              style={{
+                background: '#f59e0b',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '6px 10px',
+                fontSize: '11px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: '600'
+              }}
+              title={`Actualizar estilo "${getAppliedStyleInfo()?.name}"`}
+            >
+              🔄 Actualizar
+            </button>
+          )}
+          
+          {/* Botón Crear Nuevo */}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              background: '#059669',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '6px 10px',
+              fontSize: '11px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: '600'
+            }}
+          >
+            💾 Crear Nuevo
+          </button>
+        </div>
       </div>
 
       {/* Propiedades principales */}
@@ -520,21 +636,99 @@ const ParagraphProperties = ({
       {/* Vista previa */}
       {renderPreview()}
 
-      {/* Información del estilo actual */}
-      {selectedElement.paragraphStyleId && (
+      {/* ✅ MEJORADO: Información del estilo actual más detallada */}
+      {hasAppliedStyle() && (
         <div style={{
           marginTop: '16px',
-          padding: '8px 12px',
+          padding: '12px',
           background: '#f0fdf4',
           border: '1px solid #bbf7d0',
-          borderRadius: '4px'
+          borderRadius: '6px'
         }}>
+          <div style={{
+            fontSize: '12px',
+            color: '#15803d',
+            fontWeight: '600',
+            marginBottom: '4px'
+          }}>
+            📋 Detalles del Estilo Aplicado
+          </div>
           <div style={{
             fontSize: '11px',
             color: '#15803d',
-            fontWeight: '600'
+            lineHeight: '1.4'
           }}>
-            ✅ {styleManager.getParagraphStyle(selectedElement.paragraphStyleId)?.name || 'Estilo aplicado'}
+            <strong>Nombre:</strong> {getAppliedStyleInfo()?.name || 'Desconocido'}
+            <br />
+            <strong>Categoría:</strong> {getAppliedStyleInfo()?.category || 'Sin categoría'}
+            <br />
+            <strong>Tipo:</strong> {getAppliedStyleInfo()?.isCustom ? 'Personalizado' : 'Predefinido'}
+            {getAppliedStyleInfo()?.updatedAt && (
+              <>
+                <br />
+                <strong>Última actualización:</strong> {new Date(getAppliedStyleInfo().updatedAt).toLocaleString()}
+              </>
+            )}
+          </div>
+          
+          {/* ✅ NUEVO: Botones de acción rápida */}
+          <div style={{
+            marginTop: '8px',
+            display: 'flex',
+            gap: '6px'
+          }}>
+            <button
+              onClick={() => {
+                onUpdateSelectedElement('paragraphStyleId', null);
+              }}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid #fbbf24',
+                borderRadius: '4px',
+                background: 'white',
+                color: '#f59e0b',
+                fontSize: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Desvincular estilo (mantener propiedades)"
+            >
+              🔗 Desvincular
+            </button>
+            
+            <button
+              onClick={() => {
+                const styleData = getAppliedStyleInfo();
+                if (styleData) {
+                  const duplicatedId = styleManager.generateStyleId('paragraphStyle');
+                  styleManager.addParagraphStyle(duplicatedId, {
+                    ...styleData,
+                    name: `${styleData.name} (Copia)`,
+                    isCustom: true,
+                    createdAt: new Date().toISOString()
+                  });
+                  onUpdateSelectedElement('paragraphStyleId', duplicatedId);
+                  if (onStyleCreated) onStyleCreated('paragraphStyle', duplicatedId);
+                }
+              }}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid #059669',
+                borderRadius: '4px',
+                background: 'white',
+                color: '#059669',
+                fontSize: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+              title="Duplicar estilo para modificar independientemente"
+            >
+              📋 Duplicar
+            </button>
           </div>
         </div>
       )}

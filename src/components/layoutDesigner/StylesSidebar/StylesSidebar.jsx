@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/StylesSidebar/StylesSidebar.jsx
+// src/components/layoutDesigner/StylesSidebar/StylesSidebar.jsx - MEJORADO
 import React, { useState, useRef, useEffect } from 'react';
 import { styleManager } from '../utils/StyleManager';
 import { variableProcessor } from '../utils/variableProcessor';
@@ -73,9 +73,114 @@ const StylesSidebar = ({
     }
   };
 
+  // ✅ NUEVO: Manejar duplicación de estilos
+  const handleDuplicateStyle = (styleType, styleId, styleName) => {
+    try {
+      let originalStyle = null;
+      let newStyleId = null;
+
+      // Obtener el estilo original
+      switch(styleType) {
+        case 'textStyle':
+          originalStyle = styleManager.getTextStyle(styleId);
+          newStyleId = styleManager.generateStyleId('textStyle');
+          break;
+        case 'paragraphStyle':
+          originalStyle = styleManager.getParagraphStyle(styleId);
+          newStyleId = styleManager.generateStyleId('paragraphStyle');
+          break;
+        case 'borderStyle':
+          originalStyle = styleManager.getBorderStyle(styleId);
+          newStyleId = styleManager.generateStyleId('borderStyle');
+          break;
+        case 'fillStyle':
+          originalStyle = styleManager.getFillStyle(styleId);
+          newStyleId = styleManager.generateStyleId('fillStyle');
+          break;
+      }
+
+      if (!originalStyle) {
+        console.error('❌ Original style not found:', styleId);
+        return;
+      }
+
+      // Crear el estilo duplicado
+      const duplicatedStyle = {
+        ...originalStyle,
+        id: newStyleId,
+        name: `${styleName} (Copia)`,
+        isCustom: true,
+        createdAt: new Date().toISOString(),
+        duplicatedFrom: styleId
+      };
+
+      // Agregar el nuevo estilo
+      switch(styleType) {
+        case 'textStyle':
+          styleManager.addTextStyle(newStyleId, duplicatedStyle);
+          break;
+        case 'paragraphStyle':
+          styleManager.addParagraphStyle(newStyleId, duplicatedStyle);
+          break;
+        case 'borderStyle':
+          styleManager.addBorderStyle(newStyleId, duplicatedStyle);
+          break;
+        case 'fillStyle':
+          styleManager.addFillStyle(newStyleId, duplicatedStyle);
+          break;
+      }
+
+      // Actualizar cache
+      setCachedStyles({
+        textStyles: styleManager.getAllTextStyles(),
+        paragraphStyles: styleManager.getAllParagraphStyles(),
+        borderStyles: styleManager.getAllBorderStyles(),
+        fillStyles: styleManager.getAllFillStyles()
+      });
+
+      console.log('✅ Style duplicated successfully:', newStyleId);
+      
+      // Mostrar confirmación
+      alert(`Estilo "${duplicatedStyle.name}" creado como copia de "${styleName}"`);
+
+    } catch (error) {
+      console.error('❌ Error duplicating style:', error);
+      alert('Error al duplicar el estilo');
+    }
+  };
+
   const handleDeleteStyle = (styleType, styleId, styleName) => {
-    if (window.confirm(`¿Eliminar el estilo "${styleName}"?`)) {
+    // ✅ MEJORADO: Verificar si el estilo está en uso
+    const isStyleInUse = () => {
+      if (!selectedElement) return false;
+      
+      switch(styleType) {
+        case 'textStyle':
+          return selectedElement.textStyleId === styleId;
+        case 'paragraphStyle':
+          return selectedElement.paragraphStyleId === styleId;
+        case 'borderStyle':
+          return selectedElement.borderStyleId === styleId;
+        case 'fillStyle':
+          return selectedElement.fillStyleId === styleId;
+        default:
+          return false;
+      }
+    };
+
+    const inUseWarning = isStyleInUse() 
+      ? '\n\n⚠️ ATENCIÓN: Este estilo está aplicado al elemento seleccionado.' 
+      : '';
+
+    if (window.confirm(`¿Eliminar el estilo "${styleName}"?${inUseWarning}`)) {
       try {
+        // Si está en uso, desvincular del elemento seleccionado
+        if (isStyleInUse() && selectedElement) {
+          const styleIdField = `${styleType}Id`;
+          // Aquí deberías tener una función para actualizar el elemento
+          // onUpdateSelectedElement(styleIdField, null);
+        }
+
         switch(styleType) {
           case 'textStyle':
             styleManager.deleteTextStyle(styleId);
@@ -98,8 +203,10 @@ const StylesSidebar = ({
           fillStyles: styleManager.getAllFillStyles()
         });
         
+        console.log('✅ Style deleted:', styleId);
       } catch (error) {
         console.error('❌ Error deleting style:', error);
+        alert('Error al eliminar el estilo');
       }
     }
   };
@@ -111,8 +218,10 @@ const StylesSidebar = ({
       const success = await styleManager.addCustomFont(file, fontName);
       if (success) {
         console.log('✅ Font uploaded successfully:', fontName);
+        alert(`Fuente "${fontName}" cargada correctamente`);
       } else {
         console.error('❌ Failed to upload font');
+        alert('Error al cargar la fuente');
       }
     }
   };
@@ -229,6 +338,52 @@ const StylesSidebar = ({
     </div>
   );
 
+  // ✅ NUEVO: Renderizar estadísticas de estilos
+  const renderStylesStats = () => {
+    const stats = {
+      total: cachedStyles.textStyles.length + 
+             cachedStyles.paragraphStyles.length + 
+             cachedStyles.borderStyles.length + 
+             cachedStyles.fillStyles.length,
+      custom: [
+        ...cachedStyles.textStyles,
+        ...cachedStyles.paragraphStyles,
+        ...cachedStyles.borderStyles,
+        ...cachedStyles.fillStyles
+      ].filter(style => style.isCustom).length
+    };
+
+    return (
+      <div style={{
+        margin: '12px',
+        padding: '8px 12px',
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
+        borderRadius: '6px'
+      }}>
+        <div style={{
+          fontSize: '11px',
+          color: '#64748b',
+          fontWeight: '600',
+          marginBottom: '4px'
+        }}>
+          📊 Estadísticas de Estilos
+        </div>
+        <div style={{
+          fontSize: '10px',
+          color: '#64748b',
+          lineHeight: '1.3'
+        }}>
+          <strong>Total:</strong> {stats.total} estilos
+          <br />
+          <strong>Personalizados:</strong> {stats.custom}
+          <br />
+          <strong>Predefinidos:</strong> {stats.total - stats.custom}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={styles.container}>
       {/* Header con tabs */}
@@ -271,6 +426,7 @@ const StylesSidebar = ({
               onCreateNewStyle={onCreateNewStyle}
               onEditStyle={onEditStyle}
               onDeleteStyle={handleDeleteStyle}
+              onDuplicateStyle={handleDuplicateStyle}
             />
             
             <StylesSection
@@ -285,6 +441,7 @@ const StylesSidebar = ({
               onCreateNewStyle={onCreateNewStyle}
               onEditStyle={onEditStyle}
               onDeleteStyle={handleDeleteStyle}
+              onDuplicateStyle={handleDuplicateStyle}
             />
             
             <StylesSection
@@ -299,6 +456,7 @@ const StylesSidebar = ({
               onCreateNewStyle={onCreateNewStyle}
               onEditStyle={onEditStyle}
               onDeleteStyle={handleDeleteStyle}
+              onDuplicateStyle={handleDuplicateStyle}
             />
             
             <StylesSection
@@ -313,9 +471,11 @@ const StylesSidebar = ({
               onCreateNewStyle={onCreateNewStyle}
               onEditStyle={onEditStyle}
               onDeleteStyle={handleDeleteStyle}
+              onDuplicateStyle={handleDuplicateStyle}
             />
             
             {renderFontsSection()}
+            {renderStylesStats()}
           </div>
         )}
         
@@ -340,6 +500,8 @@ const StylesSidebar = ({
               a.download = `styles-${Date.now()}.json`;
               a.click();
               URL.revokeObjectURL(url);
+              
+              alert('Estilos exportados correctamente');
             }}
             style={styles.actionButton}
             title="Exportar estilos"
@@ -367,8 +529,11 @@ const StylesSidebar = ({
                         borderStyles: styleManager.getAllBorderStyles(),
                         fillStyles: styleManager.getAllFillStyles()
                       });
+                      
+                      alert('Estilos importados correctamente');
                     } catch (error) {
                       console.error('❌ Error importing styles:', error);
+                      alert('Error al importar estilos. Verifica que el archivo sea válido.');
                     }
                   };
                   reader.readAsText(file);
@@ -395,7 +560,24 @@ const StylesSidebar = ({
           }}>
             📝 {selectedElement.type} seleccionado
             <br />
-            Haz clic en un estilo para aplicarlo
+            {/* ✅ NUEVO: Mostrar estilos aplicados */}
+            {[
+              selectedElement.textStyleId && '🔤',
+              selectedElement.paragraphStyleId && '📄', 
+              selectedElement.borderStyleId && '🔲',
+              selectedElement.fillStyleId && '🎨'
+            ].filter(Boolean).length > 0 ? (
+              <>
+                Estilos: {[
+                  selectedElement.textStyleId && '🔤',
+                  selectedElement.paragraphStyleId && '📄', 
+                  selectedElement.borderStyleId && '🔲',
+                  selectedElement.fillStyleId && '🎨'
+                ].filter(Boolean).join(' ')}
+              </>
+            ) : (
+              'Haz clic en un estilo para aplicarlo'
+            )}
           </div>
         )}
       </div>

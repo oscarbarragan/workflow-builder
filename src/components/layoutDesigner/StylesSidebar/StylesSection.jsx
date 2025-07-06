@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/StylesSidebar/StylesSection.jsx
+// src/components/layoutDesigner/StylesSidebar/StylesSection.jsx - MEJORADO
 import React from 'react';
 
 const StylesSection = ({
@@ -12,7 +12,8 @@ const StylesSection = ({
   onApplyStyle,
   onCreateNewStyle,
   onEditStyle,
-  onDeleteStyle
+  onDeleteStyle,
+  onDuplicateStyle // ✅ NUEVO
 }) => {
   const getCurrentStyleId = () => {
     if (!selectedElement) return null;
@@ -38,6 +39,17 @@ const StylesSection = ({
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <span>{icon}</span>
         {title}
+        <span style={{ 
+          fontSize: '10px', 
+          background: '#64748b', 
+          color: 'white', 
+          padding: '1px 4px', 
+          borderRadius: '8px',
+          minWidth: '16px',
+          textAlign: 'center'
+        }}>
+          {styles.length}
+        </span>
       </div>
       <span>
         {isExpanded ? '🔽' : '▶️'}
@@ -59,22 +71,25 @@ const StylesSection = ({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontSize: '12px'
+          fontSize: '12px',
+          // ✅ MEJORADO: Hover solo si no está aplicado
+          transition: 'all 0.2s'
+        }}
+        onMouseOver={(e) => {
+          if (!isApplied) e.currentTarget.style.background = '#f8fafc';
+        }}
+        onMouseOut={(e) => {
+          if (!isApplied) e.currentTarget.style.background = 'transparent';
         }}
       >
         <div 
           style={{ 
             flex: 1, 
             cursor: 'pointer',
-            minWidth: 0
+            minWidth: 0,
+            marginRight: '8px'
           }}
           onClick={() => onApplyStyle(type, style.id)}
-          onMouseOver={(e) => {
-            if (!isApplied) e.currentTarget.style.background = '#f8fafc';
-          }}
-          onMouseOut={(e) => {
-            if (!isApplied) e.currentTarget.style.background = 'transparent';
-          }}
         >
           <div style={{ 
             fontWeight: '500', 
@@ -82,19 +97,32 @@ const StylesSection = ({
             marginBottom: '2px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
           }}>
             {style.name}
             {style.isCustom && (
               <span style={{
-                fontSize: '9px',
+                fontSize: '8px',
                 background: '#fbbf24',
                 color: 'white',
-                padding: '1px 4px',
-                borderRadius: '2px',
-                marginLeft: '4px'
+                padding: '1px 3px',
+                borderRadius: '2px'
               }}>
                 Custom
+              </span>
+            )}
+            {isApplied && (
+              <span style={{
+                fontSize: '8px',
+                background: '#16a34a',
+                color: 'white',
+                padding: '1px 3px',
+                borderRadius: '2px'
+              }}>
+                Aplicado
               </span>
             )}
           </div>
@@ -102,38 +130,75 @@ const StylesSection = ({
           {renderStylePreview(style)}
         </div>
         
-        <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
-          {style.isCustom && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEditStyle(type, style.id);
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '4px',
-                color: '#6b7280',
-                borderRadius: '3px',
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'all 0.2s'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.background = '#e5e7eb';
-                e.target.style.color = '#374151';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = 'none';
-                e.target.style.color = '#6b7280';
-              }}
-              title="Editar estilo"
-            >
-              ✏️
-            </button>
-          )}
+        {/* ✅ MEJORADO: Botones de acción más organizados */}
+        <div style={{ 
+          display: 'flex', 
+          gap: '2px',
+          flexShrink: 0
+        }}>
+          {/* Botón Editar - Disponible para todos los estilos */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditStyle(type, style.id);
+            }}
+            style={{
+              background: 'none',
+              border: '1px solid #d1d5db',
+              cursor: 'pointer',
+              padding: '3px 5px',
+              color: '#3b82f6',
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: '10px',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#eff6ff';
+              e.target.style.borderColor = '#3b82f6';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'none';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Editar estilo"
+          >
+            ✏️
+          </button>
+
+          {/* Botón Duplicar - Para todos los estilos */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicateStyle && onDuplicateStyle(type, style.id, style.name);
+            }}
+            style={{
+              background: 'none',
+              border: '1px solid #d1d5db',
+              cursor: 'pointer',
+              padding: '3px 5px',
+              color: '#059669',
+              borderRadius: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: '10px',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#f0fdf4';
+              e.target.style.borderColor = '#059669';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'none';
+              e.target.style.borderColor = '#d1d5db';
+            }}
+            title="Duplicar estilo"
+          >
+            📋
+          </button>
           
+          {/* Botón Eliminar - Solo para estilos personalizados */}
           {style.isCustom && (
             <button
               onClick={(e) => {
@@ -142,24 +207,25 @@ const StylesSection = ({
               }}
               style={{
                 background: 'none',
-                border: 'none',
+                border: '1px solid #fecaca',
                 cursor: 'pointer',
-                padding: '4px',
+                padding: '3px 5px',
                 color: '#dc2626',
                 borderRadius: '3px',
                 display: 'flex',
                 alignItems: 'center',
+                fontSize: '10px',
                 transition: 'all 0.2s'
               }}
               onMouseOver={(e) => {
                 e.target.style.background = '#fef2f2';
-                e.target.style.color = '#991b1b';
+                e.target.style.borderColor = '#dc2626';
               }}
               onMouseOut={(e) => {
                 e.target.style.background = 'none';
-                e.target.style.color = '#dc2626';
+                e.target.style.borderColor = '#fecaca';
               }}
-              title="Eliminar estilo"
+              title="Eliminar estilo personalizado"
             >
               🗑️
             </button>
@@ -183,6 +249,17 @@ const StylesSection = ({
             {style.fontFamily?.split(',')[0]} • {style.fontSize}px
             {style.bold && ' • Bold'}
             {style.italic && ' • Italic'}
+            {style.color && (
+              <span style={{
+                marginLeft: '4px',
+                display: 'inline-block',
+                width: '8px',
+                height: '8px',
+                backgroundColor: style.color,
+                borderRadius: '2px',
+                border: '1px solid #e5e7eb'
+              }}></span>
+            )}
           </div>
         );
       
@@ -192,8 +269,8 @@ const StylesSection = ({
             fontSize: '10px',
             color: '#6b7280'
           }}>
-            {style.alignment} • {style.lineHeight}
-            {style.letterSpacing && ` • ${style.letterSpacing}px`}
+            {style.alignment} • LH: {style.lineHeight}
+            {style.letterSpacing && ` • LS: ${style.letterSpacing}px`}
           </div>
         );
       
@@ -201,10 +278,18 @@ const StylesSection = ({
         return (
           <div style={{
             fontSize: '10px',
-            color: '#6b7280'
+            color: '#6b7280',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
           }}>
-            {style.width}px {style.style} • {style.color}
-            {style.radius && ` • ${style.radius}px radius`}
+            <div style={{
+              width: '16px',
+              height: '3px',
+              border: `${style.width || 1}px ${style.style || 'solid'} ${style.color || '#000'}`,
+              borderRadius: `${(style.radius || 0) / 2}px`
+            }}></div>
+            {style.width}px {style.style}
           </div>
         );
       
@@ -212,9 +297,20 @@ const StylesSection = ({
         return (
           <div style={{
             fontSize: '10px',
-            color: '#6b7280'
+            color: '#6b7280',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
           }}>
-            {style.backgroundColor} • {Math.round((style.opacity || 1) * 100)}%
+            <div style={{
+              width: '12px',
+              height: '12px',
+              backgroundColor: style.backgroundColor || 'transparent',
+              border: '1px solid #e5e7eb',
+              borderRadius: '2px',
+              opacity: style.opacity || 1
+            }}></div>
+            {Math.round((style.opacity || 1) * 100)}%
           </div>
         );
       
@@ -232,29 +328,59 @@ const StylesSection = ({
       {renderSectionHeader()}
       
       <div>
-        <div style={{ padding: '8px 12px' }}>
+        {/* ✅ MEJORADO: Botón crear con mejor diseño */}
+        <div style={{ 
+          padding: '8px 12px',
+          borderBottom: '1px solid #f1f5f9',
+          background: '#f8fafc'
+        }}>
           <button
             onClick={() => onCreateNewStyle(type)}
             style={{
               width: '100%',
-              padding: '6px 8px',
-              border: '1px dashed #3b82f6',
-              borderRadius: '4px',
+              padding: '8px 12px',
+              border: '2px dashed #3b82f6',
+              borderRadius: '6px',
               background: 'white',
               color: '#3b82f6',
               fontSize: '11px',
+              fontWeight: '600',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '4px'
+              gap: '6px',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.background = '#eff6ff';
+              e.target.style.borderStyle = 'solid';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.background = 'white';
+              e.target.style.borderStyle = 'dashed';
             }}
           >
-            ➕ Nuevo {title.replace('Estilos de ', '')}
+            ➕ Crear {title.replace('Estilos de ', '')}
           </button>
         </div>
         
-        {styles.map(style => renderStyleItem(style))}
+        {/* Lista de estilos */}
+        {styles.length === 0 ? (
+          <div style={{
+            padding: '20px 12px',
+            textAlign: 'center',
+            color: '#9ca3af',
+            fontSize: '11px',
+            fontStyle: 'italic'
+          }}>
+            No hay estilos de este tipo.
+            <br />
+            Crea uno usando el botón de arriba.
+          </div>
+        ) : (
+          styles.map(style => renderStyleItem(style))
+        )}
       </div>
     </div>
   );
