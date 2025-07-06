@@ -23,6 +23,10 @@ const TextBox = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const elementRef = useRef(null);
 
+  // ✅ CORREGIDO: Verificar si el elemento está bloqueado DESPUÉS de los hooks
+  const isLocked = element.locked === true;
+  const isVisible = element.visible !== false;
+
   // Procesar variables disponibles
   const processedVariables = useMemo(() => {
     let dataToProcess = availableVariables;
@@ -172,15 +176,21 @@ const TextBox = ({
     );
   }, [element.text, showVariableValues, processedVariables, availableVariables]);
 
-  // Event handlers
+  // Event handlers con verificación de bloqueo
   const handleDoubleClick = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     
+    // No permitir edición si está bloqueado
+    if (isLocked) {
+      console.log('Element is locked, editing disabled');
+      return;
+    }
+    
     setIsEditing(true);
     setEditValue(element.text || '');
     setShowTooltip(true);
-  }, [element.text]);
+  }, [element.text, isLocked]);
 
   const handleMouseDown = useCallback((e) => {
     if (isEditing) {
@@ -188,28 +198,48 @@ const TextBox = ({
       return;
     }
     
+    // No permitir arrastrar si está bloqueado
+    if (isLocked) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('Element is locked, dragging disabled');
+      return;
+    }
+    
     e.preventDefault();
     e.stopPropagation();
     onMouseDown(e, element);
-  }, [element, onMouseDown, isEditing]);
+  }, [element, onMouseDown, isEditing, isLocked]);
 
   const handleResizeMouseDown = useCallback((e, corner) => {
     e.preventDefault();
     e.stopPropagation();
     
+    // No permitir redimensionar si está bloqueado
+    if (isLocked) {
+      console.log('Element is locked, resizing disabled');
+      return;
+    }
+    
     if (onResizeStart) {
       onResizeStart(e, element.id, corner, element);
     }
-  }, [element, onResizeStart]);
+  }, [element, onResizeStart, isLocked]);
 
   const handleEditFinish = useCallback((newText) => {
     setIsEditing(false);
     setShowTooltip(false);
     
+    // No permitir cambios si está bloqueado
+    if (isLocked) {
+      console.log('Element is locked, text changes disabled');
+      return;
+    }
+    
     if (onTextChange && newText !== element.text) {
       onTextChange(element.id, 'text', newText);
     }
-  }, [element.id, element.text, onTextChange]);
+  }, [element.id, element.text, onTextChange, isLocked]);
 
   const handleEditCancel = useCallback(() => {
     setIsEditing(false);
@@ -218,13 +248,21 @@ const TextBox = ({
   }, [element.text]);
 
   const finalStyles = getFinalStyles();
+  
+  // Pasar isLocked a los estilos
   const elementStyle = textBoxStyles.container(
     element, 
     isSelected, 
     isDragging, 
     isEditing, 
-    finalStyles
+    finalStyles,
+    isLocked
   );
+
+  // ✅ CORREGIDO: Verificación de visibilidad DESPUÉS de todos los hooks
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <>
@@ -236,10 +274,25 @@ const TextBox = ({
         onDoubleClick={handleDoubleClick}
         onDragStart={(e) => e.preventDefault()}
         onContextMenu={(e) => e.preventDefault()}
-        title={isEditing ? 'Editando texto...' : `${element.type} - Doble click para editar`}
+        title={
+          isLocked 
+            ? '🔒 Elemento bloqueado - No se puede editar'
+            : isEditing 
+              ? 'Editando texto...' 
+              : `${element.type} - Doble click para editar`
+        }
         data-element-id={element.id}
         data-element-type={element.type}
+        data-locked={isLocked}
+        data-visible={isVisible}
       >
+        {/* Indicador de bloqueo */}
+        {isLocked && (
+          <div style={textBoxStyles.lockIndicator}>
+            🔒
+          </div>
+        )}
+        
         {/* Contenido del elemento */}
         {!isEditing && (
           <div style={textBoxStyles.content(elementStyle)}>
@@ -248,7 +301,7 @@ const TextBox = ({
         )}
         
         {/* Editor de texto */}
-        {isEditing && (
+        {isEditing && !isLocked && (
           <TextBoxEditor
             initialValue={editValue}
             element={element}
@@ -270,10 +323,16 @@ const TextBox = ({
             <span style={{ marginLeft: '8px', color: showVariableValues ? '#16a34a' : '#f59e0b' }}>
               | {showVariableValues ? 'Valores' : 'Variables'}
             </span>
+            {/* Indicador de estado en tooltip */}
+            {isLocked && (
+              <span style={{ marginLeft: '8px', color: '#dc2626' }}>
+                | 🔒 BLOQUEADO
+              </span>
+            )}
           </div>
           
-          {/* Handles de resize */}
-          {[
+          {/* Handles de resize solo si no está bloqueado */}
+          {!isLocked && [
             { corner: 'top-left', x: -4, y: -4, cursor: 'nw-resize' },
             { corner: 'top-right', x: (element.width || 200) - 4, y: -4, cursor: 'ne-resize' },
             { corner: 'bottom-left', x: -4, y: (element.height || 40) - 4, cursor: 'sw-resize' },
@@ -290,7 +349,7 @@ const TextBox = ({
       )}
 
       {/* Indicador de modo edición */}
-      {isEditing && showTooltip && (
+      {isEditing && showTooltip && !isLocked && (
         <div style={textBoxStyles.tooltip(element.x, element.y, true)}>
           ✏️ Editando - Ctrl+Espacio para variables (notación punto), Ctrl+Enter para guardar
         </div>

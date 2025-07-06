@@ -1,7 +1,7 @@
 // src/components/layoutDesigner/components/TextBox/TextBox.styles.js
 export const textBoxStyles = {
-  container: (element, isSelected, isDragging, isEditing, finalStyles) => {
-    // ✅ CORREGIDO: Generar transform correctamente
+  container: (element, isSelected, isDragging, isEditing, finalStyles, isLocked = false) => {
+    // Generar transform correctamente
     const transforms = [];
     
     // Aplicar rotación si existe
@@ -16,6 +16,16 @@ export const textBoxStyles = {
     
     const transformString = transforms.length > 0 ? transforms.join(' ') : 'none';
     
+    // ✅ MODIFICADO: Cursor y interacciones basadas en el estado bloqueado
+    let cursor = 'grab';
+    if (isLocked) {
+      cursor = 'not-allowed';
+    } else if (isDragging && isSelected) {
+      cursor = 'grabbing';
+    } else if (isEditing) {
+      cursor = 'text';
+    }
+    
     return {
       position: 'absolute',
       left: element.x,
@@ -24,12 +34,11 @@ export const textBoxStyles = {
       height: element.height || 'auto',
       minHeight: element.height || 40,
       padding: element.padding || '8px 12px',
-      cursor: isDragging && isSelected ? 'grabbing' : 
-              isEditing ? 'text' : 'grab',
-      userSelect: isEditing ? 'text' : 'none',
-      WebkitUserSelect: isEditing ? 'text' : 'none',
-      MozUserSelect: isEditing ? 'text' : 'none',
-      msUserSelect: isEditing ? 'text' : 'none',
+      cursor: cursor,
+      userSelect: isEditing && !isLocked ? 'text' : 'none',
+      WebkitUserSelect: isEditing && !isLocked ? 'text' : 'none',
+      MozUserSelect: isEditing && !isLocked ? 'text' : 'none',
+      msUserSelect: isEditing && !isLocked ? 'text' : 'none',
       transition: (isDragging || isEditing) ? 'none' : 'all 0.15s ease',
       zIndex: isSelected ? 1000 : 100,
       pointerEvents: 'auto',
@@ -41,27 +50,39 @@ export const textBoxStyles = {
       justifyContent: finalStyles.textAlign === 'center' ? 'center' : 
                      finalStyles.textAlign === 'right' ? 'flex-end' : 'flex-start',
       
-      // ✅ APLICAR TRANSFORMACIONES
+      // Aplicar transformaciones
       transform: transformString,
       transformOrigin: 'center center',
       
       ...finalStyles,
       
+      // ✅ MODIFICADO: Bordes diferentes según el estado
       border: isEditing 
         ? '2px solid #3b82f6' 
+        : isLocked
+          ? '2px dashed #dc2626' // ✅ NUEVO: Borde rojo para elementos bloqueados
+          : isSelected 
+            ? '1px dashed #3b82f6' 
+            : finalStyles.borderWidth === '0' || finalStyles.borderStyle === 'none'
+              ? '1px dashed rgba(156, 163, 175, 0.3)'
+              : `${finalStyles.borderWidth} ${finalStyles.borderStyle} ${finalStyles.borderColor}`,
+      
+      // ✅ MODIFICADO: Fondo diferente para elementos bloqueados
+      backgroundColor: isLocked
+        ? 'rgba(220, 38, 38, 0.05)' // ✅ NUEVO: Fondo rojizo para elementos bloqueados
+        : isSelected && finalStyles.backgroundColor === 'transparent' 
+          ? 'rgba(59, 130, 246, 0.02)' 
+          : finalStyles.backgroundColor,
+      
+      // ✅ MODIFICADO: Sombra diferente para elementos bloqueados
+      boxShadow: isLocked
+        ? '0 0 0 1px rgba(220, 38, 38, 0.3), inset 0 0 0 1px rgba(220, 38, 38, 0.1)' // ✅ NUEVO: Sombra roja
         : isSelected 
-          ? '1px dashed #3b82f6' 
-          : finalStyles.borderWidth === '0' || finalStyles.borderStyle === 'none'
-            ? '1px dashed rgba(156, 163, 175, 0.3)'
-            : `${finalStyles.borderWidth} ${finalStyles.borderStyle} ${finalStyles.borderColor}`,
+          ? '0 0 0 1px rgba(59, 130, 246, 0.3), ' + (finalStyles.boxShadow || 'none')
+          : finalStyles.boxShadow || 'none',
       
-      backgroundColor: isSelected && finalStyles.backgroundColor === 'transparent' 
-        ? 'rgba(59, 130, 246, 0.02)' 
-        : finalStyles.backgroundColor,
-      
-      boxShadow: isSelected 
-        ? '0 0 0 1px rgba(59, 130, 246, 0.3), ' + (finalStyles.boxShadow || 'none')
-        : finalStyles.boxShadow || 'none'
+      // ✅ NUEVO: Opacidad reducida para elementos bloqueados
+      opacity: isLocked ? (finalStyles.opacity || 1) * 0.7 : (finalStyles.opacity || 1)
     };
   },
 
@@ -99,7 +120,7 @@ export const textBoxStyles = {
     resize: 'none',
     overflow: 'auto',
     zIndex: 1001,
-    // ✅ IMPORTANTE: El textarea NO debe heredar la rotación
+    // El textarea NO debe heredar la rotación
     transform: 'none',
     transformOrigin: 'center center'
   }),
@@ -134,7 +155,7 @@ export const textBoxStyles = {
     pointerEvents: 'none',
     zIndex: 2000,
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-    // ✅ Tooltip sin transformaciones
+    // Tooltip sin transformaciones
     transform: 'none'
   }),
 
@@ -151,7 +172,30 @@ export const textBoxStyles = {
     zIndex: 2000,
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
     pointerEvents: 'auto',
-    // ✅ Handles sin transformaciones
+    // Handles sin transformaciones
     transform: 'none'
-  })
+  }),
+
+  // ✅ NUEVO: Indicador de bloqueo
+  lockIndicator: {
+    position: 'absolute',
+    top: '-8px',
+    right: '-8px',
+    width: '20px',
+    height: '20px',
+    background: '#dc2626',
+    color: 'white',
+    border: '2px solid white',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '10px',
+    fontWeight: 'bold',
+    zIndex: 2001,
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+    pointerEvents: 'none',
+    // Sin transformaciones para que siempre sea visible
+    transform: 'none'
+  }
 };
