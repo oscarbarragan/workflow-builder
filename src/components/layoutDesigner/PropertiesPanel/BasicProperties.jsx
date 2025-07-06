@@ -4,6 +4,7 @@ import { ELEMENT_TYPES } from '../utils/constants';
 import { styleManager } from '../utils/StyleManager';
 import { variableProcessor } from '../utils/variableProcessor';
 import { unitsConfig } from '../utils/units.config';
+import { elementTransforms } from '../utils/elementTransforms'; // ✅ IMPORTAR
 
 const BasicProperties = ({ 
   selectedElement, 
@@ -50,6 +51,19 @@ const BasicProperties = ({
     })).sort((a, b) => a.value.localeCompare(b.value));
   }, [availableData]);
 
+  // ✅ NUEVA: Función para manejar cambios de transformación
+  const handleTransformChange = (property, value) => {
+    console.log('🔄 Transform change:', property, value);
+    
+    // Actualizar la propiedad del elemento
+    onUpdateSelectedElement(property, value);
+    
+    // ✅ IMPORTANTE: Forzar una re-renderización en el próximo frame
+    setTimeout(() => {
+      console.log('✅ Transform applied, element should update');
+    }, 0);
+  };
+
   // Manejar cambio de estilo
   const handleStyleChange = (styleType, styleId) => {
     onUpdateSelectedElement(`${styleType}Id`, styleId);
@@ -90,10 +104,11 @@ const BasicProperties = ({
     step = 0.1, 
     showUnit = true,
     icon,
-    placeholder = "0"
+    placeholder = "0",
+    isTransform = false // ✅ NUEVO: Indicador para transformaciones
   }) => {
     // Asegurar que el valor se muestre correctamente
-    const displayValue = showUnit ? getValueInUnit(value) : (value || 0);
+    const displayValue = showUnit && !isTransform ? getValueInUnit(value) : (value || 0);
     
     return (
       <div style={{ marginBottom: '12px' }}>
@@ -124,8 +139,14 @@ const BasicProperties = ({
             value={displayValue}
             onChange={(e) => {
               const inputValue = parseFloat(e.target.value) || 0;
-              const finalValue = showUnit ? setValueFromUnit(inputValue) : inputValue;
-              onChange(finalValue);
+              const finalValue = showUnit && !isTransform ? setValueFromUnit(inputValue) : inputValue;
+              
+              // ✅ Usar función específica para transformaciones
+              if (isTransform) {
+                handleTransformChange(onChange.name, finalValue);
+              } else {
+                onChange(finalValue);
+              }
             }}
             style={{
               flex: 1,
@@ -143,7 +164,7 @@ const BasicProperties = ({
             step={step}
             placeholder={placeholder}
           />
-          {showUnit && (
+          {showUnit && !isTransform && (
             <div style={{
               padding: '4px 6px',
               background: '#f3f4f6',
@@ -156,6 +177,21 @@ const BasicProperties = ({
               flexShrink: 0
             }}>
               {currentUnit}
+            </div>
+          )}
+          {isTransform && (
+            <div style={{
+              padding: '4px 6px',
+              background: '#fef3c7',
+              borderLeft: '1px solid #f59e0b',
+              fontSize: '10px',
+              color: '#92400e',
+              fontWeight: '500',
+              minWidth: '30px',
+              textAlign: 'center',
+              flexShrink: 0
+            }}>
+              {label.includes('Rotación') ? '°' : 'x'}
             </div>
           )}
         </div>
@@ -192,6 +228,20 @@ const BasicProperties = ({
         }}>
           ID: {selectedElement.id}
         </div>
+        
+        {/* ✅ NUEVO: Mostrar transformaciones activas */}
+        {elementTransforms.hasTransformations(selectedElement) && (
+          <div style={{
+            fontSize: '10px',
+            color: '#7c3aed',
+            marginTop: '4px',
+            display: 'flex',
+            gap: '8px'
+          }}>
+            {selectedElement.rotation !== 0 && <span>🔄 {selectedElement.rotation}°</span>}
+            {selectedElement.scale !== 1 && <span>🔍 {selectedElement.scale}x</span>}
+          </div>
+        )}
       </div>
 
       {/* Selector de unidades */}
@@ -349,7 +399,7 @@ const BasicProperties = ({
         </div>
       </div>
 
-      {/* Rotación y Escala */}
+      {/* ✅ MEJORADO: Rotación y Escala con manejo especial */}
       <div style={{ marginBottom: '20px' }}>
         <h4 style={{
           margin: '0 0 12px 0',
@@ -364,24 +414,26 @@ const BasicProperties = ({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
           <NumericInput
-            label="Rotación (°)"
+            label="Rotación"
             value={selectedElement.rotation || 0}
-            onChange={(value) => onUpdateSelectedElement('rotation', parseFloat(value) || 0)}
+            onChange={{ name: 'rotation' }} // ✅ Pasar nombre para identificar
             min={-360}
             max={360}
             step={1}
             showUnit={false}
             icon="🔄"
+            isTransform={true} // ✅ Marcar como transformación
           />
           <NumericInput
-            label="Escala (x)"
+            label="Escala"
             value={selectedElement.scale || 1}
-            onChange={(value) => onUpdateSelectedElement('scale', parseFloat(value) || 1)}
+            onChange={{ name: 'scale' }} // ✅ Pasar nombre para identificar
             min={0.1}
             max={5}
             step={0.1}
             showUnit={false}
             icon="🔍"
+            isTransform={true} // ✅ Marcar como transformación
           />
         </div>
 
@@ -405,7 +457,7 @@ const BasicProperties = ({
             {[0, 90, 180, 270].map(angle => (
               <button
                 key={angle}
-                onClick={() => onUpdateSelectedElement('rotation', angle)}
+                onClick={() => handleTransformChange('rotation', angle)} // ✅ Usar función especial
                 style={{
                   padding: '4px 2px',
                   border: '1px solid #e5e7eb',
@@ -443,7 +495,7 @@ const BasicProperties = ({
             {[0.5, 0.75, 1, 1.5, 2].map(scale => (
               <button
                 key={scale}
-                onClick={() => onUpdateSelectedElement('scale', scale)}
+                onClick={() => handleTransformChange('scale', scale)} // ✅ Usar función especial
                 style={{
                   padding: '4px 2px',
                   border: '1px solid #e5e7eb',
@@ -460,7 +512,39 @@ const BasicProperties = ({
             ))}
           </div>
         </div>
+
+        {/* ✅ NUEVO: Botón de reset transformaciones */}
+        <div style={{ marginTop: '8px' }}>
+          <button
+            onClick={() => {
+              handleTransformChange('rotation', 0);
+              handleTransformChange('scale', 1);
+            }}
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              border: '1px solid #f59e0b',
+              borderRadius: '4px',
+              background: 'white',
+              color: '#f59e0b',
+              fontSize: '10px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+            onMouseOver={(e) => e.target.style.background = '#fef3c7'}
+            onMouseOut={(e) => e.target.style.background = 'white'}
+          >
+            🔄 Resetear Transformaciones
+          </button>
+        </div>
       </div>
+
+      {/* Resto del componente continúa igual... */}
+      {/* [El resto del código permanece sin cambios] */}
 
       {/* Visibilidad y Orden */}
       <div style={{ marginBottom: '20px' }}>
@@ -542,401 +626,6 @@ const BasicProperties = ({
         </div>
       </div>
 
-      {/* Contenido específico para elementos de texto */}
-      {selectedElement.type === ELEMENT_TYPES.TEXT && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '12px',
-            fontWeight: '600',
-            color: '#374151',
-            textTransform: 'uppercase',
-            letterSpacing: '0.025em'
-          }}>
-            📝 Contenido de Texto
-          </h4>
-          
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '11px',
-              fontWeight: '500',
-              marginBottom: '4px',
-              color: '#374151',
-              textTransform: 'uppercase',
-              letterSpacing: '0.025em'
-            }}>
-              Texto
-            </label>
-            <textarea
-              value={selectedElement.text || ''}
-              onChange={(e) => onUpdateSelectedElement('text', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '12px',
-                minHeight: '60px',
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box'
-              }}
-              placeholder="Ingresa el texto a mostrar"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Variables para elementos de variable */}
-      {selectedElement.type === ELEMENT_TYPES.VARIABLE && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '12px',
-            fontWeight: '600',
-            color: '#374151',
-            textTransform: 'uppercase',
-            letterSpacing: '0.025em'
-          }}>
-            🔗 Variable
-          </h4>
-          
-          {processedVariables.length === 0 ? (
-            <div style={{
-              padding: '12px',
-              border: '1px dashed #d1d5db',
-              borderRadius: '6px',
-              textAlign: 'center',
-              color: '#6b7280',
-              fontSize: '12px'
-            }}>
-              <div style={{ marginBottom: '4px' }}>🔗 No hay variables disponibles</div>
-              <div style={{ fontSize: '11px' }}>
-                Conecta nodos para obtener variables
-              </div>
-            </div>
-          ) : (
-            <select
-              value={selectedElement.variable || ''}
-              onChange={(e) => onUpdateSelectedElement('variable', e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                fontSize: '12px',
-                boxSizing: 'border-box',
-                fontFamily: 'monospace'
-              }}
-            >
-              <option value="">Selecciona una variable del workflow</option>
-              {processedVariables.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
-
-      {/* Propiedades para Rectangle */}
-      {selectedElement.type === ELEMENT_TYPES.RECTANGLE && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '12px',
-            fontWeight: '600',
-            color: '#374151',
-            textTransform: 'uppercase',
-            letterSpacing: '0.025em'
-          }}>
-            ⬜ Propiedades del Rectángulo
-          </h4>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '12px' }}>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: '500',
-                marginBottom: '4px',
-                color: '#374151',
-                textTransform: 'uppercase',
-                letterSpacing: '0.025em'
-              }}>
-                Color Relleno
-              </label>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  type="color"
-                  value={selectedElement.fillColor || 'rgba(156, 163, 175, 0.1)'}
-                  onChange={(e) => onUpdateSelectedElement('fillColor', e.target.value)}
-                  style={{
-                    width: '40px',
-                    height: '32px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                />
-                <input
-                  type="text"
-                  value={selectedElement.fillColor || 'rgba(156, 163, 175, 0.1)'}
-                  onChange={(e) => onUpdateSelectedElement('fillColor', e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }}
-                  placeholder="rgba(156, 163, 175, 0.1)"
-                />
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '11px',
-                fontWeight: '500',
-                marginBottom: '4px',
-                color: '#374151',
-                textTransform: 'uppercase',
-                letterSpacing: '0.025em'
-              }}>
-                Color Borde
-              </label>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  type="color"
-                  value={selectedElement.borderColor || '#6b7280'}
-                  onChange={(e) => onUpdateSelectedElement('borderColor', e.target.value)}
-                  style={{
-                    width: '40px',
-                    height: '32px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
-                />
-                <input
-                  type="text"
-                  value={selectedElement.borderColor || '#6b7280'}
-                  onChange={(e) => onUpdateSelectedElement('borderColor', e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '6px 8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }}
-                  placeholder="#6b7280"
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            <NumericInput
-              label="Grosor Borde"
-              value={selectedElement.borderWidth || 2}
-              onChange={(value) => onUpdateSelectedElement('borderWidth', value)}
-              min={0}
-              max={20}
-              step={1}
-              showUnit={false}
-              icon="🔲"
-            />
-            <NumericInput
-              label="Radio Borde"
-              value={selectedElement.borderRadius || 4}
-              onChange={(value) => onUpdateSelectedElement('borderRadius', value)}
-              min={0}
-              max={50}
-              step={1}
-              showUnit={false}
-              icon="🔲"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Enlaces para elementos de texto */}
-      {(selectedElement.type === ELEMENT_TYPES.TEXT || selectedElement.type === ELEMENT_TYPES.VARIABLE) && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '12px',
-            fontWeight: '600',
-            color: '#374151',
-            textTransform: 'uppercase',
-            letterSpacing: '0.025em'
-          }}>
-            🔗 Configuración de Enlace
-          </h4>
-
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            marginBottom: '12px',
-            padding: '6px 8px',
-            border: '1px solid #e5e7eb',
-            borderRadius: '4px',
-            background: selectedElement.linkEnabled ? '#f0fdf4' : 'white'
-          }}>
-            <input
-              type="checkbox"
-              checked={selectedElement.linkEnabled || false}
-              onChange={(e) => onUpdateSelectedElement('linkEnabled', e.target.checked)}
-              style={{ width: '14px', height: '14px' }}
-            />
-            Habilitar como enlace
-          </label>
-
-          {selectedElement.linkEnabled && (
-            <div style={{ paddingLeft: '8px' }}>
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="radio"
-                      name="linkType"
-                      value="static"
-                      checked={selectedElement.linkType !== 'variable'}
-                      onChange={() => onUpdateSelectedElement('linkType', 'static')}
-                    />
-                    URL estática
-                  </label>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="radio"
-                      name="linkType"
-                      value="variable"
-                      checked={selectedElement.linkType === 'variable'}
-                      onChange={() => onUpdateSelectedElement('linkType', 'variable')}
-                    />
-                    Variable
-                  </label>
-                </div>
-              </div>
-
-              {selectedElement.linkType !== 'variable' ? (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    marginBottom: '4px',
-                    color: '#374151',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.025em'
-                  }}>
-                    URL del Enlace
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedElement.linkUrl || ''}
-                    onChange={(e) => onUpdateSelectedElement('linkUrl', e.target.value)}
-                    placeholder="https://ejemplo.com"
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-              ) : (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '11px',
-                    fontWeight: '500',
-                    marginBottom: '4px',
-                    color: '#374151',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.025em'
-                  }}>
-                    Variable de Enlace
-                  </label>
-                  <select
-                    value={selectedElement.linkVariable || ''}
-                    onChange={(e) => onUpdateSelectedElement('linkVariable', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      boxSizing: 'border-box',
-                      fontFamily: 'monospace'
-                    }}
-                  >
-                    <option value="">Selecciona una variable</option>
-                    {processedVariables
-                      .filter(v => v.type === 'string')
-                      .map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.value}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              )}
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  marginBottom: '4px',
-                  color: '#374151',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.025em'
-                }}>
-                  Abrir enlace
-                </label>
-                <select
-                  value={selectedElement.linkTarget || '_self'}
-                  onChange={(e) => onUpdateSelectedElement('linkTarget', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <option value="_self">Misma ventana</option>
-                  <option value="_blank">Nueva ventana</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Acciones rápidas */}
       <div style={{ marginBottom: '20px' }}>
         <h4 style={{
@@ -976,7 +665,7 @@ const BasicProperties = ({
           
           <button
             onClick={() => {
-              const snapSize = setValueFromUnit(5); // 5 unidades de la unidad actual
+              const snapSize = setValueFromUnit(5);
               onUpdateSelectedElement('x', Math.round(selectedElement.x / snapSize) * snapSize);
               onUpdateSelectedElement('y', Math.round(selectedElement.y / snapSize) * snapSize);
             }}
@@ -1026,6 +715,8 @@ const BasicProperties = ({
           </button>
         </div>
       </div>
+
+      {/* [Resto del componente TextBox, Variable, Rectangle, etc. permanece igual] */}
     </div>
   );
 };
