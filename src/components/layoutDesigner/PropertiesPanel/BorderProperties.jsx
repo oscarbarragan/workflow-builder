@@ -1,180 +1,99 @@
-// src/components/layoutDesigner/PropertiesPanel/BasicProperties.jsx
-import React from 'react';
-import { ELEMENT_TYPES } from '../utils/constants';
+// src/components/layoutDesigner/PropertiesPanel/BorderProperties.jsx
+import React, { useState } from 'react';
 import { styleManager } from '../utils/StyleManager';
-import { variableProcessor } from '../utils/variableProcessor';
+import { propertiesConfig } from './properties.config';
 
-const BasicProperties = ({ 
+const BorderProperties = ({ 
   selectedElement, 
-  onUpdateSelectedElement, 
-  availableData = {},
-  onStyleChanged // Nuevo prop para notificar cambios de estilo
+  onUpdateSelectedElement,
+  onStyleCreated
 }) => {
-  // Procesar variables para opciones
-  const processedVariables = React.useMemo(() => {
-    const processed = variableProcessor.processAvailableVariables(availableData);
-    return Object.entries(processed).map(([key, value]) => ({
-      value: key,
-      label: `${key} (${value.type}) - ${value.displayValue.length > 30 ? value.displayValue.substring(0, 30) + '...' : value.displayValue}`,
-      type: value.type,
-      displayValue: value.displayValue
-    })).sort((a, b) => a.value.localeCompare(b.value));
-  }, [availableData]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newStyleName, setNewStyleName] = useState('');
+  const [newStyleCategory, setNewStyleCategory] = useState('custom');
 
-  // Manejar cambio de estilo y cargar configuración
-  const handleStyleChange = (styleType, styleId) => {
-    onUpdateSelectedElement(`${styleType}Id`, styleId);
+  const { borderConfig } = propertiesConfig;
+
+  // ✅ CORREGIDO: Obtener el estilo actual del borde con valores por defecto
+  const getCurrentBorderStyle = () => {
+    if (selectedElement.borderStyleId) {
+      const style = styleManager.getBorderStyle(selectedElement.borderStyleId);
+      if (style) return style;
+    }
     
-    if (styleId && styleManager) {
-      let style = null;
-      switch (styleType) {
-        case 'textStyle':
-          style = styleManager.getTextStyle(styleId);
-          break;
-        case 'paragraphStyle':
-          style = styleManager.getParagraphStyle(styleId);
-          break;
-        case 'borderStyle':
-          style = styleManager.getBorderStyle(styleId);
-          break;
-        case 'fillStyle':
-          style = styleManager.getFillStyle(styleId);
-          break;
+    // Combinar estilo del elemento con valores por defecto
+    const elementBorderStyle = selectedElement.borderStyle || {};
+    const defaultBorderStyle = {
+      width: 1,
+      style: 'solid',
+      color: '#d1d5db',
+      radius: 0,
+      sides: ['top', 'right', 'bottom', 'left']
+    };
+    
+    return { ...defaultBorderStyle, ...elementBorderStyle };
+  };
+
+  const currentStyle = getCurrentBorderStyle();
+
+  // ✅ CORREGIDO: Actualizar propiedad del estilo de borde con logging
+  const updateBorderStyleProperty = (property, value) => {
+    console.log('🔲 Updating border property:', property, 'to:', value);
+    
+    const newBorderStyle = { 
+      ...currentStyle, 
+      [property]: value 
+    };
+    
+    console.log('🔲 New border style:', newBorderStyle);
+    onUpdateSelectedElement('borderStyle', newBorderStyle);
+    
+    // ✅ NUEVO: Forzar re-render después de un breve delay
+    setTimeout(() => {
+      console.log('✅ Border style should be applied now');
+    }, 0);
+  };
+
+  // Crear nuevo estilo
+  const handleCreateStyle = () => {
+    if (!newStyleName.trim()) {
+      alert('Por favor ingresa un nombre para el estilo');
+      return;
+    }
+
+    const styleId = styleManager.generateStyleId('borderStyle');
+    const styleData = {
+      name: newStyleName.trim(),
+      category: newStyleCategory,
+      isCustom: true,
+      ...currentStyle
+    };
+
+    try {
+      styleManager.addBorderStyle(styleId, styleData);
+      
+      // Aplicar el nuevo estilo al elemento
+      onUpdateSelectedElement('borderStyleId', styleId);
+      
+      if (onStyleCreated) {
+        onStyleCreated('borderStyle', styleId);
       }
       
-      if (style) {
-        // Cargar configuración del estilo seleccionado
-        onUpdateSelectedElement(styleType, { ...style });
-        if (onStyleChanged) {
-          onStyleChanged(styleType, style);
-        }
-      }
+      setShowCreateModal(false);
+      setNewStyleName('');
+      console.log('✅ Border style created:', styleId);
+    } catch (error) {
+      console.error('❌ Error creating border style:', error);
+      alert('Error al crear el estilo');
     }
   };
 
-  const renderFormField = (label, field, type = 'text', options = {}) => {
-    const fieldStyle = {
-      width: '100%',
-      padding: '6px 8px',
-      border: '1px solid #d1d5db',
-      borderRadius: '4px',
-      fontSize: '12px',
-      boxSizing: 'border-box',
-      transition: 'border-color 0.2s'
-    };
-
-    const labelStyle = {
-      display: 'block',
-      fontSize: '12px',
-      fontWeight: '500',
-      marginBottom: '4px',
-      color: '#374151'
-    };
+  // Renderizar campo de propiedad
+  const renderProperty = (property, config) => {
+    const value = currentStyle[property] ?? config.default;
 
     return (
-      <div style={{ marginBottom: '12px' }}>
-        <label style={labelStyle}>
-          {label}
-          {options.unit && <span style={{ color: '#6b7280', fontSize: '11px' }}> ({options.unit})</span>}
-        </label>
-        
-        {type === 'select' ? (
-          <select
-            value={selectedElement[field] || options.default || ''}
-            onChange={(e) => onUpdateSelectedElement(field, e.target.value)}
-            style={fieldStyle}
-          >
-            {options.placeholder && (
-              <option value="">{options.placeholder}</option>
-            )}
-            {options.options?.map(option => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        ) : type === 'textarea' ? (
-          <textarea
-            value={selectedElement[field] || ''}
-            onChange={(e) => onUpdateSelectedElement(field, e.target.value)}
-            style={{
-              ...fieldStyle,
-              minHeight: '60px',
-              resize: 'vertical',
-              fontFamily: 'inherit'
-            }}
-            placeholder={options.placeholder}
-          />
-        ) : type === 'color' ? (
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <input
-              type="color"
-              value={selectedElement[field] || options.default || '#000000'}
-              onChange={(e) => onUpdateSelectedElement(field, e.target.value)}
-              style={{
-                width: '40px',
-                height: '32px',
-                border: '1px solid #d1d5db',
-                borderRadius: '4px',
-                cursor: 'pointer'
-              }}
-            />
-            <input
-              type="text"
-              value={selectedElement[field] || options.default || '#000000'}
-              onChange={(e) => onUpdateSelectedElement(field, e.target.value)}
-              style={{
-                ...fieldStyle,
-                flex: 1
-              }}
-              placeholder="#000000"
-            />
-          </div>
-        ) : type === 'boolean' ? (
-          <label style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            color: '#374151'
-          }}>
-            <input
-              type="checkbox"
-              checked={selectedElement[field] || false}
-              onChange={(e) => onUpdateSelectedElement(field, e.target.checked)}
-              style={{
-                width: '14px',
-                height: '14px',
-                cursor: 'pointer'
-              }}
-            />
-            {options.label || label}
-          </label>
-        ) : (
-          <input
-            type={type}
-            value={selectedElement[field] || (type === 'number' ? (options.default || 0) : '')}
-            onChange={(e) => {
-              const value = type === 'number' 
-                ? parseFloat(e.target.value) || options.default || 0
-                : e.target.value;
-              onUpdateSelectedElement(field, value);
-            }}
-            style={fieldStyle}
-            placeholder={options.placeholder}
-            min={options.min}
-            max={options.max}
-            step={options.step}
-          />
-        )}
-      </div>
-    );
-  };
-
-  const renderStyleSelector = (label, styleType, getAllStylesFunc, icon) => {
-    return (
-      <div style={{ marginBottom: '12px' }}>
+      <div key={property} style={{ marginBottom: '12px' }}>
         <label style={{
           display: 'block',
           fontSize: '12px',
@@ -182,672 +101,552 @@ const BasicProperties = ({
           marginBottom: '4px',
           color: '#374151'
         }}>
-          {icon} {label}
+          {config.label}
+          {config.unit && <span style={{ color: '#6b7280', fontSize: '11px' }}> ({config.unit})</span>}
         </label>
-        <select
-          value={selectedElement[`${styleType}Id`] || ''}
-          onChange={(e) => handleStyleChange(styleType, e.target.value || null)}
-          style={{
-            width: '100%',
-            padding: '6px 8px',
-            border: '1px solid #d1d5db',
-            borderRadius: '4px',
-            fontSize: '12px',
-            boxSizing: 'border-box'
-          }}
-        >
-          <option value="">Sin estilo aplicado</option>
-          {getAllStylesFunc().map(style => (
-            <option key={style.id} value={style.id}>
-              {style.name} {style.isCustom ? '(Custom)' : ''}
-            </option>
-          ))}
-        </select>
-        
-        {/* Mostrar configuración actual si hay estilo seleccionado */}
-        {selectedElement[`${styleType}Id`] && (
-          <div style={{
-            marginTop: '6px',
-            padding: '6px 8px',
-            background: '#f0fdf4',
-            border: '1px solid #bbf7d0',
-            borderRadius: '4px',
-            fontSize: '11px',
-            color: '#15803d'
-          }}>
-            ✅ Estilo aplicado: {styleManager[`get${styleType.charAt(0).toUpperCase() + styleType.slice(1)}`]?.(selectedElement[`${styleType}Id`])?.name || 'Desconocido'}
+
+        {config.type === 'select' && (
+          <select
+            value={value}
+            onChange={(e) => updateBorderStyleProperty(property, e.target.value)}
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '12px'
+            }}
+          >
+            {config.options.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {config.type === 'number' && (
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => updateBorderStyleProperty(property, parseFloat(e.target.value) || config.default)}
+            style={{
+              width: '100%',
+              padding: '6px 8px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              fontSize: '12px'
+            }}
+            min={config.min}
+            max={config.max}
+            step={config.step}
+          />
+        )}
+
+        {config.type === 'color' && (
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+              <input
+                type="color"
+                value={value === 'transparent' ? '#ffffff' : value}
+                onChange={(e) => updateBorderStyleProperty(property, e.target.value)}
+                style={{
+                  width: '40px',
+                  height: '32px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              />
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => updateBorderStyleProperty(property, e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '6px 8px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  fontSize: '12px'
+                }}
+                placeholder="transparent"
+              />
+            </div>
+            
+            {/* Colores predefinidos */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px' }}>
+              {config.presets?.map(preset => (
+                <button
+                  key={preset}
+                  onClick={() => updateBorderStyleProperty(property, preset)}
+                  style={{
+                    width: '30px',
+                    height: '25px',
+                    backgroundColor: preset === 'transparent' ? 'white' : preset,
+                    border: value === preset ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    backgroundImage: preset === 'transparent' 
+                      ? 'repeating-conic-gradient(#ccc 0% 25%, transparent 0% 50%) 50% / 8px 8px' 
+                      : 'none'
+                  }}
+                  title={preset}
+                >
+                  {preset === 'transparent' && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      fontSize: '8px',
+                      color: '#dc2626',
+                      fontWeight: 'bold'
+                    }}>
+                      ∅
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {config.type === 'multiselect' && property === 'sides' && (
+          <div>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(2, 1fr)', 
+              gap: '4px',
+              marginBottom: '8px'
+            }}>
+              {config.options.map(option => {
+                const currentSides = currentStyle.sides || ['top', 'right', 'bottom', 'left'];
+                const isSelected = currentSides.includes(option.value);
+                
+                return (
+                  <button
+                    key={option.value}
+                    onClick={() => {
+                      const newSides = isSelected 
+                        ? currentSides.filter(side => side !== option.value)
+                        : [...currentSides, option.value];
+                      console.log('🔲 Updating sides from', currentSides, 'to', newSides);
+                      updateBorderStyleProperty('sides', newSides);
+                    }}
+                    style={{
+                      padding: '8px 4px',
+                      border: '2px solid',
+                      borderColor: isSelected ? '#3b82f6' : '#d1d5db',
+                      borderRadius: '4px',
+                      background: isSelected ? '#eff6ff' : 'white',
+                      cursor: 'pointer',
+                      fontSize: '10px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '2px',
+                      transition: 'all 0.2s',
+                      fontWeight: isSelected ? '600' : '400'
+                    }}
+                    onMouseOver={(e) => {
+                      if (!isSelected) {
+                        e.target.style.backgroundColor = '#f8fafc';
+                        e.target.style.borderColor = '#9ca3af';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isSelected) {
+                        e.target.style.backgroundColor = 'white';
+                        e.target.style.borderColor = '#d1d5db';
+                      }
+                    }}
+                  >
+                    <span style={{ fontSize: '12px' }}>{option.icon}</span>
+                    <span>{option.label}</span>
+                    {isSelected && (
+                      <span style={{ 
+                        fontSize: '8px', 
+                        color: '#3b82f6',
+                        fontWeight: '600'
+                      }}>
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* ✅ NUEVO: Información de lados seleccionados */}
+            <div style={{
+              fontSize: '11px',
+              color: '#6b7280',
+              textAlign: 'center',
+              padding: '4px 8px',
+              background: '#f8fafc',
+              borderRadius: '4px',
+              border: '1px solid #e5e7eb'
+            }}>
+              {(() => {
+                const currentSides = currentStyle.sides || ['top', 'right', 'bottom', 'left'];
+                if (currentSides.length === 4) {
+                  return '🔲 Todos los lados seleccionados';
+                } else if (currentSides.length === 0) {
+                  return '⚪ Sin bordes seleccionados';
+                } else {
+                  const sideNames = {
+                    top: 'Arriba',
+                    right: 'Derecha', 
+                    bottom: 'Abajo',
+                    left: 'Izquierda'
+                  };
+                  return `🔘 ${currentSides.map(side => sideNames[side]).join(', ')}`;
+                }
+              })()}
+            </div>
           </div>
         )}
       </div>
     );
   };
 
-  return (
-    <div>
-      {/* Element Info */}
+  // Renderizar vista previa
+  const renderPreview = () => {
+    const previewStyles = {
+      width: '120px',
+      height: '80px',
+      margin: '0 auto',
+      borderRadius: `${currentStyle.radius || 0}px`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '12px',
+      color: '#374151',
+      fontWeight: '500',
+      background: '#f8fafc'
+    };
+
+    // Aplicar bordes según los lados seleccionados
+    const sides = currentStyle.sides || ['top', 'right', 'bottom', 'left'];
+    const borderStyle = `${currentStyle.width || 1}px ${currentStyle.style || 'solid'} ${currentStyle.color || '#000000'}`;
+    
+    if (sides.includes('top')) previewStyles.borderTop = borderStyle;
+    if (sides.includes('right')) previewStyles.borderRight = borderStyle;
+    if (sides.includes('bottom')) previewStyles.borderBottom = borderStyle;
+    if (sides.includes('left')) previewStyles.borderLeft = borderStyle;
+
+    return (
       <div style={{
-        background: '#eff6ff',
+        marginTop: '16px',
         padding: '12px',
+        border: '1px solid #e5e7eb',
         borderRadius: '6px',
-        marginBottom: '16px',
-        border: '1px solid #bfdbfe'
+        background: '#f8fafc'
       }}>
         <div style={{
-          fontSize: '12px',
-          color: '#1e40af',
-          fontWeight: '600',
-          marginBottom: '4px'
+          fontSize: '11px',
+          fontWeight: '500',
+          color: '#6b7280',
+          marginBottom: '12px',
+          textAlign: 'center'
         }}>
-          📝 Elemento seleccionado
+          Vista Previa del Borde
         </div>
-        <div style={{
-          fontSize: '14px',
-          color: '#1e40af',
-          marginBottom: '4px'
-        }}>
-          <strong>Tipo:</strong> {selectedElement.type}
-        </div>
-        <div style={{
-          fontSize: '12px',
-          color: '#3730a3'
-        }}>
-          <strong>ID:</strong> {selectedElement.id}
-        </div>
-      </div>
-
-      {/* Posición y Dimensiones */}
-      <div style={{ marginBottom: '20px' }}>
-        <h4 style={{
-          margin: '0 0 12px 0',
-          fontSize: '14px',
-          color: '#374151',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
-          📍 Posición y Dimensiones
-        </h4>
         
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          {renderFormField('Rotación X', 'rotationX', 'number', { min: -360, max: 360, step: 1, default: 0, unit: '°' })}
-          {renderFormField('Rotación Y', 'rotationY', 'number', { min: -360, max: 360, step: 1, default: 0, unit: '°' })}
-        </div>
-      </div>
-
-      {/* Contenido específico del elemento */}
-      {selectedElement.type === ELEMENT_TYPES.TEXT && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            color: '#374151',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            📝 Contenido de Texto
-          </h4>
-          
-          {renderFormField('Texto', 'text', 'textarea', {
-            placeholder: 'Ingresa el texto a mostrar'
-          })}
-          
-          {renderFormField('Padding', 'padding', 'text', {
-            placeholder: '8px 12px',
-            default: '8px 12px'
-          })}
-        </div>
-      )}
-
-      {/* Control de Enlaces para elementos de texto */}
-      {(selectedElement.type === ELEMENT_TYPES.TEXT || selectedElement.type === ELEMENT_TYPES.VARIABLE) && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            color: '#374151',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            🔗 Configuración de Enlace
-          </h4>
-          
-          {/* Habilitar enlace */}
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            cursor: 'pointer',
-            fontSize: '12px',
-            marginBottom: '12px'
-          }}>
-            <input
-              type="checkbox"
-              checked={selectedElement.linkEnabled || false}
-              onChange={(e) => onUpdateSelectedElement('linkEnabled', e.target.checked)}
-              style={{
-                width: '16px',
-                height: '16px',
-                cursor: 'pointer'
-              }}
-            />
-            Habilitar como enlace
-          </label>
-
-          {selectedElement.linkEnabled && (
-            <div>
-              {/* Tipo de enlace */}
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  marginBottom: '4px',
-                  color: '#374151'
-                }}>
-                  Tipo de Enlace
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="radio"
-                      name="linkType"
-                      value="static"
-                      checked={selectedElement.linkType !== 'variable'}
-                      onChange={(e) => onUpdateSelectedElement('linkType', 'static')}
-                    />
-                    Enlace estático
-                  </label>
-                  <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '11px',
-                    cursor: 'pointer'
-                  }}>
-                    <input
-                      type="radio"
-                      name="linkType"
-                      value="variable"
-                      checked={selectedElement.linkType === 'variable'}
-                      onChange={(e) => onUpdateSelectedElement('linkType', 'variable')}
-                    />
-                    Variable
-                  </label>
-                </div>
-              </div>
-
-              {/* URL estática */}
-              {selectedElement.linkType !== 'variable' && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    marginBottom: '4px',
-                    color: '#374151'
-                  }}>
-                    URL del Enlace
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedElement.linkUrl || ''}
-                    onChange={(e) => onUpdateSelectedElement('linkUrl', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      boxSizing: 'border-box'
-                    }}
-                    placeholder="https://ejemplo.com"
-                  />
-                </div>
-              )}
-
-              {/* Variable de enlace */}
-              {selectedElement.linkType === 'variable' && (
-                <div style={{ marginBottom: '12px' }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '12px',
-                    fontWeight: '500',
-                    marginBottom: '4px',
-                    color: '#374151'
-                  }}>
-                    Variable de Enlace
-                  </label>
-                  {processedVariables.filter(v => v.type === 'string').length === 0 ? (
-                    <div style={{
-                      padding: '8px 12px',
-                      border: '1px dashed #d1d5db',
-                      borderRadius: '4px',
-                      textAlign: 'center',
-                      color: '#6b7280',
-                      fontSize: '11px'
-                    }}>
-                      No hay variables de tipo string disponibles
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedElement.linkVariable || ''}
-                      onChange={(e) => onUpdateSelectedElement('linkVariable', e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '6px 8px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        boxSizing: 'border-box',
-                        fontFamily: 'monospace'
-                      }}
-                    >
-                      <option value="">Selecciona una variable</option>
-                      {processedVariables
-                        .filter(v => v.type === 'string')
-                        .map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.value}
-                          </option>
-                        ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              {/* Target del enlace */}
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  marginBottom: '4px',
-                  color: '#374151'
-                }}>
-                  Abrir enlace
-                </label>
-                <select
-                  value={selectedElement.linkTarget || '_self'}
-                  onChange={(e) => onUpdateSelectedElement('linkTarget', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }}
-                >
-                  <option value="_self">En la misma pestaña</option>
-                  <option value="_blank">En nueva pestaña</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Z-Index y propiedades de orden */}
-      <div style={{ marginBottom: '20px' }}>
-        <h4 style={{
-          margin: '0 0 12px 0',
-          fontSize: '14px',
-          color: '#374151',
-          fontWeight: '600',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px'
+        <div style={{
+          padding: '20px',
+          background: 'white',
+          borderRadius: '6px'
         }}>
-          📊 Orden y Visibilidad
-        </h4>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          {renderFormField('Z-Index', 'zIndex', 'number', {
-            min: 0, max: 9999, step: 1, default: 100
-          })}
-          {renderFormField('Opacidad', 'opacity', 'number', {
-            min: 0, max: 1, step: 0.01, default: 1
-          })}
-        </div>
-      </div>
-
-      {/* Propiedades para Rectangle */}
-      {selectedElement.type === ELEMENT_TYPES.RECTANGLE && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            color: '#374151',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
-          }}>
-            ⬜ Propiedades del Rectángulo
-          </h4>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-            {renderFormField('Color Relleno', 'fillColor', 'color', {
-              default: 'rgba(156, 163, 175, 0.1)'
-            })}
-            {renderFormField('Color Borde', 'borderColor', 'color', {
-              default: '#6b7280'
-            })}
-          </div>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {renderFormField('Grosor Borde', 'borderWidth', 'number', {
-              min: 0, max: 20, step: 1, default: 2, unit: 'px'
-            })}
-            {renderFormField('Radio Borde', 'borderRadius', 'number', {
-              min: 0, max: 50, step: 1, default: 4, unit: 'px'
-            })}
+          <div style={previewStyles}>
+            Ejemplo
           </div>
         </div>
-      )}
+      </div>
+    );
+  };
 
-      {/* Variable para elementos de variable */}
-      {selectedElement.type === ELEMENT_TYPES.VARIABLE && (
-        <div style={{ marginBottom: '20px' }}>
-          <h4 style={{
-            margin: '0 0 12px 0',
-            fontSize: '14px',
-            color: '#374151',
-            fontWeight: '600',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px'
+  // Modal para crear nuevo estilo
+  const renderCreateModal = () => {
+    if (!showCreateModal) return null;
+
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000
+      }}>
+        <div style={{
+          background: 'white',
+          padding: '20px',
+          borderRadius: '8px',
+          width: '300px',
+          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)'
+        }}>
+          <h3 style={{
+            margin: '0 0 16px 0',
+            fontSize: '16px',
+            color: '#374151'
           }}>
-            🔗 Variable
-          </h4>
-          
-          {processedVariables.length === 0 ? (
-            <div style={{
-              padding: '12px',
-              border: '1px dashed #d1d5db',
-              borderRadius: '6px',
-              textAlign: 'center',
-              color: '#6b7280',
-              fontSize: '12px'
+            🔲 Crear Border Style
+          </h3>
+
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: '500',
+              marginBottom: '4px',
+              color: '#374151'
             }}>
-              <div style={{ marginBottom: '4px' }}>🔗 No hay variables disponibles</div>
-              <div style={{ fontSize: '11px' }}>
-                Conecta nodos para obtener variables
-              </div>
-            </div>
-          ) : (
-            <select
-              value={selectedElement.variable || ''}
-              onChange={(e) => onUpdateSelectedElement('variable', e.target.value)}
+              Nombre del Estilo *
+            </label>
+            <input
+              type="text"
+              value={newStyleName}
+              onChange={(e) => setNewStyleName(e.target.value)}
+              placeholder="Ej: Mi Borde Personalizado"
               style={{
                 width: '100%',
                 padding: '6px 8px',
                 border: '1px solid #d1d5db',
                 borderRadius: '4px',
-                fontSize: '12px',
-                boxSizing: 'border-box',
-                fontFamily: 'monospace'
+                fontSize: '12px'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: '500',
+              marginBottom: '4px',
+              color: '#374151'
+            }}>
+              Categoría
+            </label>
+            <select
+              value={newStyleCategory}
+              onChange={(e) => setNewStyleCategory(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '6px 8px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '12px'
               }}
             >
-              <option value="">Selecciona una variable del workflow</option>
-              {processedVariables.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {borderConfig.categories.map(category => (
+                <option key={category.value} value={category.value}>
+                  {category.label}
                 </option>
               ))}
             </select>
-          )}
-        </div>
-      )}
+          </div>
 
-      {/* Aplicar Estilos Existentes */}
-      <div style={{ marginBottom: '20px' }}>
-        <h4 style={{
-          margin: '0 0 12px 0',
-          fontSize: '14px',
-          color: '#374151',
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '8px'
+          }}>
+            <button
+              onClick={() => setShowCreateModal(false)}
+              style={{
+                padding: '6px 12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                background: 'white',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreateStyle}
+              style={{
+                padding: '6px 12px',
+                border: 'none',
+                borderRadius: '4px',
+                background: '#059669',
+                color: 'white',
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
+            >
+              💾 Crear
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div style={{
+        background: '#f0f9ff',
+        padding: '12px',
+        borderRadius: '6px',
+        marginBottom: '16px',
+        border: '1px solid #0ea5e9'
+      }}>
+        <div style={{
+          fontSize: '12px',
+          color: '#0c4a6e',
           fontWeight: '600',
+          marginBottom: '4px',
           display: 'flex',
           alignItems: 'center',
           gap: '6px'
         }}>
-          🎨 Estilos Aplicados
-        </h4>
-
-        {/* Text Style */}
-        {(selectedElement.type === ELEMENT_TYPES.TEXT || selectedElement.type === ELEMENT_TYPES.VARIABLE) && 
-          renderStyleSelector('Text Style', 'textStyle', () => styleManager.getAllTextStyles(), '🔤')
-        }
-
-        {/* Paragraph Style */}
-        {selectedElement.type === ELEMENT_TYPES.TEXT && 
-          renderStyleSelector('Paragraph Style', 'paragraphStyle', () => styleManager.getAllParagraphStyles(), '📄')
-        }
-
-        {/* Border Style */}
-        {renderStyleSelector('Border Style', 'borderStyle', () => styleManager.getAllBorderStyles(), '🔲')}
-
-        {/* Fill Style */}
-        {renderStyleSelector('Fill Style', 'fillStyle', () => styleManager.getAllFillStyles(), '🎨')}
-      </div>
-
-      {/* Información de Estilos Aplicados */}
-      <div style={{ marginBottom: '16px' }}>
-        <h4 style={{
-          margin: '0 0 8px 0',
-          fontSize: '14px',
-          color: '#374151',
-          fontWeight: '600'
-        }}>
-          📋 Resumen de Estilos
-        </h4>
-        
+          🔲 Border Style Configuration
+        </div>
         <div style={{
-          background: 'white',
-          border: '1px solid #e5e7eb',
-          borderRadius: '6px',
-          padding: '12px'
-        }}>
-          {selectedElement.textStyleId && (
-            <div style={{
-              fontSize: '11px',
-              color: '#16a34a',
-              marginBottom: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>🔤</span>
-              <strong>Texto:</strong> {styleManager.getTextStyle(selectedElement.textStyleId)?.name || selectedElement.textStyleId}
-            </div>
-          )}
-          {selectedElement.paragraphStyleId && (
-            <div style={{
-              fontSize: '11px',
-              color: '#16a34a',
-              marginBottom: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>📄</span>
-              <strong>Párrafo:</strong> {styleManager.getParagraphStyle(selectedElement.paragraphStyleId)?.name || selectedElement.paragraphStyleId}
-            </div>
-          )}
-          {selectedElement.borderStyleId && (
-            <div style={{
-              fontSize: '11px',
-              color: '#16a34a',
-              marginBottom: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>🔲</span>
-              <strong>Borde:</strong> {styleManager.getBorderStyle(selectedElement.borderStyleId)?.name || selectedElement.borderStyleId}
-            </div>
-          )}
-          {selectedElement.fillStyleId && (
-            <div style={{
-              fontSize: '11px',
-              color: '#16a34a',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}>
-              <span>🎨</span>
-              <strong>Relleno:</strong> {styleManager.getFillStyle(selectedElement.fillStyleId)?.name || selectedElement.fillStyleId}
-            </div>
-          )}
-          
-          {!selectedElement.textStyleId && !selectedElement.paragraphStyleId && 
-           !selectedElement.borderStyleId && !selectedElement.fillStyleId && (
-            <div style={{
-              fontSize: '11px',
-              color: '#9ca3af',
-              fontStyle: 'italic',
-              textAlign: 'center',
-              padding: '8px'
-            }}>
-              Sin estilos aplicados desde el sidebar
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Acciones rápidas */}
-      <div style={{
-        paddingTop: '12px',
-        borderTop: '1px solid #e5e7eb'
-      }}>
-        <h4 style={{
-          margin: '0 0 8px 0',
-          fontSize: '14px',
-          color: '#374151',
-          fontWeight: '600'
-        }}>
-          ⚡ Acciones Rápidas
-        </h4>
-        
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <button
-            onClick={() => {
-              onUpdateSelectedElement('x', 0);
-              onUpdateSelectedElement('y', 0);
-            }}
-            style={{
-              padding: '6px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              background: 'white',
-              fontSize: '11px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            onMouseOver={(e) => e.target.style.background = '#f3f4f6'}
-            onMouseOut={(e) => e.target.style.background = 'white'}
-          >
-            📍 Mover a origen (0,0)
-          </button>
-          
-          <button
-            onClick={() => {
-              const snapSize = 20;
-              onUpdateSelectedElement('x', Math.round(selectedElement.x / snapSize) * snapSize);
-              onUpdateSelectedElement('y', Math.round(selectedElement.y / snapSize) * snapSize);
-            }}
-            style={{
-              padding: '6px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              background: 'white',
-              fontSize: '11px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            onMouseOver={(e) => e.target.style.background = '#f3f4f6'}
-            onMouseOut={(e) => e.target.style.background = 'white'}
-          >
-            🧲 Ajustar a cuadrícula
-          </button>
-
-          <button
-            onClick={() => {
-              // Limpiar referencias a estilos del sidebar
-              onUpdateSelectedElement('textStyleId', null);
-              onUpdateSelectedElement('paragraphStyleId', null);
-              onUpdateSelectedElement('borderStyleId', null);
-              onUpdateSelectedElement('fillStyleId', null);
-            }}
-            style={{
-              padding: '6px 10px',
-              border: '1px solid #dc2626',
-              borderRadius: '4px',
-              background: 'white',
-              color: '#dc2626',
-              fontSize: '11px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            onMouseOver={(e) => e.target.style.background = '#fef2f2'}
-            onMouseOut={(e) => e.target.style.background = 'white'}
-          >
-            🗑️ Quitar estilos aplicados
-          </button>
-        </div>
-      </div>
-
-      {/* Información sobre variables */}
-      <div style={{
-        marginTop: '16px',
-        padding: '12px',
-        background: '#f0fdf4',
-        border: '1px solid #bbf7d0',
-        borderRadius: '6px'
-      }}>
-        <div style={{
-          fontSize: '12px',
-          color: '#15803d',
-          fontWeight: '600',
-          marginBottom: '6px'
-        }}>
-          💡 Configuración de Estilos
-        </div>
-        <ul style={{
           fontSize: '11px',
-          color: '#15803d',
-          margin: 0,
-          paddingLeft: '16px',
-          lineHeight: '1.4'
+          color: '#0c4a6e'
         }}>
-          <li>Los <strong>estilos aplicados</strong> se cargan automáticamente al seleccionarlos</li>
-          <li>Usa las pestañas <strong>Text Style</strong>, <strong>Paragraph</strong>, etc. para crear nuevos estilos</li>
-          <li>Los cambios manuales sobrescriben temporalmente los estilos aplicados</li>
-          <li>Usa <strong>Ctrl+Espacio</strong> en texto para insertar variables</li>
-          <li>Los estilos creados se guardan automáticamente en el sidebar izquierdo</li>
-        </ul>
+          Configura grosor, estilo, color y radio de bordes
+        </div>
       </div>
+
+      {/* Botón para crear estilo */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '16px'
+      }}>
+        <h4 style={{
+          margin: 0,
+          fontSize: '14px',
+          color: '#374151',
+          fontWeight: '600'
+        }}>
+          Propiedades de Borde
+        </h4>
+        
+        <button
+          onClick={() => setShowCreateModal(true)}
+          style={{
+            background: '#059669',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            padding: '6px 10px',
+            fontSize: '11px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}
+        >
+          💾 Crear Border Style
+        </button>
+      </div>
+
+      {/* Propiedades principales */}
+      <div style={{ marginBottom: '16px' }}>
+        {/* Grosor */}
+        {renderProperty('width', {
+          label: 'Grosor',
+          type: 'number',
+          min: 0,
+          max: 50,
+          step: 1,
+          default: 1,
+          unit: 'px'
+        })}
+
+        {/* Estilo */}
+        {renderProperty('style', {
+          label: 'Estilo',
+          type: 'select',
+          options: [
+            { value: 'none', label: 'Sin borde' },
+            { value: 'solid', label: 'Sólido' },
+            { value: 'dashed', label: 'Punteado' },
+            { value: 'dotted', label: 'Puntos' },
+            { value: 'double', label: 'Doble' },
+            { value: 'groove', label: 'Biselado' },
+            { value: 'ridge', label: 'Relieve' },
+            { value: 'inset', label: 'Hundido' },
+            { value: 'outset', label: 'Elevado' }
+          ],
+          default: 'solid'
+        })}
+
+        {/* Color */}
+        {renderProperty('color', {
+          label: 'Color',
+          type: 'color',
+          default: '#000000',
+          presets: [
+            '#000000', '#808080', '#C0C0C0', '#FFFFFF',
+            '#FF0000', '#00FF00', '#0000FF', '#FFFF00'
+          ]
+        })}
+
+        {/* Radio */}
+        {renderProperty('radius', {
+          label: 'Radio',
+          type: 'number',
+          min: 0,
+          max: 100,
+          step: 1,
+          default: 0,
+          unit: 'px'
+        })}
+
+        {/* Lados */}
+        {renderProperty('sides', {
+          label: 'Lados',
+          type: 'multiselect',
+          options: [
+            { value: 'top', label: 'Arriba', icon: '⬆️' },
+            { value: 'right', label: 'Derecha', icon: '➡️' },
+            { value: 'bottom', label: 'Abajo', icon: '⬇️' },
+            { value: 'left', label: 'Izquierda', icon: '⬅️' }
+          ],
+          default: ['top', 'right', 'bottom', 'left']
+        })}
+      </div>
+
+      {/* Vista previa */}
+      {renderPreview()}
+
+      {/* Información del estilo actual */}
+      {selectedElement.borderStyleId && (
+        <div style={{
+          marginTop: '16px',
+          padding: '8px 12px',
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '4px'
+        }}>
+          <div style={{
+            fontSize: '11px',
+            color: '#15803d',
+            fontWeight: '600'
+          }}>
+            ✅ {styleManager.getBorderStyle(selectedElement.borderStyleId)?.name || 'Estilo aplicado'}
+          </div>
+        </div>
+      )}
+
+      {/* Modal */}
+      {renderCreateModal()}
     </div>
   );
 };
 
-export default BasicProperties;
+export default BorderProperties;

@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/components/TextBox/TextBox.styles.js
+// src/components/layoutDesigner/components/TextBox/TextBox.styles.js - CORREGIDO
 export const textBoxStyles = {
   container: (element, isSelected, isDragging, isEditing, finalStyles, isLocked = false) => {
     // Generar transform correctamente
@@ -16,7 +16,61 @@ export const textBoxStyles = {
     
     const transformString = transforms.length > 0 ? transforms.join(' ') : 'none';
     
-    // ✅ MODIFICADO: Cursor y interacciones basadas en el estado bloqueado
+    // ✅ NUEVO: Función para generar bordes selectivos
+    const generateSelectiveBorders = () => {
+      // Verificar si hay un estilo de borde aplicado
+      const borderStyle = element.borderStyle || finalStyles.borderStyle || {};
+      const borderStyleId = element.borderStyleId;
+      
+      // Si no hay estilo de borde, usar valores por defecto
+      if (!borderStyle.width && !borderStyleId) {
+        return isEditing 
+          ? { border: '2px solid #3b82f6' }
+          : isLocked
+            ? { border: '2px dashed #dc2626' }
+            : isSelected 
+              ? { border: '1px dashed #3b82f6' }
+              : { border: '1px dashed rgba(156, 163, 175, 0.3)' };
+      }
+      
+      // Obtener propiedades del borde
+      const width = borderStyle.width || 1;
+      const style = borderStyle.style || 'solid';
+      const color = borderStyle.color || '#d1d5db';
+      const sides = borderStyle.sides || ['top', 'right', 'bottom', 'left'];
+      
+      console.log('🔲 Applying selective borders:', { width, style, color, sides });
+      
+      // Aplicar bordes selectivos
+      const borderStyles = {};
+      
+      // Resetear todos los bordes primero
+      borderStyles.borderTop = 'none';
+      borderStyles.borderRight = 'none';
+      borderStyles.borderBottom = 'none';
+      borderStyles.borderLeft = 'none';
+      
+      // Aplicar solo los bordes seleccionados
+      const borderValue = `${width}px ${style} ${color}`;
+      
+      if (sides.includes('top')) {
+        borderStyles.borderTop = borderValue;
+      }
+      if (sides.includes('right')) {
+        borderStyles.borderRight = borderValue;
+      }
+      if (sides.includes('bottom')) {
+        borderStyles.borderBottom = borderValue;
+      }
+      if (sides.includes('left')) {
+        borderStyles.borderLeft = borderValue;
+      }
+      
+      console.log('✅ Generated border styles:', borderStyles);
+      return borderStyles;
+    };
+    
+    // Cursor y interacciones basadas en el estado bloqueado
     let cursor = 'grab';
     if (isLocked) {
       cursor = 'not-allowed';
@@ -26,7 +80,7 @@ export const textBoxStyles = {
       cursor = 'text';
     }
     
-    return {
+    const baseStyles = {
       position: 'absolute',
       left: element.x,
       top: element.y,
@@ -54,36 +108,36 @@ export const textBoxStyles = {
       transform: transformString,
       transformOrigin: 'center center',
       
+      // Aplicar estilos finales
       ...finalStyles,
       
-      // ✅ MODIFICADO: Bordes diferentes según el estado
-      border: isEditing 
-        ? '2px solid #3b82f6' 
-        : isLocked
-          ? '2px dashed #dc2626' // ✅ NUEVO: Borde rojo para elementos bloqueados
-          : isSelected 
-            ? '1px dashed #3b82f6' 
-            : finalStyles.borderWidth === '0' || finalStyles.borderStyle === 'none'
-              ? '1px dashed rgba(156, 163, 175, 0.3)'
-              : `${finalStyles.borderWidth} ${finalStyles.borderStyle} ${finalStyles.borderColor}`,
+      // ✅ CORREGIDO: Aplicar bordes selectivos
+      ...generateSelectiveBorders(),
       
-      // ✅ MODIFICADO: Fondo diferente para elementos bloqueados
+      // Radio de borde
+      borderRadius: (element.borderStyle?.radius !== undefined) 
+        ? `${element.borderStyle.radius}px`
+        : (finalStyles.borderRadius || '0'),
+      
+      // Fondo diferente para elementos bloqueados
       backgroundColor: isLocked
-        ? 'rgba(220, 38, 38, 0.05)' // ✅ NUEVO: Fondo rojizo para elementos bloqueados
+        ? 'rgba(220, 38, 38, 0.05)'
         : isSelected && finalStyles.backgroundColor === 'transparent' 
           ? 'rgba(59, 130, 246, 0.02)' 
           : finalStyles.backgroundColor,
       
-      // ✅ MODIFICADO: Sombra diferente para elementos bloqueados
+      // Sombra diferente para elementos bloqueados
       boxShadow: isLocked
-        ? '0 0 0 1px rgba(220, 38, 38, 0.3), inset 0 0 0 1px rgba(220, 38, 38, 0.1)' // ✅ NUEVO: Sombra roja
+        ? '0 0 0 1px rgba(220, 38, 38, 0.3), inset 0 0 0 1px rgba(220, 38, 38, 0.1)'
         : isSelected 
           ? '0 0 0 1px rgba(59, 130, 246, 0.3), ' + (finalStyles.boxShadow || 'none')
           : finalStyles.boxShadow || 'none',
       
-      // ✅ NUEVO: Opacidad reducida para elementos bloqueados
+      // Opacidad reducida para elementos bloqueados
       opacity: isLocked ? (finalStyles.opacity || 1) * 0.7 : (finalStyles.opacity || 1)
     };
+    
+    return baseStyles;
   },
 
   content: (elementStyle) => ({
@@ -176,7 +230,7 @@ export const textBoxStyles = {
     transform: 'none'
   }),
 
-  // ✅ NUEVO: Indicador de bloqueo
+  // Indicador de bloqueo
   lockIndicator: {
     position: 'absolute',
     top: '-8px',

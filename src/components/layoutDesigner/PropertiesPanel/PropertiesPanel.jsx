@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PropertiesPanel/PropertiesPanel.jsx
+// src/components/layoutDesigner/PropertiesPanel/PropertiesPanel.jsx - CORREGIDO
 import React, { useState } from 'react';
 import { ELEMENT_TYPES } from '../utils/constants';
 import BasicProperties from './BasicProperties';
@@ -27,14 +27,17 @@ const PropertiesPanel = ({
   // Manejar cambio de estilo aplicado desde Básico
   const handleStyleChanged = (styleType, styleData) => {
     console.log('🎨 Style applied from basic tab:', styleType, styleData);
-    // Aquí se podría agregar lógica adicional si es necesaria
   };
 
+  // ✅ CORREGIDO: Función renderTabContent que carga el componente correcto
   const renderTabContent = () => {
     if (!selectedElement) return null;
 
+    console.log('🔍 Rendering tab content for:', activeTab, 'element type:', selectedElement.type);
+
     switch (activeTab) {
       case 'basic':
+        console.log('📝 Loading BasicProperties');
         return (
           <BasicProperties
             selectedElement={selectedElement}
@@ -45,6 +48,7 @@ const PropertiesPanel = ({
         );
 
       case 'textStyle':
+        console.log('🔤 Loading TextStyleProperties');
         if (selectedElement.type === ELEMENT_TYPES.TEXT || selectedElement.type === ELEMENT_TYPES.VARIABLE) {
           return (
             <TextStyleProperties
@@ -68,6 +72,7 @@ const PropertiesPanel = ({
         );
 
       case 'paragraph':
+        console.log('📄 Loading ParagraphProperties');
         if (selectedElement.type === ELEMENT_TYPES.TEXT) {
           return (
             <ParagraphProperties
@@ -90,6 +95,8 @@ const PropertiesPanel = ({
         );
 
       case 'border':
+        console.log('🔲 Loading BorderProperties');
+        // ✅ CORREGIDO: BorderProperties debe estar disponible para todos los elementos
         return (
           <BorderProperties
             selectedElement={selectedElement}
@@ -99,6 +106,7 @@ const PropertiesPanel = ({
         );
 
       case 'fill':
+        console.log('🎨 Loading FillProperties');
         return (
           <FillProperties
             selectedElement={selectedElement}
@@ -108,6 +116,7 @@ const PropertiesPanel = ({
         );
 
       default:
+        console.warn('⚠️ Unknown tab:', activeTab);
         return (
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>❓</div>
@@ -115,7 +124,7 @@ const PropertiesPanel = ({
               Pestaña no encontrada
             </div>
             <div style={styles.emptyDescription}>
-              La pestaña seleccionada no existe
+              La pestaña seleccionada no existe: {activeTab}
             </div>
           </div>
         );
@@ -194,6 +203,12 @@ const PropertiesPanel = ({
     );
   };
 
+  // ✅ NUEVO: Función para manejar cambio de tab con logging
+  const handleTabChange = (tabId) => {
+    console.log('🔄 Changing tab from', activeTab, 'to', tabId);
+    setActiveTab(tabId);
+  };
+
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -205,16 +220,19 @@ const PropertiesPanel = ({
         {/* Información del elemento */}
         {selectedElement && renderElementInfo()}
         
-        {/* Tabs */}
+        {/* ✅ CORREGIDO: Tabs con mejor logging */}
         <div style={styles.tabContainer}>
           {availableTabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               style={styles.tab(activeTab === tab.id)}
               title={tab.description}
             >
               {tab.icon}
+              <span style={{ marginLeft: '4px', fontSize: '11px' }}>
+                {tab.label}
+              </span>
             </button>
           ))}
         </div>

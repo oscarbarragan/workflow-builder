@@ -1,7 +1,7 @@
-// src/components/layoutDesigner/components/Rectangle/Rectangle.styles.js
+// src/components/layoutDesigner/components/Rectangle/Rectangle.styles.js - CORREGIDO
 export const rectangleStyles = {
   container: (element, isSelected, isDragging) => {
-    // ✅ CORREGIDO: Generar transform correctamente
+    // Generar transform correctamente
     const transforms = [];
     
     // Aplicar rotación si existe
@@ -16,6 +16,60 @@ export const rectangleStyles = {
     
     const transformString = transforms.length > 0 ? transforms.join(' ') : 'none';
     
+    // ✅ NUEVO: Función para generar bordes selectivos para rectángulos
+    const generateSelectiveBorders = () => {
+      // Verificar si hay un estilo de borde aplicado
+      const borderStyle = element.borderStyle || {};
+      const borderStyleId = element.borderStyleId;
+      
+      // Si no hay estilo de borde, usar valores por defecto del elemento
+      if (!borderStyle.width && !borderStyleId) {
+        const defaultBorderColor = isSelected ? '#3b82f6' : (element.borderColor || '#6b7280');
+        const defaultBorderWidth = element.borderWidth || 2;
+        const defaultBorderStyle = element.borderStyle || 'solid';
+        
+        return {
+          border: `${defaultBorderWidth}px ${defaultBorderStyle} ${defaultBorderColor}`
+        };
+      }
+      
+      // Obtener propiedades del borde del estilo
+      const width = borderStyle.width || element.borderWidth || 2;
+      const style = borderStyle.style || element.borderStyle || 'solid';
+      const color = borderStyle.color || element.borderColor || '#6b7280';
+      const sides = borderStyle.sides || ['top', 'right', 'bottom', 'left'];
+      
+      console.log('🔲 Rectangle applying selective borders:', { width, style, color, sides });
+      
+      // Aplicar bordes selectivos
+      const borderStyles = {};
+      
+      // Resetear todos los bordes primero
+      borderStyles.borderTop = 'none';
+      borderStyles.borderRight = 'none';
+      borderStyles.borderBottom = 'none';
+      borderStyles.borderLeft = 'none';
+      
+      // Aplicar solo los bordes seleccionados
+      const borderValue = `${width}px ${style} ${color}`;
+      
+      if (sides.includes('top')) {
+        borderStyles.borderTop = borderValue;
+      }
+      if (sides.includes('right')) {
+        borderStyles.borderRight = borderValue;
+      }
+      if (sides.includes('bottom')) {
+        borderStyles.borderBottom = borderValue;
+      }
+      if (sides.includes('left')) {
+        borderStyles.borderLeft = borderValue;
+      }
+      
+      console.log('✅ Rectangle generated border styles:', borderStyles);
+      return borderStyles;
+    };
+    
     return {
       position: 'absolute',
       left: element.x,
@@ -23,8 +77,11 @@ export const rectangleStyles = {
       width: element.width || 100,
       height: element.height || 50,
       background: element.fillColor || (isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(156, 163, 175, 0.1)'),
-      border: `${element.borderWidth || 2}px ${element.borderStyle || 'solid'} ${element.borderColor || (isSelected ? '#3b82f6' : '#6b7280')}`,
-      borderRadius: `${element.borderRadius || 4}px`,
+      
+      // ✅ CORREGIDO: Aplicar bordes selectivos
+      ...generateSelectiveBorders(),
+      
+      borderRadius: `${(element.borderStyle?.radius !== undefined) ? element.borderStyle.radius : (element.borderRadius || 4)}px`,
       cursor: isDragging && isSelected ? 'grabbing' : 'grab',
       userSelect: 'none',
       WebkitUserSelect: 'none',
@@ -40,7 +97,7 @@ export const rectangleStyles = {
         : '0 2px 4px rgba(0, 0, 0, 0.1)',
       opacity: element.opacity !== undefined ? element.opacity : 1,
       
-      // ✅ APLICAR TRANSFORMACIONES
+      // Aplicar transformaciones
       transform: transformString,
       transformOrigin: 'center center'
     };
@@ -72,7 +129,7 @@ export const rectangleStyles = {
     pointerEvents: 'none',
     zIndex: 2000,
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-    // ✅ Tooltip sin transformaciones
+    // Tooltip sin transformaciones
     transform: 'none'
   }),
 
@@ -89,12 +146,12 @@ export const rectangleStyles = {
     zIndex: 2000,
     boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
     pointerEvents: 'auto',
-    // ✅ Handles sin transformaciones
+    // Handles sin transformaciones
     transform: 'none'
   }),
 
   selectionBorder: (element) => {
-    // ✅ CORREGIDO: El borde de selección debe tener las mismas transformaciones
+    // El borde de selección debe tener las mismas transformaciones
     const transforms = [];
     
     if (element.rotation && element.rotation !== 0) {
@@ -114,7 +171,7 @@ export const rectangleStyles = {
       width: (element.width || 100) + 2,
       height: (element.height || 50) + 2,
       border: '1px dashed #3b82f6',
-      borderRadius: `${(element.borderRadius || 4) + 1}px`,
+      borderRadius: `${((element.borderStyle?.radius !== undefined) ? element.borderStyle.radius : (element.borderRadius || 4)) + 1}px`,
       pointerEvents: 'none',
       zIndex: 1500,
       opacity: 0.7,
