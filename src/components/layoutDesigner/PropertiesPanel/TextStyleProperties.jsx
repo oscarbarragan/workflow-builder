@@ -1,5 +1,5 @@
-// src/components/layoutDesigner/PropertiesPanel/TextStyleProperties.jsx - CORREGIDO
-import React, { useState } from 'react';
+// src/components/layoutDesigner/PropertiesPanel/TextStyleProperties.jsx - CORRECCIÓN FINAL
+import React, { useState, useEffect } from 'react';
 import { styleManager } from '../utils/StyleManager';
 import { propertiesConfig } from './properties.config';
 
@@ -10,46 +10,66 @@ const TextStyleProperties = ({
   onStyleCreated
 }) => {
   const [previewText, setPreviewText] = useState('Texto de ejemplo');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newStyleName, setNewStyleName] = useState('');
   const [newStyleCategory, setNewStyleCategory] = useState('custom');
 
+  // ✅ Estado para valores resueltos del estilo actual
+  const [currentValues, setCurrentValues] = useState({});
+  
+  // ✅ NUEVO: Estado para valores temporales de inputs (permite edición libre)
+  const [tempInputValues, setTempInputValues] = useState({});
+
   const { textStyleConfig } = propertiesConfig;
 
-  // Obtener el estilo actual del texto
-  const getCurrentTextStyle = () => {
+  // ✅ Resolver valores cada vez que cambie el elemento
+  useEffect(() => {
+    if (!selectedElement) return;
+
+    let values = {};
+
+    // Si hay un estilo aplicado, usar sus valores
     if (selectedElement.textStyleId) {
-      const style = styleManager.getTextStyle(selectedElement.textStyleId);
-      if (style) return style;
+      const appliedStyle = styleManager.getTextStyle(selectedElement.textStyleId);
+      if (appliedStyle) {
+        values = { ...appliedStyle };
+      }
     }
-    return selectedElement.textStyle || {};
-  };
 
-  const currentStyle = getCurrentTextStyle();
+    // Los valores locales del elemento siempre tienen prioridad
+    if (selectedElement.textStyle) {
+      values = { ...values, ...selectedElement.textStyle };
+    }
 
-  // ✅ CORREGIDO: Actualizar propiedad del estilo de texto
+    setCurrentValues(values);
+    
+    // ✅ NUEVO: Limpiar valores temporales cuando cambie el elemento
+    setTempInputValues({});
+    
+    console.log('🔤 Text style values resolved:', values);
+  }, [selectedElement, selectedElement?.textStyleId, selectedElement?.textStyle]);
+
+  // ✅ Función simple para actualizar propiedades
   const updateTextStyleProperty = (property, value) => {
     console.log('🔤 Updating text property:', property, 'to:', value);
     
+    // Siempre actualizar el objeto textStyle local del elemento
+    const currentTextStyle = selectedElement.textStyle || {};
     const newTextStyle = { 
-      ...currentStyle, 
+      ...currentTextStyle, 
       [property]: value 
     };
     
-    console.log('🔤 New text style:', newTextStyle);
     onUpdateSelectedElement('textStyle', newTextStyle);
-  };
+    console.log('✅ Text style updated locally:', newTextStyle);
 
-  // Procesar variables para enlaces
-  const processedVariables = React.useMemo(() => {
-    if (!availableData || Object.keys(availableData).length === 0) return [];
-    
-    return Object.entries(availableData).map(([key, value]) => ({
-      value: key,
-      label: `{{${key}}} - ${typeof value === 'string' ? value.substring(0, 30) : String(value).substring(0, 30)}`
-    }));
-  }, [availableData]);
+    // ✅ NUEVO: Limpiar valor temporal después de aplicar
+    setTempInputValues(prev => {
+      const updated = { ...prev };
+      delete updated[property];
+      return updated;
+    });
+  };
 
   // Crear nuevo estilo
   const handleCreateStyle = () => {
@@ -63,7 +83,7 @@ const TextStyleProperties = ({
       name: newStyleName.trim(),
       category: newStyleCategory,
       isCustom: true,
-      ...currentStyle
+      ...currentValues
     };
 
     try {
@@ -85,11 +105,55 @@ const TextStyleProperties = ({
     }
   };
 
-  // ✅ CORREGIDO: Renderizar campo de propiedad
+  // ✅ CORREGIDO: Renderizar campo de propiedad con inputs editables
   const renderProperty = (property, config) => {
-    const value = currentStyle[property];
-    // ✅ IMPORTANTE: No usar || para valores que pueden ser 0
-    const displayValue = value !== undefined && value !== null ? value : config.default;
+    // ✅ Obtener valor actual (temporal o resuelto)
+    const getCurrentValue = () => {
+      if (tempInputValues[property] !== undefined) {
+        return tempInputValues[property];
+      }
+      const value = currentValues[property];
+      return value !== undefined && value !== null ? value : config.default;
+    };
+
+    const currentValue = getCurrentValue();
+
+    // ✅ Manejar cambio de input numérico
+    const handleNumericChange = (inputValue) => {
+      console.log('📝 Input change:', property, inputValue);
+      setTempInputValues(prev => ({
+        ...prev,
+        [property]: inputValue
+      }));
+    };
+
+    // ✅ Manejar blur de input numérico
+    const handleNumericBlur = (inputValue) => {
+      console.log('🔚 Input blur:', property, inputValue);
+      
+      if (inputValue === '' || inputValue === null || inputValue === undefined) {
+        updateTextStyleProperty(property, config.default);
+      } else {
+        const numValue = parseFloat(inputValue);
+        if (!isNaN(numValue)) {
+          updateTextStyleProperty(property, numValue);
+        } else {
+          // Si no es un número válido, restaurar valor anterior
+          setTempInputValues(prev => {
+            const updated = { ...prev };
+            delete updated[property];
+            return updated;
+          });
+        }
+      }
+    };
+
+    // ✅ Manejar Enter para aplicar inmediatamente
+    const handleKeyPress = (e, inputValue) => {
+      if (e.key === 'Enter') {
+        e.target.blur(); // Trigger blur para aplicar valor
+      }
+    };
 
     return (
       <div key={property} style={{ marginBottom: '12px' }}>
@@ -106,7 +170,7 @@ const TextStyleProperties = ({
 
         {config.type === 'select' && (
           <select
-            value={displayValue}
+            value={currentValue}
             onChange={(e) => updateTextStyleProperty(property, e.target.value)}
             style={{
               width: '100%',
@@ -127,34 +191,10 @@ const TextStyleProperties = ({
         {config.type === 'number' && (
           <input
             type="number"
-            value={displayValue}
-            onChange={(e) => {
-              const inputValue = e.target.value;
-              
-              // ✅ CORREGIDO: Permitir campos vacíos temporalmente
-              if (inputValue === '') {
-                updateTextStyleProperty(property, '');
-                return;
-              }
-              
-              // Convertir a número
-              const numValue = parseFloat(inputValue);
-              if (!isNaN(numValue)) {
-                updateTextStyleProperty(property, numValue);
-              }
-            }}
-            onBlur={(e) => {
-              // ✅ CORREGIDO: Al perder el foco, asegurar valor válido
-              const inputValue = e.target.value;
-              if (inputValue === '' || inputValue === null || inputValue === undefined) {
-                updateTextStyleProperty(property, config.default);
-              } else {
-                const numValue = parseFloat(inputValue);
-                if (isNaN(numValue)) {
-                  updateTextStyleProperty(property, config.default);
-                }
-              }
-            }}
+            value={currentValue}
+            onChange={(e) => handleNumericChange(e.target.value)}
+            onBlur={(e) => handleNumericBlur(e.target.value)}
+            onKeyPress={(e) => handleKeyPress(e, e.target.value)}
             style={{
               width: '100%',
               padding: '6px 8px',
@@ -162,10 +202,10 @@ const TextStyleProperties = ({
               borderRadius: '4px',
               fontSize: '12px'
             }}
-            placeholder={String(config.default)}
             min={config.min}
             max={config.max}
             step={config.step}
+            placeholder={String(config.default)}
           />
         )}
 
@@ -173,7 +213,7 @@ const TextStyleProperties = ({
           <div style={{ display: 'flex', gap: '6px' }}>
             <input
               type="color"
-              value={displayValue}
+              value={currentValue}
               onChange={(e) => updateTextStyleProperty(property, e.target.value)}
               style={{
                 width: '40px',
@@ -185,7 +225,7 @@ const TextStyleProperties = ({
             />
             <input
               type="text"
-              value={displayValue}
+              value={currentValue}
               onChange={(e) => updateTextStyleProperty(property, e.target.value)}
               style={{
                 flex: 1,
@@ -196,24 +236,6 @@ const TextStyleProperties = ({
               }}
               placeholder="#000000"
             />
-            {/* Preset colors */}
-            <div style={{ display: 'flex', gap: '2px' }}>
-              {config.presets?.slice(0, 5).map(preset => (
-                <button
-                  key={preset}
-                  onClick={() => updateTextStyleProperty(property, preset)}
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    backgroundColor: preset,
-                    border: displayValue === preset ? '2px solid #3b82f6' : '1px solid #d1d5db',
-                    borderRadius: '3px',
-                    cursor: 'pointer'
-                  }}
-                  title={preset}
-                />
-              ))}
-            </div>
           </div>
         )}
 
@@ -223,11 +245,15 @@ const TextStyleProperties = ({
             alignItems: 'center',
             gap: '6px',
             cursor: 'pointer',
-            fontSize: '12px'
+            fontSize: '12px',
+            padding: '8px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '4px',
+            background: currentValue ? '#eff6ff' : 'white'
           }}>
             <input
               type="checkbox"
-              checked={displayValue || false}
+              checked={currentValue || false}
               onChange={(e) => updateTextStyleProperty(property, e.target.checked)}
               style={{
                 width: '16px',
@@ -238,153 +264,22 @@ const TextStyleProperties = ({
             {config.label}
           </label>
         )}
-
-        {config.type === 'text' && property === 'link' && (
-          <div>
-            {/* Habilitar hipervínculo */}
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              marginBottom: '8px'
-            }}>
-              <input
-                type="checkbox"
-                checked={currentStyle.linkEnabled || false}
-                onChange={(e) => updateTextStyleProperty('linkEnabled', e.target.checked)}
-                style={{
-                  width: '16px',
-                  height: '16px',
-                  cursor: 'pointer'
-                }}
-              />
-              Habilitar como hipervínculo
-            </label>
-
-            {currentStyle.linkEnabled && (
-              <div>
-                {/* Tipo de enlace */}
-                <div style={{ marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '8px' }}>
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '11px',
-                      cursor: 'pointer'
-                    }}>
-                      <input
-                        type="radio"
-                        name="linkType"
-                        value="static"
-                        checked={currentStyle.linkType !== 'variable'}
-                        onChange={() => updateTextStyleProperty('linkType', 'static')}
-                      />
-                      URL estática
-                    </label>
-                    <label style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '11px',
-                      cursor: 'pointer'
-                    }}>
-                      <input
-                        type="radio"
-                        name="linkType"
-                        value="variable"
-                        checked={currentStyle.linkType === 'variable'}
-                        onChange={() => updateTextStyleProperty('linkType', 'variable')}
-                      />
-                      Variable
-                    </label>
-                  </div>
-                </div>
-
-                {/* URL estática */}
-                {currentStyle.linkType !== 'variable' && (
-                  <input
-                    type="text"
-                    value={currentStyle.linkUrl || ''}
-                    onChange={(e) => updateTextStyleProperty('linkUrl', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      marginBottom: '8px'
-                    }}
-                    placeholder="https://ejemplo.com"
-                  />
-                )}
-
-                {/* Variable de enlace */}
-                {currentStyle.linkType === 'variable' && (
-                  <select
-                    value={currentStyle.linkVariable || ''}
-                    onChange={(e) => updateTextStyleProperty('linkVariable', e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '6px 8px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                      marginBottom: '8px',
-                      fontFamily: 'monospace'
-                    }}
-                  >
-                    <option value="">Selecciona una variable</option>
-                    {processedVariables
-                      .filter(v => v.type === 'string')
-                      .map(variable => (
-                        <option key={variable.value} value={variable.value}>
-                          {variable.value}
-                        </option>
-                      ))}
-                  </select>
-                )}
-
-                {/* Target del enlace */}
-                <select
-                  value={currentStyle.linkTarget || '_self'}
-                  onChange={(e) => updateTextStyleProperty('linkTarget', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '6px 8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px'
-                  }}
-                >
-                  <option value="_self">Misma ventana</option>
-                  <option value="_blank">Nueva ventana</option>
-                </select>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     );
   };
 
-  // Renderizar vista previa
+  // Vista previa
   const renderPreview = () => {
     const previewStyles = {
-      fontFamily: currentStyle.fontFamily || 'Arial, sans-serif',
-      fontSize: `${(currentStyle.fontSize || 14)}px`,
-      color: currentStyle.color || '#000000',
-      fontWeight: currentStyle.bold ? 'bold' : 'normal',
-      fontStyle: currentStyle.italic ? 'italic' : 'normal',
+      fontFamily: currentValues.fontFamily || 'Arial, sans-serif',
+      fontSize: `${currentValues.fontSize || 14}px`,
+      color: currentValues.color || '#000000',
+      fontWeight: currentValues.bold ? 'bold' : 'normal',
+      fontStyle: currentValues.italic ? 'italic' : 'normal',
       textDecoration: [
-        currentStyle.underline ? 'underline' : '',
-        currentStyle.strikethrough ? 'line-through' : ''
-      ].filter(Boolean).join(' ') || 'none',
-      transform: (currentStyle.scale && currentStyle.scale !== 1) ? `scale(${currentStyle.scale})` : 'none',
-      transformOrigin: 'left center',
-      display: 'inline-block'
+        currentValues.underline ? 'underline' : '',
+        currentValues.strikethrough ? 'line-through' : ''
+      ].filter(Boolean).join(' ') || 'none'
     };
 
     return (
@@ -432,18 +327,6 @@ const TextStyleProperties = ({
             fontSize: '11px'
           }}
         />
-        
-        {/* Información actual */}
-        <div style={{
-          marginTop: '8px',
-          fontSize: '10px',
-          color: '#6b7280'
-        }}>
-          Tamaño: {currentStyle.fontSize || 14}px • Escala: {currentStyle.scale || 1}x
-          {currentStyle.scale && currentStyle.scale !== 1 && (
-            <span> → {Math.round((currentStyle.fontSize || 14) * (currentStyle.scale || 1))}px</span>
-          )}
-        </div>
       </div>
     );
   };
@@ -596,7 +479,7 @@ const TextStyleProperties = ({
           fontSize: '11px',
           color: '#92400e'
         }}>
-          Configura propiedades de texto y guárdalas como estilos reutilizables
+          Los cambios se aplican inmediatamente. Crea un estilo para reutilizar esta configuración.
         </div>
       </div>
 

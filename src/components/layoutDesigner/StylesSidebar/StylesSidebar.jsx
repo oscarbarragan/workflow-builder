@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/StylesSidebar/StylesSidebar.jsx - MEJORADO
+// src/components/layoutDesigner/StylesSidebar/StylesSidebar.jsx - SOLUCIÓN DEFINITIVA
 import React, { useState, useRef, useEffect } from 'react';
 import { styleManager } from '../utils/StyleManager';
 import { variableProcessor } from '../utils/variableProcessor';
@@ -14,7 +14,7 @@ const StylesSidebar = ({
   availableVariables = {},
   showVariableValues = false,
   onToggleVariableValues,
-  updateTrigger = 0
+  updateTrigger = 0 // ✅ Recibir trigger
 }) => {
   const [expandedSections, setExpandedSections] = useState({
     variables: sidebarConfig.sections.variables.expandedByDefault,
@@ -38,6 +38,7 @@ const StylesSidebar = ({
     return variableProcessor.processAvailableVariables(availableVariables);
   }, [availableVariables]);
 
+  // ✅ SOLUCIÓN: Actualizar cache cuando cambie el trigger
   useEffect(() => {
     console.log('🔄 StylesSidebar: Updating cached styles due to trigger:', updateTrigger);
     
@@ -67,13 +68,25 @@ const StylesSidebar = ({
     }));
   };
 
+  // ✅ SOLUCIÓN: Aplicar estilo y forzar actualización inmediata
   const handleApplyStyle = (styleType, styleId) => {
     if (onApplyStyle && selectedElement) {
+      console.log('🎨 Applying style from sidebar:', styleType, styleId);
       onApplyStyle(selectedElement.id, styleType, styleId);
+      
+      // ✅ Forzar re-render inmediato actualizando el cache
+      setTimeout(() => {
+        setCachedStyles({
+          textStyles: styleManager.getAllTextStyles(),
+          paragraphStyles: styleManager.getAllParagraphStyles(),
+          borderStyles: styleManager.getAllBorderStyles(),
+          fillStyles: styleManager.getAllFillStyles()
+        });
+      }, 50);
     }
   };
 
-  // ✅ NUEVO: Manejar duplicación de estilos
+  // Manejar duplicación de estilos
   const handleDuplicateStyle = (styleType, styleId, styleName) => {
     try {
       let originalStyle = null;
@@ -139,8 +152,6 @@ const StylesSidebar = ({
       });
 
       console.log('✅ Style duplicated successfully:', newStyleId);
-      
-      // Mostrar confirmación
       alert(`Estilo "${duplicatedStyle.name}" creado como copia de "${styleName}"`);
 
     } catch (error) {
@@ -150,7 +161,7 @@ const StylesSidebar = ({
   };
 
   const handleDeleteStyle = (styleType, styleId, styleName) => {
-    // ✅ MEJORADO: Verificar si el estilo está en uso
+    // Verificar si el estilo está en uso
     const isStyleInUse = () => {
       if (!selectedElement) return false;
       
@@ -174,13 +185,6 @@ const StylesSidebar = ({
 
     if (window.confirm(`¿Eliminar el estilo "${styleName}"?${inUseWarning}`)) {
       try {
-        // Si está en uso, desvincular del elemento seleccionado
-        if (isStyleInUse() && selectedElement) {
-          const styleIdField = `${styleType}Id`;
-          // Aquí deberías tener una función para actualizar el elemento
-          // onUpdateSelectedElement(styleIdField, null);
-        }
-
         switch(styleType) {
           case 'textStyle':
             styleManager.deleteTextStyle(styleId);
@@ -225,21 +229,6 @@ const StylesSidebar = ({
       }
     }
   };
-
-  const renderSectionHeader = (title, section, icon) => (
-    <div
-      onClick={() => toggleSection(section)}
-      style={styles.sectionHeader(expandedSections[section])}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span>{icon}</span>
-        {title}
-      </div>
-      <span>
-        {expandedSections[section] ? '🔽' : '▶️'}
-      </span>
-    </div>
-  );
 
   const renderElementsTree = () => (
     <div style={{ padding: '12px' }}>
@@ -338,7 +327,7 @@ const StylesSidebar = ({
     </div>
   );
 
-  // ✅ NUEVO: Renderizar estadísticas de estilos
+  // Renderizar estadísticas de estilos
   const renderStylesStats = () => {
     const stats = {
       total: cachedStyles.textStyles.length + 
@@ -560,7 +549,6 @@ const StylesSidebar = ({
           }}>
             📝 {selectedElement.type} seleccionado
             <br />
-            {/* ✅ NUEVO: Mostrar estilos aplicados */}
             {[
               selectedElement.textStyleId && '🔤',
               selectedElement.paragraphStyleId && '📄', 

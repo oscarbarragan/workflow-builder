@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/StyleEditor/StyleEditorModal.jsx
+// src/components/layoutDesigner/StyleEditor/StyleEditorModal.jsx - FIX INPUT MODAL
 import React, { useState, useEffect } from 'react';
 import Modal from '../../common/Modal/Modal';
 import { styleManager } from '../utils/StyleManager';
@@ -68,7 +68,9 @@ const StyleEditorModal = ({
     setStyleProperties({});
   };
 
+  // ✅ CORREGIDO: Función de actualización que permite edición libre
   const updateProperty = (property, value) => {
+    console.log('🎨 Modal: Updating property:', property, 'to:', value);
     setStyleProperties(prev => ({
       ...prev,
       [property]: value
@@ -156,7 +158,7 @@ const StyleEditorModal = ({
 
     switch (styleType) {
       case 'textStyle':
-        return <TextStyleEditor {...commonProps} />;
+        return <TextStyleEditorFixed {...commonProps} />;
       case 'paragraphStyle':
         return <ParagraphStyleEditor {...commonProps} />;
       case 'borderStyle':
@@ -383,6 +385,193 @@ const StyleEditorModal = ({
         </div>
       </div>
     </Modal>
+  );
+};
+
+// ✅ CORREGIDO: TextStyleEditor con inputs que permiten edición libre
+const TextStyleEditorFixed = ({ styleProperties, updateProperty }) => {
+  // ✅ State para valores temporales durante edición
+  const [tempValues, setTempValues] = useState({});
+
+  // ✅ Función para manejar cambio de input numérico
+  const handleNumericChange = (property, value, config) => {
+    // Guardar valor temporal
+    setTempValues(prev => ({ ...prev, [property]: value }));
+  };
+
+  // ✅ Función para aplicar valor al perder foco
+  const handleNumericBlur = (property, value, config) => {
+    // Limpiar valor temporal
+    setTempValues(prev => {
+      const updated = { ...prev };
+      delete updated[property];
+      return updated;
+    });
+
+    // Aplicar valor final
+    if (value === '' || value === null || value === undefined) {
+      updateProperty(property, config.default || 0);
+    } else {
+      const numValue = parseFloat(value);
+      updateProperty(property, isNaN(numValue) ? config.default || 0 : numValue);
+    }
+  };
+
+  // ✅ Función para obtener valor actual (temporal o real)
+  const getCurrentValue = (property, config) => {
+    if (tempValues[property] !== undefined) {
+      return tempValues[property];
+    }
+    const value = styleProperties[property];
+    return value !== undefined && value !== null ? value : config.default;
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Font Family */}
+      <div>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '14px', 
+          fontWeight: '500', 
+          marginBottom: '6px',
+          color: '#374151'
+        }}>
+          Fuente
+        </label>
+        <select
+          value={styleProperties.fontFamily || 'Arial, sans-serif'}
+          onChange={(e) => updateProperty('fontFamily', e.target.value)}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            fontSize: '14px'
+          }}
+        >
+          {styleManager.getAvailableFonts().map(font => (
+            <option key={font} value={font}>
+              {font.split(',')[0]}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Font Size */}
+      <div>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '14px', 
+          fontWeight: '500', 
+          marginBottom: '6px',
+          color: '#374151'
+        }}>
+          Tamaño (px)
+        </label>
+        <input
+          type="number"
+          value={getCurrentValue('fontSize', { default: 14 })}
+          onChange={(e) => handleNumericChange('fontSize', e.target.value, { default: 14 })}
+          onBlur={(e) => handleNumericBlur('fontSize', e.target.value, { default: 14 })}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            border: '1px solid #d1d5db',
+            borderRadius: '6px',
+            fontSize: '14px'
+          }}
+          min="8"
+          max="72"
+        />
+      </div>
+
+      {/* Font Styles */}
+      <div>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '14px', 
+          fontWeight: '500', 
+          marginBottom: '8px',
+          color: '#374151'
+        }}>
+          Estilos
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          {[
+            { key: 'bold', label: 'Negrita', icon: '𝐁' },
+            { key: 'italic', label: 'Cursiva', icon: '𝐼' },
+            { key: 'underline', label: 'Subrayado', icon: 'U̲' },
+            { key: 'strikethrough', label: 'Tachado', icon: 'S̶' }
+          ].map(style => (
+            <label 
+              key={style.key}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                color: '#374151',
+                padding: '8px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                background: styleProperties[style.key] ? '#eff6ff' : 'white'
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={styleProperties[style.key] || false}
+                onChange={(e) => updateProperty(style.key, e.target.checked)}
+                style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+              />
+              <span style={{ marginRight: '4px' }}>{style.icon}</span>
+              {style.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Color */}
+      <div>
+        <label style={{ 
+          display: 'block', 
+          fontSize: '14px', 
+          fontWeight: '500', 
+          marginBottom: '6px',
+          color: '#374151'
+        }}>
+          Color
+        </label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            type="color"
+            value={styleProperties.color || '#000000'}
+            onChange={(e) => updateProperty('color', e.target.value)}
+            style={{
+              width: '50px',
+              height: '40px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          />
+          <input
+            type="text"
+            value={styleProperties.color || '#000000'}
+            onChange={(e) => updateProperty('color', e.target.value)}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '14px'
+            }}
+            placeholder="#000000"
+          />
+        </div>
+      </div>
+    </div>
   );
 };
 
