@@ -1,10 +1,31 @@
-// src/hooks/useLayoutDesigner.js - Hook principal para el Layout Designer
+// src/components/layoutDesigner/hooks/useLayoutDesigner.js - UPDATED WITH PAGES
 import { useState, useCallback, useRef } from 'react';
 import { ELEMENT_TYPES, DEFAULT_ELEMENT_PROPS } from '../utils/constants';
+import { usePageManager } from './usePageManager';
 
 export const useLayoutDesigner = (initialData = null) => {
-  // ✅ Estados principales
-  const [elements, setElements] = useState(initialData?.elements || []);
+  // ✅ Integrar Page Manager
+  const {
+    pages,
+    currentPageIndex,
+    currentPage,
+    addPage,
+    duplicatePage,
+    deletePage,
+    goToPage,
+    reorderPages,
+    updatePageConfig,
+    updatePageElements,
+    applyPageSizePreset,
+    togglePageOrientation,
+    getPageDimensionsInPixels,
+    getPageSizePresets,
+    exportPages,
+    importPages,
+    getStatistics: getPageStatistics
+  } = usePageManager(initialData?.pages);
+
+  // ✅ Estados principales (ahora basados en página actual)
   const [selectedElement, setSelectedElement] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -12,6 +33,9 @@ export const useLayoutDesigner = (initialData = null) => {
   // ✅ Referencias
   const nextIdRef = useRef(1);
   const maxHistorySize = 50;
+
+  // ✅ Obtener elementos de la página actual
+  const elements = currentPage?.elements || [];
 
   // ✅ Función para generar IDs únicos
   const generateElementId = useCallback(() => {
@@ -24,7 +48,6 @@ export const useLayoutDesigner = (initialData = null) => {
       const newHistory = prev.slice(0, historyIndex + 1);
       newHistory.push(JSON.parse(JSON.stringify(elementsState)));
       
-      // Limitar tamaño del historial
       if (newHistory.length > maxHistorySize) {
         newHistory.shift();
       } else {
@@ -35,9 +58,9 @@ export const useLayoutDesigner = (initialData = null) => {
     });
   }, [historyIndex]);
 
-  // ✅ Agregar nuevo elemento
+  // ✅ Agregar nuevo elemento (a la página actual)
   const addElement = useCallback((type, position = null) => {
-    console.log('➕ Adding new element:', type);
+    console.log('➕ Adding new element to page:', currentPageIndex, type);
     
     const defaultProps = DEFAULT_ELEMENT_PROPS[type] || {};
     const newElement = {
@@ -49,18 +72,16 @@ export const useLayoutDesigner = (initialData = null) => {
       ...defaultProps
     };
 
-    setElements(prev => {
-      const newElements = [...prev, newElement];
-      saveToHistory(newElements);
-      return newElements;
-    });
+    const newElements = [...elements, newElement];
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
 
     // Seleccionar automáticamente el nuevo elemento
     setSelectedElement(newElement);
     
-    console.log('✅ Element added:', newElement.id);
+    console.log('✅ Element added to page:', newElement.id);
     return newElement;
-  }, [generateElementId, saveToHistory]);
+  }, [currentPageIndex, elements, generateElementId, updatePageElements, saveToHistory]);
 
   // ✅ Actualizar elemento seleccionado
   const updateSelectedElement = useCallback((field, value) => {
@@ -71,47 +92,43 @@ export const useLayoutDesigner = (initialData = null) => {
 
     console.log('📝 Updating selected element field:', field, 'value:', value);
 
-    setElements(prev => {
-      const newElements = prev.map(element => 
-        element.id === selectedElement.id 
-          ? { ...element, [field]: value }
-          : element
-      );
-      
-      // Actualizar también el elemento seleccionado
-      setSelectedElement(prev => ({
-        ...prev,
-        [field]: value
-      }));
-      
-      saveToHistory(newElements);
-      return newElements;
-    });
-  }, [selectedElement, saveToHistory]);
+    const newElements = elements.map(element => 
+      element.id === selectedElement.id 
+        ? { ...element, [field]: value }
+        : element
+    );
+    
+    // Actualizar también el elemento seleccionado
+    setSelectedElement(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
+  }, [selectedElement, elements, currentPageIndex, updatePageElements, saveToHistory]);
 
   // ✅ Actualizar elemento por ID
   const updateElement = useCallback((elementId, updates) => {
     console.log('📝 Updating element:', elementId, 'updates:', updates);
 
-    setElements(prev => {
-      const newElements = prev.map(element => 
-        element.id === elementId 
-          ? { ...element, ...updates }
-          : element
-      );
-      
-      // Si es el elemento seleccionado, actualizar también
-      if (selectedElement?.id === elementId) {
-        setSelectedElement(prev => ({
-          ...prev,
-          ...updates
-        }));
-      }
-      
-      saveToHistory(newElements);
-      return newElements;
-    });
-  }, [selectedElement, saveToHistory]);
+    const newElements = elements.map(element => 
+      element.id === elementId 
+        ? { ...element, ...updates }
+        : element
+    );
+    
+    // Si es el elemento seleccionado, actualizar también
+    if (selectedElement?.id === elementId) {
+      setSelectedElement(prev => ({
+        ...prev,
+        ...updates
+      }));
+    }
+    
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
+  }, [selectedElement, elements, currentPageIndex, updatePageElements, saveToHistory]);
 
   // ✅ Mover elemento
   const moveElement = useCallback((elementId, x, y) => {
@@ -139,14 +156,11 @@ export const useLayoutDesigner = (initialData = null) => {
 
     console.log('🗑️ Deleting selected element:', selectedElement.id);
 
-    setElements(prev => {
-      const newElements = prev.filter(element => element.id !== selectedElement.id);
-      saveToHistory(newElements);
-      return newElements;
-    });
-
+    const newElements = elements.filter(element => element.id !== selectedElement.id);
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
     setSelectedElement(null);
-  }, [selectedElement, saveToHistory]);
+  }, [selectedElement, elements, currentPageIndex, updatePageElements, saveToHistory]);
 
   // ✅ Duplicar elemento
   const duplicateElement = useCallback((elementId) => {
@@ -165,71 +179,103 @@ export const useLayoutDesigner = (initialData = null) => {
       y: elementToDuplicate.y + 20
     };
 
-    setElements(prev => {
-      const newElements = [...prev, duplicatedElement];
-      saveToHistory(newElements);
-      return newElements;
-    });
-
+    const newElements = [...elements, duplicatedElement];
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
     setSelectedElement(duplicatedElement);
-    return duplicatedElement;
-  }, [elements, generateElementId, saveToHistory]);
-
-  // ✅ Limpiar layout
-  const clearLayout = useCallback(() => {
-    console.log('🧹 Clearing entire layout');
     
-    setElements([]);
+    return duplicatedElement;
+  }, [elements, currentPageIndex, generateElementId, updatePageElements, saveToHistory]);
+
+  // ✅ Limpiar página actual
+  const clearLayout = useCallback(() => {
+    console.log('🧹 Clearing current page layout');
+    
+    updatePageElements(currentPageIndex, []);
     setSelectedElement(null);
     saveToHistory([]);
-  }, [saveToHistory]);
+  }, [currentPageIndex, updatePageElements, saveToHistory]);
 
-  // ✅ Obtener datos del layout
+  // ✅ Obtener datos del layout completo (todas las páginas)
   const getLayoutData = useCallback(() => {
+    const pagesData = exportPages();
+    
     return {
-      elements: elements.map(element => ({
-        ...element,
-        // Limpiar referencias temporales si las hay
-        isSelected: undefined,
-        isDragging: undefined,
-        isResizing: undefined
-      })),
+      ...pagesData,
       selectedElementId: selectedElement?.id || null,
-      createdAt: new Date().toISOString(),
-      version: '1.0'
+      version: '2.0', // Incrementar versión para indicar soporte de páginas múltiples
+      createdAt: new Date().toISOString()
     };
-  }, [elements, selectedElement]);
+  }, [exportPages, selectedElement]);
 
   // ✅ Cargar datos del layout
   const loadLayoutData = useCallback((layoutData) => {
     console.log('📂 Loading layout data:', layoutData);
     
-    if (layoutData?.elements && Array.isArray(layoutData.elements)) {
-      setElements(layoutData.elements);
+    if (layoutData?.pages) {
+      // Nuevo formato con páginas múltiples
+      importPages(layoutData);
       
       // Seleccionar elemento si se especifica
+      if (layoutData.selectedElementId && layoutData.currentPageIndex !== undefined) {
+        const targetPage = layoutData.pages[layoutData.currentPageIndex];
+        if (targetPage) {
+          const elementToSelect = targetPage.elements.find(
+            el => el.id === layoutData.selectedElementId
+          );
+          setSelectedElement(elementToSelect || null);
+        }
+      }
+    } else if (layoutData?.elements) {
+      // Formato legacy con una sola página
+      console.log('📂 Converting legacy single-page layout to multi-page');
+      
+      const legacyPage = {
+        id: `page_${Date.now()}_1`,
+        name: 'Página Principal',
+        size: { width: 210, height: 297, unit: 'mm', preset: 'A4' },
+        orientation: 'portrait',
+        elements: layoutData.elements,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      importPages({
+        pages: [legacyPage],
+        currentPageIndex: 0,
+        totalPages: 1
+      });
+      
+      // Seleccionar elemento legacy
       if (layoutData.selectedElementId) {
         const elementToSelect = layoutData.elements.find(
           el => el.id === layoutData.selectedElementId
         );
         setSelectedElement(elementToSelect || null);
-      } else {
-        setSelectedElement(null);
       }
-      
-      // Actualizar referencia de ID para evitar conflictos
-      const maxId = layoutData.elements.reduce((max, el) => {
-        const match = el.id.match(/element_\d+_(\d+)/);
-        return match ? Math.max(max, parseInt(match[1])) : max;
-      }, 0);
-      nextIdRef.current = maxId + 1;
-      
-      saveToHistory(layoutData.elements);
-      console.log('✅ Layout data loaded successfully');
-    } else {
-      console.warn('⚠️ Invalid layout data provided');
     }
-  }, [saveToHistory]);
+    
+    // Actualizar referencia de ID para evitar conflictos
+    let maxId = 0;
+    pages.forEach(page => {
+      page.elements.forEach(el => {
+        const match = el.id.match(/element_\d+_(\d+)/);
+        if (match) {
+          maxId = Math.max(maxId, parseInt(match[1]));
+        }
+      });
+    });
+    nextIdRef.current = maxId + 1;
+    
+    console.log('✅ Layout data loaded successfully');
+  }, [importPages, pages]);
+
+  // ✅ Cambiar página y limpiar selección
+  const handlePageChange = useCallback((pageIndex) => {
+    console.log('📄 Changing to page:', pageIndex);
+    setSelectedElement(null); // Limpiar selección al cambiar página
+    goToPage(pageIndex);
+  }, [goToPage]);
 
   // ✅ Historial - Deshacer
   const undo = useCallback(() => {
@@ -237,13 +283,13 @@ export const useLayoutDesigner = (initialData = null) => {
       const newIndex = historyIndex - 1;
       const previousState = history[newIndex];
       
-      setElements(previousState);
+      updatePageElements(currentPageIndex, previousState);
       setHistoryIndex(newIndex);
       setSelectedElement(null); // Limpiar selección al deshacer
       
-      console.log('↶ Undo performed, index:', newIndex);
+      console.log('↶ Undo performed for page:', currentPageIndex, 'index:', newIndex);
     }
-  }, [history, historyIndex]);
+  }, [history, historyIndex, currentPageIndex, updatePageElements]);
 
   // ✅ Historial - Rehacer
   const redo = useCallback(() => {
@@ -251,13 +297,13 @@ export const useLayoutDesigner = (initialData = null) => {
       const newIndex = historyIndex + 1;
       const nextState = history[newIndex];
       
-      setElements(nextState);
+      updatePageElements(currentPageIndex, nextState);
       setHistoryIndex(newIndex);
       setSelectedElement(null); // Limpiar selección al rehacer
       
-      console.log('↷ Redo performed, index:', newIndex);
+      console.log('↷ Redo performed for page:', currentPageIndex, 'index:', newIndex);
     }
-  }, [history, historyIndex]);
+  }, [history, historyIndex, currentPageIndex, updatePageElements]);
 
   // ✅ Obtener elemento por ID
   const getElementById = useCallback((elementId) => {
@@ -268,20 +314,48 @@ export const useLayoutDesigner = (initialData = null) => {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  // ✅ Estadísticas del layout
+  // ✅ Estadísticas del layout completo
   const stats = {
+    // Estadísticas de elementos (página actual)
     totalElements: elements.length,
     selectedElement: selectedElement,
     canUndo,
     canRedo,
-    historySize: history.length
+    historySize: history.length,
+    
+    // Estadísticas de páginas
+    ...getPageStatistics(),
+    
+    // Información de página actual
+    currentPageName: currentPage?.name,
+    currentPageSize: currentPage?.size,
+    currentPageDimensions: getPageDimensionsInPixels()
+  };
+
+  // ✅ Funciones específicas de páginas (reexportar para facilidad de uso)
+  const pageOperations = {
+    addPage,
+    duplicatePage,
+    deletePage,
+    goToPage: handlePageChange,
+    reorderPages,
+    updatePageConfig,
+    applyPageSizePreset,
+    togglePageOrientation,
+    getPageSizePresets,
+    getPageDimensionsInPixels
   };
 
   return {
-    // Estado
+    // Estado de elementos (página actual)
     elements,
     selectedElement,
     stats,
+    
+    // Estado de páginas
+    pages,
+    currentPageIndex,
+    currentPage,
     
     // Operaciones de elementos
     addElement,
@@ -305,6 +379,9 @@ export const useLayoutDesigner = (initialData = null) => {
     redo,
     canUndo,
     canRedo,
+    
+    // Operaciones de páginas
+    ...pageOperations,
     
     // Utilidades
     getElementById
