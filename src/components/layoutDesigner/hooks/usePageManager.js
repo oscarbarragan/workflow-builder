@@ -1,18 +1,13 @@
-// src/components/layoutDesigner/hooks/usePageManager.js
+// src/components/layoutDesigner/hooks/usePageManager.js - CORREGIDO
 import { useState, useCallback, useRef } from 'react';
 
 export const usePageManager = (initialPages = null) => {
-  // ✅ Estados principales de páginas
-  const [pages, setPages] = useState(initialPages || [createDefaultPage()]);
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [pageHistory, setPageHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  
+  // ✅ CORREGIDO: Inicializar refs ANTES de usarlos
   const nextPageIdRef = useRef(1);
   const maxHistorySize = 50;
 
-  // ✅ Función para crear página por defecto
-  function createDefaultPage() {
+  // ✅ Función para crear página por defecto (movida después de refs)
+  const createDefaultPage = useCallback(() => {
     return {
       id: `page_${Date.now()}_${nextPageIdRef.current++}`,
       name: 'Página 1',
@@ -39,7 +34,19 @@ export const usePageManager = (initialPages = null) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-  }
+  }, []);
+
+  // ✅ Estados principales de páginas (ahora usando la función callback)
+  const [pages, setPages] = useState(() => {
+    if (initialPages && Array.isArray(initialPages) && initialPages.length > 0) {
+      return initialPages;
+    }
+    return [createDefaultPage()];
+  });
+  
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [pageHistory, setPageHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   // ✅ Generar ID único para páginas
   const generatePageId = useCallback(() => {
@@ -74,8 +81,10 @@ export const usePageManager = (initialPages = null) => {
     const newPage = {
       ...createDefaultPage(),
       id: generatePageId(),
-      name: `Página ${pages.length + 1}`,
-      ...pageConfig
+      name: pageConfig.name || `Página ${pages.length + 1}`,
+      ...pageConfig,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     };
 
     setPages(prev => {
@@ -101,7 +110,7 @@ export const usePageManager = (initialPages = null) => {
 
     console.log('✅ Page added:', newPage.id);
     return newPage;
-  }, [pages, generatePageId, saveToHistory]);
+  }, [pages, generatePageId, saveToHistory, createDefaultPage]);
 
   // ✅ Duplicar página
   const duplicatePage = useCallback((pageIndex = currentPageIndex) => {
@@ -263,7 +272,7 @@ export const usePageManager = (initialPages = null) => {
     };
   }, [pages, currentPageIndex]);
 
-  // ✅ Presets de tamaños de página
+  // ✅ Presets de tamaños de página mejorados para PDF
   const getPageSizePresets = useCallback(() => {
     return {
       iso: [
@@ -281,7 +290,8 @@ export const usePageManager = (initialPages = null) => {
       custom: [
         { name: 'Carta', width: 216, height: 279, unit: 'mm' },
         { name: 'Oficio', width: 216, height: 330, unit: 'mm' },
-        { name: 'Media Carta', width: 140, height: 216, unit: 'mm' }
+        { name: 'Media Carta', width: 140, height: 216, unit: 'mm' },
+        { name: 'Personalizado', width: 210, height: 297, unit: 'mm' }
       ]
     };
   }, []);
@@ -302,6 +312,9 @@ export const usePageManager = (initialPages = null) => {
           preset: presetName
         }
       });
+      console.log('✅ Applied preset:', presetName, 'to page:', pageIndex);
+    } else {
+      console.warn('⚠️ Preset not found:', presetName);
     }
   }, [currentPageIndex, getPageSizePresets, updatePageConfig]);
 
@@ -321,6 +334,8 @@ export const usePageManager = (initialPages = null) => {
         height: width
       }
     });
+    
+    console.log('🔄 Toggled orientation for page:', pageIndex, 'to:', newOrientation);
   }, [pages, currentPageIndex, updatePageConfig]);
 
   // ✅ Exportar todas las páginas
@@ -341,7 +356,7 @@ export const usePageManager = (initialPages = null) => {
   const importPages = useCallback((pagesData) => {
     console.log('📥 Importing pages:', pagesData);
     
-    if (pagesData?.pages && Array.isArray(pagesData.pages)) {
+    if (pagesData?.pages && Array.isArray(pagesData.pages) && pagesData.pages.length > 0) {
       setPages(pagesData.pages);
       setCurrentPageIndex(
         Math.min(pagesData.currentPageIndex || 0, pagesData.pages.length - 1)
@@ -356,6 +371,8 @@ export const usePageManager = (initialPages = null) => {
       
       saveToHistory(pagesData.pages);
       console.log('✅ Pages imported successfully');
+    } else {
+      console.warn('⚠️ Invalid pages data for import');
     }
   }, [saveToHistory]);
 

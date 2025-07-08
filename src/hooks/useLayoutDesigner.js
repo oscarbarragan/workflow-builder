@@ -1,282 +1,402 @@
-import { useState, useCallback } from 'react';
+// src/components/layoutDesigner/hooks/useLayoutDesigner.js - CORREGIDO
+import { useState, useCallback, useRef } from 'react';
 import { ELEMENT_TYPES, DEFAULT_ELEMENT_PROPS } from '../utils/constants';
+import { usePageManager } from './usePageManager';
 
-export const useLayoutDesigner = (initialData) => {
-  const [elements, setElements] = useState(initialData?.elements || []);
+export const useLayoutDesigner = (initialData = null) => {
+  // ✅ Integrar Page Manager - CORREGIDO: pasar solo las páginas
+  const initialPages = initialData?.pages || null;
+  
+  const {
+    pages,
+    currentPageIndex,
+    currentPage,
+    addPage,
+    duplicatePage,
+    deletePage,
+    goToPage,
+    reorderPages,
+    updatePageConfig,
+    updatePageElements,
+    applyPageSizePreset,
+    togglePageOrientation,
+    getPageDimensionsInPixels,
+    getPageSizePresets,
+    exportPages,
+    importPages,
+    getStatistics: getPageStatistics
+  } = usePageManager(initialPages);
+
+  // ✅ Estados principales (ahora basados en página actual)
   const [selectedElement, setSelectedElement] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  
+  // ✅ Referencias
+  const nextIdRef = useRef(1);
+  const maxHistorySize = 50;
 
-  // Add new element to layout
-  const addElement = useCallback((type) => {
-    const newElement = {
-      id: `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type,
-      x: Math.random() * 400 + 50,
-      y: Math.random() * 200 + 50,
-      ...DEFAULT_ELEMENT_PROPS[type]
-    };
-    
-    console.log('🆕 Adding new element:', newElement);
-    
-    setElements(prev => [...prev, newElement]);
-    setSelectedElement(newElement);
+  // ✅ Obtener elementos de la página actual
+  const elements = currentPage?.elements || [];
+
+  // ✅ Función para generar IDs únicos
+  const generateElementId = useCallback(() => {
+    return `element_${Date.now()}_${nextIdRef.current++}`;
   }, []);
 
-  // Update element properties - ✅ MEJORADO para manejar estilos anidados
-  const updateElement = useCallback((elementId, updates) => {
-    console.log('📝 Updating element:', elementId, updates);
-    
-    setElements(prev => prev.map(el => {
-      if (el.id === elementId) {
-        const updatedElement = { ...el };
-        
-        // Manejar actualizaciones de propiedades anidadas como textStyle y paragraphStyle
-        Object.entries(updates).forEach(([key, value]) => {
-          if (key === 'textStyle' && el.textStyle) {
-            // Merge con textStyle existente
-            updatedElement.textStyle = { ...el.textStyle, ...value };
-          } else if (key === 'paragraphStyle' && el.paragraphStyle) {
-            // Merge con paragraphStyle existente
-            updatedElement.paragraphStyle = { ...el.paragraphStyle, ...value };
-          } else {
-            // Actualización directa de propiedad
-            updatedElement[key] = value;
-          }
-        });
-        
-        console.log('✅ Element updated:', updatedElement);
-        return updatedElement;
+  // ✅ Función para guardar estado en historial
+  const saveToHistory = useCallback((elementsState) => {
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(JSON.parse(JSON.stringify(elementsState)));
+      
+      if (newHistory.length > maxHistorySize) {
+        newHistory.shift();
+      } else {
+        setHistoryIndex(prev => prev + 1);
       }
-      return el;
+      
+      return newHistory;
+    });
+  }, [historyIndex]);
+
+  // ✅ Agregar nuevo elemento (a la página actual)
+  const addElement = useCallback((type, position = null) => {
+    if (!Object.values(ELEMENT_TYPES).includes(type)) {
+      console.warn('⚠️ Invalid element type:', type);
+      return null;
+    }
+
+    console.log('➕ Adding new element to page:', currentPageIndex, type);
+    
+    const defaultProps = DEFAULT_ELEMENT_PROPS[type] || {};
+    const newElement = {
+      id: generateElementId(),
+      type,
+      x: position?.x || Math.random() * 300 + 50,
+      y: position?.y || Math.random() * 200 + 50,
+      zIndex: 100,
+      ...defaultProps
+    };
+
+    const newElements = [...elements, newElement];
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
+
+    // Seleccionar automáticamente el nuevo elemento
+    setSelectedElement(newElement);
+    
+    console.log('✅ Element added to page:', newElement.id);
+    return newElement;
+  }, [currentPageIndex, elements, generateElementId, updatePageElements, saveToHistory]);
+
+  // ✅ Actualizar elemento seleccionado
+  const updateSelectedElement = useCallback((field, value) => {
+    if (!selectedElement) {
+      console.warn('⚠️ No element selected for update');
+      return;
+    }
+
+    console.log('📝 Updating selected element field:', field, 'value:', value);
+
+    const newElements = elements.map(element => 
+      element.id === selectedElement.id 
+        ? { ...element, [field]: value }
+        : element
+    );
+    
+    // Actualizar también el elemento seleccionado
+    setSelectedElement(prev => ({
+      ...prev,
+      [field]: value
     }));
     
-    // Actualizar elemento seleccionado si es el que se está editando
-    if (selectedElement && selectedElement.id === elementId) {
-      setSelectedElement(prev => {
-        const updated = { ...prev };
-        Object.entries(updates).forEach(([key, value]) => {
-          if (key === 'textStyle' && prev.textStyle) {
-            updated.textStyle = { ...prev.textStyle, ...value };
-          } else if (key === 'paragraphStyle' && prev.paragraphStyle) {
-            updated.paragraphStyle = { ...prev.paragraphStyle, ...value };
-          } else {
-            updated[key] = value;
-          }
-        });
-        return updated;
-      });
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
+  }, [selectedElement, elements, currentPageIndex, updatePageElements, saveToHistory]);
+
+  // ✅ Actualizar elemento por ID
+  const updateElement = useCallback((elementId, updates) => {
+    console.log('📝 Updating element:', elementId, 'updates:', updates);
+
+    const newElements = elements.map(element => 
+      element.id === elementId 
+        ? { ...element, ...updates }
+        : element
+    );
+    
+    // Si es el elemento seleccionado, actualizar también
+    if (selectedElement?.id === elementId) {
+      setSelectedElement(prev => ({
+        ...prev,
+        ...updates
+      }));
     }
-  }, [selectedElement]);
-
-  // Update selected element - ✅ MEJORADO para manejar estilos anidados
-  const updateSelectedElement = useCallback((field, value) => {
-    if (!selectedElement) return;
     
-    console.log('🎯 Updating selected element field:', field, value);
-    
-    // Si el campo es textStyle o paragraphStyle, hacer merge
-    if (field === 'textStyle' || field === 'paragraphStyle') {
-      const currentStyle = selectedElement[field] || {};
-      const updatedStyle = typeof value === 'object' ? value : { [field]: value };
-      updateElement(selectedElement.id, { [field]: updatedStyle });
-    } else {
-      // Actualización normal
-      updateElement(selectedElement.id, { [field]: value });
-    }
-  }, [selectedElement, updateElement]);
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
+  }, [selectedElement, elements, currentPageIndex, updatePageElements, saveToHistory]);
 
-  // ✅ NUEVA: Función para aplicar preset de estilo
-  const applyStylePreset = useCallback((elementId, preset) => {
-    if (!preset) return;
-    
-    console.log('🎨 Applying style preset:', preset.name, 'to element:', elementId);
-    
-    updateElement(elementId, {
-      textStyle: preset.textStyle,
-      paragraphStyle: preset.paragraphStyle
-    });
-  }, [updateElement]);
-
-  // Delete element
-  const deleteElement = useCallback((elementId) => {
-    console.log('🗑️ Deleting element:', elementId);
-    
-    setElements(prev => prev.filter(el => el.id !== elementId));
-    
-    if (selectedElement && selectedElement.id === elementId) {
-      setSelectedElement(null);
-    }
-  }, [selectedElement]);
-
-  // Delete selected element
-  const deleteSelected = useCallback(() => {
-    if (!selectedElement) return;
-    deleteElement(selectedElement.id);
-  }, [selectedElement, deleteElement]);
-
-  // Select element
-  const selectElement = useCallback((element) => {
-    console.log('🎯 Selecting element:', element.id, element.type);
-    setSelectedElement(element);
-  }, []);
-
-  // Clear selection
-  const clearSelection = useCallback(() => {
-    console.log('❌ Clearing selection');
-    setSelectedElement(null);
-  }, []);
-
-  // Move element
+  // ✅ Mover elemento
   const moveElement = useCallback((elementId, x, y) => {
     updateElement(elementId, { x, y });
   }, [updateElement]);
 
-  // ✅ NUEVA: Función para duplicar elemento con estilos
-  const duplicateElement = useCallback((elementId) => {
-    const element = elements.find(el => el.id === elementId);
-    if (!element) return;
+  // ✅ Seleccionar elemento
+  const selectElement = useCallback((element) => {
+    console.log('🎯 Selecting element:', element?.id);
+    setSelectedElement(element);
+  }, []);
 
-    const duplicatedElement = {
-      ...element,
-      id: `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      x: element.x + 20,
-      y: element.y + 20,
-      // ✅ Clonar estilos profundamente
-      textStyle: element.textStyle ? { ...element.textStyle } : undefined,
-      paragraphStyle: element.paragraphStyle ? { ...element.paragraphStyle } : undefined
-    };
+  // ✅ Limpiar selección
+  const clearSelection = useCallback(() => {
+    console.log('🔄 Clearing selection');
+    setSelectedElement(null);
+  }, []);
 
-    console.log('📋 Duplicating element with styles:', duplicatedElement);
-
-    setElements(prev => [...prev, duplicatedElement]);
-    setSelectedElement(duplicatedElement);
-  }, [elements]);
-
-  // ✅ MEJORADA: Get layout data con soporte para estilos
-  const getLayoutData = useCallback(() => {
-    const layoutData = {
-      elements: elements.map(element => ({
-        ...element,
-        // Asegurar que los estilos se incluyan en la exportación
-        textStyle: element.textStyle || undefined,
-        paragraphStyle: element.paragraphStyle || undefined
-      })),
-      metadata: {
-        version: '2.0',
-        createdAt: new Date().toISOString(),
-        totalElements: elements.length,
-        textElements: elements.filter(el => el.type === ELEMENT_TYPES.TEXT).length,
-        variableElements: elements.filter(el => el.type === ELEMENT_TYPES.VARIABLE).length,
-        rectangleElements: elements.filter(el => el.type === ELEMENT_TYPES.RECTANGLE).length,
-        hasCustomStyles: elements.some(el => el.textStyle || el.paragraphStyle)
-      }
-    };
-    
-    console.log('💾 Getting layout data with styles:', layoutData);
-    return layoutData;
-  }, [elements]);
-
-  // ✅ MEJORADA: Load layout data con soporte para estilos
-  const loadLayoutData = useCallback((data) => {
-    if (!data || !data.elements) {
-      console.warn('⚠️ Invalid layout data provided');
+  // ✅ Eliminar elemento seleccionado
+  const deleteSelected = useCallback(() => {
+    if (!selectedElement) {
+      console.warn('⚠️ No element selected for deletion');
       return;
     }
 
-    console.log('📂 Loading layout data with styles:', data);
+    console.log('🗑️ Deleting selected element:', selectedElement.id);
 
-    // Asegurar que los elementos tengan las propiedades de estilo necesarias
-    const processedElements = data.elements.map(element => ({
-      ...element,
-      // Asegurar que los elementos de texto tengan estilos por defecto si no los tienen
-      textStyle: element.type === ELEMENT_TYPES.TEXT && !element.textStyle 
-        ? DEFAULT_ELEMENT_PROPS[ELEMENT_TYPES.TEXT].textStyle 
-        : element.textStyle,
-      paragraphStyle: element.type === ELEMENT_TYPES.TEXT && !element.paragraphStyle 
-        ? DEFAULT_ELEMENT_PROPS[ELEMENT_TYPES.TEXT].paragraphStyle 
-        : element.paragraphStyle
-    }));
-
-    setElements(processedElements);
+    const newElements = elements.filter(element => element.id !== selectedElement.id);
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
     setSelectedElement(null);
-  }, []);
+  }, [selectedElement, elements, currentPageIndex, updatePageElements, saveToHistory]);
 
-  // Clear layout
-  const clearLayout = useCallback(() => {
-    console.log('🧹 Clearing layout');
-    setElements([]);
-    setSelectedElement(null);
-  }, []);
+  // ✅ Duplicar elemento
+  const duplicateElement = useCallback((elementId) => {
+    const elementToDuplicate = elements.find(el => el.id === elementId);
+    if (!elementToDuplicate) {
+      console.warn('⚠️ Element not found for duplication:', elementId);
+      return;
+    }
 
-  // ✅ NUEVA: Función para obtener estadísticas de estilos
-  const getStyleStatistics = useCallback(() => {
-    const stats = {
-      totalElements: elements.length,
-      elementsWithCustomTextStyle: 0,
-      elementsWithCustomParagraphStyle: 0,
-      fontFamiliesUsed: new Set(),
-      fontSizesUsed: new Set(),
-      colorsUsed: new Set(),
-      alignmentsUsed: new Set()
+    console.log('📋 Duplicating element:', elementId);
+
+    const duplicatedElement = {
+      ...elementToDuplicate,
+      id: generateElementId(),
+      x: elementToDuplicate.x + 20,
+      y: elementToDuplicate.y + 20
     };
 
-    elements.forEach(element => {
-      if (element.textStyle) {
-        stats.elementsWithCustomTextStyle++;
-        if (element.textStyle.fontFamily) stats.fontFamiliesUsed.add(element.textStyle.fontFamily);
-        if (element.textStyle.fontSize) stats.fontSizesUsed.add(element.textStyle.fontSize);
-        if (element.textStyle.color) stats.colorsUsed.add(element.textStyle.color);
+    const newElements = [...elements, duplicatedElement];
+    updatePageElements(currentPageIndex, newElements);
+    saveToHistory(newElements);
+    setSelectedElement(duplicatedElement);
+    
+    return duplicatedElement;
+  }, [elements, currentPageIndex, generateElementId, updatePageElements, saveToHistory]);
+
+  // ✅ Limpiar página actual
+  const clearLayout = useCallback(() => {
+    console.log('🧹 Clearing current page layout');
+    
+    updatePageElements(currentPageIndex, []);
+    setSelectedElement(null);
+    saveToHistory([]);
+  }, [currentPageIndex, updatePageElements, saveToHistory]);
+
+  // ✅ Obtener datos del layout completo (todas las páginas)
+  const getLayoutData = useCallback(() => {
+    const pagesData = exportPages();
+    
+    return {
+      ...pagesData,
+      selectedElementId: selectedElement?.id || null,
+      version: '2.0', // Incrementar versión para indicar soporte de páginas múltiples
+      createdAt: new Date().toISOString()
+    };
+  }, [exportPages, selectedElement]);
+
+  // ✅ Cargar datos del layout
+  const loadLayoutData = useCallback((layoutData) => {
+    console.log('📂 Loading layout data:', layoutData);
+    
+    try {
+      if (layoutData?.pages) {
+        // Nuevo formato con páginas múltiples
+        importPages(layoutData);
+        
+        // Seleccionar elemento si se especifica
+        if (layoutData.selectedElementId && layoutData.currentPageIndex !== undefined) {
+          const targetPage = layoutData.pages[layoutData.currentPageIndex];
+          if (targetPage) {
+            const elementToSelect = targetPage.elements.find(
+              el => el.id === layoutData.selectedElementId
+            );
+            setSelectedElement(elementToSelect || null);
+          }
+        }
+      } else if (layoutData?.elements) {
+        // Formato legacy con una sola página
+        console.log('📂 Converting legacy single-page layout to multi-page');
+        
+        const legacyPage = {
+          id: `page_${Date.now()}_1`,
+          name: 'Página Principal',
+          size: { width: 210, height: 297, unit: 'mm', preset: 'A4' },
+          orientation: 'portrait',
+          elements: layoutData.elements,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        
+        importPages({
+          pages: [legacyPage],
+          currentPageIndex: 0,
+          totalPages: 1
+        });
+        
+        // Seleccionar elemento legacy
+        if (layoutData.selectedElementId) {
+          const elementToSelect = layoutData.elements.find(
+            el => el.id === layoutData.selectedElementId
+          );
+          setSelectedElement(elementToSelect || null);
+        }
       }
+      
+      // Actualizar referencia de ID para evitar conflictos
+      let maxId = 0;
+      pages.forEach(page => {
+        if (page.elements) {
+          page.elements.forEach(el => {
+            const match = el.id.match(/element_\d+_(\d+)/);
+            if (match) {
+              maxId = Math.max(maxId, parseInt(match[1]));
+            }
+          });
+        }
+      });
+      nextIdRef.current = maxId + 1;
+      
+      console.log('✅ Layout data loaded successfully');
+    } catch (error) {
+      console.error('❌ Error loading layout data:', error);
+    }
+  }, [importPages, pages]);
 
-      if (element.paragraphStyle) {
-        stats.elementsWithCustomParagraphStyle++;
-        if (element.paragraphStyle.alignment) stats.alignmentsUsed.add(element.paragraphStyle.alignment);
-      }
-    });
+  // ✅ Cambiar página y limpiar selección
+  const handlePageChange = useCallback((pageIndex) => {
+    console.log('📄 Changing to page:', pageIndex);
+    setSelectedElement(null); // Limpiar selección al cambiar página
+    goToPage(pageIndex);
+  }, [goToPage]);
 
-    // Convertir Sets a arrays para serialización
-    stats.fontFamiliesUsed = Array.from(stats.fontFamiliesUsed);
-    stats.fontSizesUsed = Array.from(stats.fontSizesUsed);
-    stats.colorsUsed = Array.from(stats.colorsUsed);
-    stats.alignmentsUsed = Array.from(stats.alignmentsUsed);
+  // ✅ Historial - Deshacer
+  const undo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      const previousState = history[newIndex];
+      
+      updatePageElements(currentPageIndex, previousState);
+      setHistoryIndex(newIndex);
+      setSelectedElement(null); // Limpiar selección al deshacer
+      
+      console.log('↶ Undo performed for page:', currentPageIndex, 'index:', newIndex);
+    }
+  }, [history, historyIndex, currentPageIndex, updatePageElements]);
 
-    return stats;
+  // ✅ Historial - Rehacer
+  const redo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      const nextState = history[newIndex];
+      
+      updatePageElements(currentPageIndex, nextState);
+      setHistoryIndex(newIndex);
+      setSelectedElement(null); // Limpiar selección al rehacer
+      
+      console.log('↷ Redo performed for page:', currentPageIndex, 'index:', newIndex);
+    }
+  }, [history, historyIndex, currentPageIndex, updatePageElements]);
+
+  // ✅ Obtener elemento por ID
+  const getElementById = useCallback((elementId) => {
+    return elements.find(element => element.id === elementId);
   }, [elements]);
 
-  // ✅ NUEVA: Función para aplicar estilo en lote
-  const applyStyleToMultipleElements = useCallback((elementIds, styleType, styleValues) => {
-    console.log('🎨 Applying bulk style:', styleType, 'to elements:', elementIds);
+  // ✅ Verificar si se puede deshacer/rehacer
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
-    elementIds.forEach(elementId => {
-      updateElement(elementId, { [styleType]: styleValues });
-    });
-  }, [updateElement]);
+  // ✅ Estadísticas del layout completo
+  const stats = {
+    // Estadísticas de elementos (página actual)
+    totalElements: elements.length,
+    selectedElement: selectedElement,
+    canUndo,
+    canRedo,
+    historySize: history.length,
+    
+    // Estadísticas de páginas
+    ...getPageStatistics(),
+    
+    // Información de página actual
+    currentPageName: currentPage?.name,
+    currentPageSize: currentPage?.size,
+    currentPageDimensions: getPageDimensionsInPixels()
+  };
+
+  // ✅ Funciones específicas de páginas (reexportar para facilidad de uso)
+  const pageOperations = {
+    addPage,
+    duplicatePage,
+    deletePage,
+    goToPage: handlePageChange,
+    reorderPages,
+    updatePageConfig,
+    applyPageSizePreset,
+    togglePageOrientation,
+    getPageSizePresets,
+    getPageDimensionsInPixels
+  };
 
   return {
-    // State
+    // Estado de elementos (página actual)
     elements,
     selectedElement,
+    stats,
     
-    // Actions
+    // Estado de páginas
+    pages,
+    currentPageIndex,
+    currentPage,
+    
+    // Operaciones de elementos
     addElement,
-    updateElement,
     updateSelectedElement,
-    deleteElement,
-    deleteSelected,
-    selectElement,
-    clearSelection,
+    updateElement,
     moveElement,
+    deleteSelected,
     duplicateElement,
     
-    // Style functions - ✅ NUEVAS
-    applyStylePreset,
-    applyStyleToMultipleElements,
+    // Selección
+    selectElement,
+    clearSelection,
     
-    // Data management
+    // Layout completo
+    clearLayout,
     getLayoutData,
     loadLayoutData,
-    clearLayout,
     
-    // Statistics - ✅ NUEVA
-    getStyleStatistics
+    // Historial
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    
+    // Operaciones de páginas
+    ...pageOperations,
+    
+    // Utilidades
+    getElementById
   };
 };
