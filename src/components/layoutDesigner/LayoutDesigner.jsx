@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/LayoutDesigner.jsx - CORRECCIÓN DE MODAL
+// src/components/layoutDesigner/LayoutDesigner.jsx - HEADER OPTIMIZADO
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLayoutDesigner } from './hooks/useLayoutDesigner';
@@ -16,7 +16,7 @@ import StyleEditorModal from './StyleEditor';
 // Constantes
 import { ELEMENT_TYPES } from './utils/constants';
 
-// Estilos de la modal (inline para evitar problemas de importación)
+// Estilos optimizados para layout compacto
 const layoutDesignerStyles = {
   modalOverlay: {
     position: 'fixed',
@@ -29,60 +29,65 @@ const layoutDesignerStyles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '20px',
+    padding: '8px', // Reducido
     boxSizing: 'border-box'
   },
   modalContent: {
-    width: '95vw',
-    height: '90vh',
+    width: '98vw',
+    height: '95vh',
     background: 'white',
-    borderRadius: '12px',
+    borderRadius: '8px', // Reducido
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
   },
+  // ✅ Header compacto optimizado
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 20px',
+    padding: '8px 16px', // Reducido de 16px a 8px
     borderBottom: '1px solid #e5e7eb',
-    background: '#f8fafc',
-    flexShrink: 0
+    background: '#ffffff',
+    flexShrink: 0,
+    minHeight: '48px' // Altura mínima definida
   },
   title: {
     margin: 0,
-    fontSize: '20px',
+    fontSize: '16px', // Reducido de 20px
     fontWeight: '600',
-    color: '#1f2937'
+    color: '#1f2937',
+    flex: 1
   },
   headerControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: '8px', // Reducido de 12px
+    flexShrink: 0
   },
   toggleButton: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '8px 12px',
+    gap: '4px',
+    padding: '6px 10px', // Reducido
     border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    fontSize: '12px',
+    borderRadius: '4px',
+    fontSize: '11px', // Reducido
     cursor: 'pointer',
     transition: 'all 0.2s',
-    backgroundColor: 'white'
+    backgroundColor: 'white',
+    fontWeight: '500'
   },
   closeButton: {
     background: '#fee2e2',
     border: '1px solid #fecaca',
     cursor: 'pointer',
-    padding: '8px 12px',
-    borderRadius: '6px',
+    padding: '6px 10px', // Reducido
+    borderRadius: '4px',
     color: '#dc2626',
-    fontSize: '14px',
+    fontSize: '12px', // Reducido
     fontWeight: 'bold',
     transition: 'all 0.2s'
   },
@@ -92,23 +97,25 @@ const layoutDesignerStyles = {
     minHeight: 0,
     overflow: 'hidden'
   },
+  // ✅ Footer compacto
   footer: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '12px 20px',
+    padding: '8px 16px', // Reducido de 12px
     borderTop: '1px solid #e5e7eb',
     background: '#f8fafc',
-    flexShrink: 0
+    flexShrink: 0,
+    minHeight: '44px' // Altura mínima definida
   },
   footerInfo: {
-    fontSize: '12px',
+    fontSize: '11px', // Reducido
     color: '#6b7280',
     fontWeight: '500'
   },
   footerButtons: {
     display: 'flex',
-    gap: '12px'
+    gap: '8px' // Reducido
   }
 };
 
@@ -118,20 +125,17 @@ const LayoutDesigner = ({
   onSave, 
   initialData = null,
   availableVariables = {},
-  availableData = {}, // Mantener compatibilidad con el código original
+  availableData = {}, 
   title = "🎨 Layout Designer - Estilo Inspire Designer"
 }) => {
   // ✅ Hook principal del Layout Designer
   const {
-    // Estado de elementos y páginas
     elements,
     selectedElement,
     pages,
     currentPageIndex,
     currentPage,
     stats,
-    
-    // Operaciones de elementos
     addElement,
     updateSelectedElement,
     updateElement,
@@ -140,8 +144,6 @@ const LayoutDesigner = ({
     duplicateElement,
     selectElement,
     clearSelection,
-    
-    // Operaciones de páginas
     addPage,
     duplicatePage,
     deletePage,
@@ -150,13 +152,9 @@ const LayoutDesigner = ({
     applyPageSizePreset,
     togglePageOrientation,
     getPageSizePresets,
-    
-    // Layout completo
     clearLayout,
     getLayoutData,
     loadLayoutData,
-    
-    // Historial
     undo,
     redo,
     canUndo,
@@ -194,10 +192,8 @@ const LayoutDesigner = ({
   // ✅ Efectos para el modal
   useEffect(() => {
     if (isOpen) {
-      // Deshabilitar scroll del body
       document.body.style.overflow = 'hidden';
       
-      // Deshabilitar interacciones con react-flow si existe
       const reactFlowWrapper = document.querySelector('.react-flow');
       if (reactFlowWrapper) {
         reactFlowWrapper.style.pointerEvents = 'none';
@@ -375,7 +371,6 @@ const LayoutDesigner = ({
     setEditingStyleId(null);
   }, []);
 
-  // ✅ Manejador de toggle de variables
   const handleToggleVariableValues = useCallback(() => {
     setShowVariableValues(prev => !prev);
   }, [setShowVariableValues]);
@@ -410,21 +405,21 @@ const LayoutDesigner = ({
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
+        {/* ✅ Header optimizado y compacto */}
         <div style={layoutDesignerStyles.header}>
-          <h2 style={layoutDesignerStyles.title}>
+          <div style={layoutDesignerStyles.title}>
             {title}
             {pages.length > 1 && (
               <span style={{ 
-                fontSize: '14px', 
+                fontSize: '12px', 
                 fontWeight: '400', 
                 color: '#6b7280',
                 marginLeft: '8px'
               }}>
-                - Página {currentPageIndex + 1} de {pages.length}
+                - {currentPageIndex + 1}/{pages.length}
               </span>
             )}
-          </h2>
+          </div>
 
           <div style={layoutDesignerStyles.headerControls}>
             {/* Toggle Page Manager */}
@@ -437,7 +432,7 @@ const LayoutDesigner = ({
               }}
               title="Mostrar/Ocultar gestor de páginas"
             >
-              📄 Páginas
+              📄
             </button>
 
             {/* Toggle Variables */}
@@ -448,12 +443,9 @@ const LayoutDesigner = ({
                 backgroundColor: showVariableValues ? '#f0fdf4' : 'white',
                 color: showVariableValues ? '#16a34a' : '#6b7280'
               }}
-              title={showVariableValues ? 'Mostrar nombres de variables' : 'Mostrar valores de variables'}
+              title={showVariableValues ? 'Mostrar nombres' : 'Mostrar valores'}
             >
-              <span style={{ fontSize: '14px' }}>
-                {showVariableValues ? '👁️' : '🔗'}
-              </span>
-              {showVariableValues ? 'Ver Variables' : 'Ver Valores'}
+              {showVariableValues ? '👁️' : '🔗'}
             </button>
 
             {/* Toggle Styles Sidebar */}
@@ -466,25 +458,25 @@ const LayoutDesigner = ({
               }}
               title="Mostrar/Ocultar panel de estilos"
             >
-              🎨 Estilos
+              🎨
+            </button>
+
+            <button 
+              onClick={handleClose}
+              style={layoutDesignerStyles.closeButton}
+              title="Cerrar"
+            >
+              ✕
             </button>
           </div>
-
-          <button 
-            onClick={handleClose}
-            style={layoutDesignerStyles.closeButton}
-            title="Cerrar Layout Designer"
-          >
-            ✕
-          </button>
         </div>
 
-        {/* Page Manager (opcional) */}
+        {/* ✅ Page Manager compacto */}
         {showPageManager && (
           <div style={{ 
             flexShrink: 0, 
-            background: '#f8fafc', 
-            borderBottom: '1px solid #e5e7eb' 
+            background: '#ffffff', 
+            borderBottom: '1px solid #e5e7eb'
           }}>
             <PageManager
               pages={pages}
@@ -501,10 +493,10 @@ const LayoutDesigner = ({
           </div>
         )}
 
-        {/* Toolbar */}
+        {/* ✅ Toolbar compacto */}
         <div style={{ 
           flexShrink: 0,
-          background: '#f3f4f6',
+          background: '#f8fafc',
           borderBottom: '1px solid #e5e7eb'
         }}>
           <Toolbar
@@ -519,7 +511,7 @@ const LayoutDesigner = ({
 
         {/* Main Content */}
         <div style={layoutDesignerStyles.mainContent}>
-          {/* Styles Sidebar (opcional) */}
+          {/* Styles Sidebar */}
           {showStylesSidebar && (
             <div style={{ 
               width: '280px',
@@ -583,20 +575,20 @@ const LayoutDesigner = ({
           </div>
         </div>
 
-        {/* Footer */}
+        {/* ✅ Footer compacto */}
         <div style={layoutDesignerStyles.footer}>
           <div style={layoutDesignerStyles.footerInfo}>
-            <strong>📊 Elementos:</strong> {elements.length}
+            <strong>📊</strong> {elements.length} elem.
             {selectedElement && (
-              <span style={{ marginLeft: '20px', color: '#3b82f6' }}>
-                <strong>🎯 Seleccionado:</strong> {selectedElement.type} 
-                <span style={{ marginLeft: '8px', fontSize: '11px' }}>
+              <span style={{ marginLeft: '16px', color: '#3b82f6' }}>
+                <strong>🎯</strong> {selectedElement.type} 
+                <span style={{ fontSize: '10px', marginLeft: '4px' }}>
                   ({Math.round(selectedElement.x)}, {Math.round(selectedElement.y)})
                 </span>
               </span>
             )}
-            <span style={{ marginLeft: '20px', color: showVariableValues ? '#16a34a' : '#f59e0b' }}>
-              <strong>👁️ Vista:</strong> {showVariableValues ? 'Valores' : 'Variables'}
+            <span style={{ marginLeft: '16px', color: showVariableValues ? '#16a34a' : '#f59e0b' }}>
+              <strong>👁️</strong> {showVariableValues ? 'Valores' : 'Variables'}
             </span>
           </div>
           
@@ -604,13 +596,13 @@ const LayoutDesigner = ({
             <button
               onClick={handleClose}
               style={{
-                padding: '8px 16px',
+                padding: '6px 12px', // Reducido
                 background: '#6b7280',
                 color: 'white',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px', // Reducido
                 fontWeight: '500',
                 transition: 'all 0.2s'
               }}
@@ -621,18 +613,18 @@ const LayoutDesigner = ({
             <button
               onClick={handleSave}
               style={{
-                padding: '8px 16px',
+                padding: '6px 12px', // Reducido
                 background: '#16a34a',
                 color: 'white',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '14px',
+                fontSize: '12px', // Reducido
                 fontWeight: '500',
                 transition: 'all 0.2s'
               }}
             >
-              💾 Guardar Layout
+              💾 Guardar
             </button>
           </div>
         </div>
