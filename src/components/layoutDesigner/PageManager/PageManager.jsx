@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PageManager/PageManager.jsx - MEJORADO
+// src/components/layoutDesigner/PageManager/PageManager.jsx - VERSIÓN COMPLETA
 import React, { useState, useCallback } from 'react';
 import Button from '../../common/Button/Button';
 import Modal from '../../common/Modal/Modal';
@@ -117,57 +117,171 @@ const PageManager = ({
     setShowSizeModal(false);
   }, [onApplyPreset, currentPageIndex]);
 
-  // ✅ Renderizar selector de preset mejorado
-  const renderPresetSelector = useCallback(() => (
-    <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-      {Object.entries(sizePresets).map(([category, presets]) => (
-        <div key={category} style={{ marginBottom: '16px' }}>
-          <h4 style={{
-            fontSize: '12px',
+  // ✅ Renderizar selector de preset
+  const renderPresetSelector = () => {
+    return (
+      <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+        {Object.entries(sizePresets).map(([category, presets]) => (
+          <div key={category} style={{ marginBottom: '16px' }}>
+            <h4 style={{
+              fontSize: '12px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px',
+              textTransform: 'uppercase'
+            }}>
+              {category === 'iso' ? '📏 ISO (A4, A3, etc.)' :
+               category === 'northAmerica' ? '🇺🇸 Norte América' : 
+               category === 'custom' ? '⚙️ Personalizado' : category}
+            </h4>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+              gap: '8px'
+            }}>
+              {Array.isArray(presets) && presets.map(preset => (
+                <button
+                  key={preset.name}
+                  onClick={() => handleApplyPreset(preset)}
+                  style={{
+                    padding: '10px 8px',
+                    border: newPageConfig.size.preset === preset.name ? 
+                      '2px solid #3b82f6' : '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    background: newPageConfig.size.preset === preset.name ? 
+                      '#eff6ff' : 'white',
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'center'
+                  }}
+                >
+                  <div style={{ fontWeight: '600', marginBottom: '3px', color: '#1f2937' }}>
+                    {preset.name}
+                  </div>
+                  <div style={{ color: '#6b7280', fontSize: '9px' }}>
+                    {preset.width} × {preset.height} {preset.unit}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ✅ Renderizar miniatura de página
+  const renderPageThumbnail = (page, index) => {
+    const isActive = index === currentPageIndex;
+    const aspectRatio = page.size ? (page.size.width / page.size.height) : 0.707;
+    const thumbnailHeight = 60;
+    const thumbnailWidth = Math.min(thumbnailHeight * aspectRatio, 80);
+
+    return (
+      <div
+        key={page.id || `page-${index}`}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '10px',
+          border: isActive ? '2px solid #3b82f6' : '1px solid #d1d5db',
+          borderRadius: '8px',
+          background: isActive ? '#eff6ff' : 'white',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          minWidth: '110px'
+        }}
+        onClick={() => onGoToPage && onGoToPage(index)}
+      >
+        {/* Miniatura */}
+        <div style={{
+          width: thumbnailWidth,
+          height: thumbnailHeight,
+          background: 'white',
+          border: '1px solid #e5e7eb',
+          borderRadius: '3px',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Elementos en miniatura */}
+          {Array.isArray(page.elements) && page.elements.slice(0, 8).map((element, idx) => (
+            <div
+              key={element.id || idx}
+              style={{
+                position: 'absolute',
+                left: Math.max(0, (element.x / 500) * thumbnailWidth),
+                top: Math.max(0, (element.y / 700) * thumbnailHeight),
+                width: Math.max(2, (element.width || 20) / 500 * thumbnailWidth),
+                height: Math.max(2, (element.height || 20) / 700 * thumbnailHeight),
+                background: element.type === 'text' ? '#3b82f6' : 
+                           element.type === 'rectangle' ? '#10b981' : '#f59e0b',
+                borderRadius: '1px',
+                opacity: 0.7
+              }}
+            />
+          ))}
+          
+          {/* Indicador de más elementos */}
+          {Array.isArray(page.elements) && page.elements.length > 8 && (
+            <div style={{
+              position: 'absolute',
+              bottom: '2px',
+              right: '2px',
+              background: '#6b7280',
+              color: 'white',
+              fontSize: '7px',
+              padding: '1px 3px',
+              borderRadius: '2px'
+            }}>
+              +{page.elements.length - 8}
+            </div>
+          )}
+        </div>
+
+        {/* Información de página */}
+        <div style={{ textAlign: 'center', width: '100%' }}>
+          <div style={{
+            fontSize: '11px',
             fontWeight: '600',
-            color: '#374151',
-            marginBottom: '8px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            color: isActive ? '#1e40af' : '#374151',
+            marginBottom: '2px'
           }}>
-            {category === 'iso' ? '📏 ISO (A4, A3, etc.)' :
-             category === 'northAmerica' ? '🇺🇸 Norte América' : 
-             category === 'custom' ? '⚙️ Personalizado' : category}
-          </h4>
+            {index + 1}. {page.name || `Página ${index + 1}`}
+          </div>
           
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
-            gap: '8px'
+            fontSize: '9px',
+            color: '#6b7280'
           }}>
-            {Array.isArray(presets) && presets.map(preset => (
-              <button
-                key={preset.name}
-                onClick={() => handleApplyPreset(preset)}
-                style={{
-                  padding: '10px 8px',
-                  border: newPageConfig.size.preset === preset.name ? 
-                    '2px solid #3b82f6' : '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  background: newPageConfig.size.preset === preset.name ? 
-                    '#eff6ff' : 'white',
-                  fontSize: '11px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  textAlign: 'center',
-                  boxShadow: newPageConfig.size.preset === preset.name ? 
-                    '0 2px 4px rgba(59, 130, 246, 0.2)' : 'none'
-                }}
-                onMouseOver={(e) => {
-                  if (newPageConfig.size.preset !== preset.name) {
-                    e.target.style.background = '#f8fafc';
-                    e.target.style.borderColor = '#9ca3af';
-                  }
-                }}
-                onMouseOut={(e) => {
-              e.target.style.background = 'white';
-              e.target.style.borderColor = '#d1d5db';
+            {page.size?.preset || 'Custom'} • {Array.isArray(page.elements) ? page.elements.length : 0} elem.
+          </div>
+        </div>
+
+        {/* Botones de acción */}
+        <div style={{
+          display: 'flex',
+          gap: '4px',
+          marginTop: '2px'
+        }}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEditPage(index);
             }}
+            style={{
+              padding: '3px 6px',
+              border: '1px solid #d1d5db',
+              borderRadius: '4px',
+              background: 'white',
+              fontSize: '10px',
+              cursor: 'pointer',
+              color: '#3b82f6'
+            }}
+            title="Editar página"
           >
             ✏️
           </button>
@@ -184,18 +298,9 @@ const PageManager = ({
               background: 'white',
               fontSize: '10px',
               cursor: 'pointer',
-              color: '#059669',
-              transition: 'all 0.2s'
+              color: '#059669'
             }}
             title="Duplicar página"
-            onMouseOver={(e) => {
-              e.target.style.background = '#ecfdf5';
-              e.target.style.borderColor = '#059669';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = 'white';
-              e.target.style.borderColor = '#d1d5db';
-            }}
           >
             📋
           </button>
@@ -215,18 +320,9 @@ const PageManager = ({
                 background: 'white',
                 fontSize: '10px',
                 cursor: 'pointer',
-                color: '#dc2626',
-                transition: 'all 0.2s'
+                color: '#dc2626'
               }}
               title="Eliminar página"
-              onMouseOver={(e) => {
-                e.target.style.background = '#fef2f2';
-                e.target.style.borderColor = '#dc2626';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = 'white';
-                e.target.style.borderColor = '#fecaca';
-              }}
             >
               🗑️
             </button>
@@ -234,9 +330,8 @@ const PageManager = ({
         </div>
       </div>
     );
-  }, [currentPageIndex, safePages.length, onGoToPage, onDuplicatePage, onDeletePage, handleEditPage]);
+  };
 
-  // Renderizado principal
   return (
     <div style={{
       display: 'flex',
@@ -245,8 +340,7 @@ const PageManager = ({
       padding: '12px',
       background: '#f8fafc',
       borderRadius: '8px',
-      border: '1px solid #e2e8f0',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+      border: '1px solid #e2e8f0'
     }}>
       {/* Header */}
       <div style={{
@@ -342,18 +436,9 @@ const PageManager = ({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.2s'
+                gap: '6px'
               }}
               title="Cambiar orientación"
-              onMouseOver={(e) => {
-                e.target.style.background = '#f8fafc';
-                e.target.style.borderColor = '#9ca3af';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.background = 'white';
-                e.target.style.borderColor = '#d1d5db';
-              }}
             >
               🔄 {currentPage.orientation === 'portrait' ? 'Vertical' : 'Horizontal'}
             </button>
@@ -424,7 +509,6 @@ const PageManager = ({
                 boxSizing: 'border-box'
               }}
               placeholder="Ej: Portada, Página principal..."
-              autoFocus
             />
           </div>
 
@@ -460,18 +544,7 @@ const PageManager = ({
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '6px',
-                    fontSize: '12px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    if (newPageConfig.orientation !== option.value) {
-                      e.target.style.background = '#f8fafc';
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (newPageConfig.orientation !== option.value) {
-                      e.target.style.background = 'white';
-                    }
+                    fontSize: '12px'
                   }}
                 >
                   <span style={{ fontSize: '18px' }}>{option.icon}</span>
@@ -493,108 +566,6 @@ const PageManager = ({
               📐 Tamaño de Página
             </label>
             {renderPresetSelector()}
-          </div>
-
-          {/* Tamaño personalizado */}
-          <div>
-            <label style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: '500',
-              marginBottom: '8px',
-              color: '#374151'
-            }}>
-              ⚙️ Tamaño Personalizado
-            </label>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '1fr 1fr 100px', 
-              gap: '10px', 
-              alignItems: 'end' 
-            }}>
-              <div>
-                <label style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', display: 'block' }}>
-                  Ancho
-                </label>
-                <input
-                  type="number"
-                  value={newPageConfig.size.width || ''}
-                  onChange={(e) => setNewPageConfig(prev => ({
-                    ...prev,
-                    size: { 
-                      ...prev.size, 
-                      width: parseFloat(e.target.value) || 0, 
-                      preset: 'Personalizado' 
-                    }
-                  }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    boxSizing: 'border-box'
-                  }}
-                  min="1"
-                  step="0.1"
-                />
-              </div>
-              
-              <div>
-                <label style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', display: 'block' }}>
-                  Alto
-                </label>
-                <input
-                  type="number"
-                  value={newPageConfig.size.height || ''}
-                  onChange={(e) => setNewPageConfig(prev => ({
-                    ...prev,
-                    size: { 
-                      ...prev.size, 
-                      height: parseFloat(e.target.value) || 0, 
-                      preset: 'Personalizado' 
-                    }
-                  }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    boxSizing: 'border-box'
-                  }}
-                  min="1"
-                  step="0.1"
-                />
-              </div>
-              
-              <div>
-                <label style={{ fontSize: '11px', color: '#6b7280', marginBottom: '4px', display: 'block' }}>
-                  Unidad
-                </label>
-                <select
-                  value={newPageConfig.size.unit || 'mm'}
-                  onChange={(e) => setNewPageConfig(prev => ({
-                    ...prev,
-                    size: { ...prev.size, unit: e.target.value }
-                  }))}
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <option value="mm">mm</option>
-                  <option value="cm">cm</option>
-                  <option value="in">in</option>
-                  <option value="pt">pt</option>
-                  <option value="px">px</option>
-                </select>
-              </div>
-            </div>
           </div>
 
           {/* Botones */}
@@ -666,38 +637,36 @@ const PageManager = ({
               gridTemplateColumns: 'repeat(2, 1fr)',
               gap: '8px'
             }}>
-              {[
-                ...sizePresets.iso.slice(0, 4),
-                ...sizePresets.custom.slice(0, 2)
-              ].map(preset => (
-                <button
-                  key={preset.name}
-                  onClick={() => handleQuickApplyPreset(preset.name)}
-                  style={{
-                    padding: '10px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    background: 'white',
-                    fontSize: '11px',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.background = '#f8fafc';
-                    e.target.style.borderColor = '#3b82f6';
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.background = 'white';
-                    e.target.style.borderColor = '#d1d5db';
-                  }}
-                >
-                  <div style={{ fontWeight: '600' }}>{preset.name}</div>
-                  <div style={{ color: '#6b7280', fontSize: '10px' }}>
-                    {preset.width} × {preset.height} {preset.unit}
-                  </div>
-                </button>
-              ))}
+              {/* Usar presets seguros con validación */}
+              {(() => {
+                const commonPresets = [];
+                if (sizePresets.iso && Array.isArray(sizePresets.iso)) {
+                  commonPresets.push(...sizePresets.iso.slice(0, 4));
+                }
+                if (sizePresets.custom && Array.isArray(sizePresets.custom)) {
+                  commonPresets.push(...sizePresets.custom.slice(0, 2));
+                }
+                return commonPresets.map(preset => (
+                  <button
+                    key={preset.name}
+                    onClick={() => handleQuickApplyPreset(preset.name)}
+                    style={{
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      background: 'white',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      textAlign: 'center'
+                    }}
+                  >
+                    <div style={{ fontWeight: '600' }}>{preset.name}</div>
+                    <div style={{ color: '#6b7280', fontSize: '10px' }}>
+                      {preset.width} × {preset.height} {preset.unit}
+                    </div>
+                  </button>
+                ));
+              })()}
             </div>
           </div>
 
@@ -732,177 +701,3 @@ const PageManager = ({
 };
 
 export default PageManager;
-                  if (newPageConfig.size.preset !== preset.name) {
-                    e.target.style.background = 'white';
-                    e.target.style.borderColor = '#d1d5db';
-                  }
-                }}
-              >
-                <div style={{ fontWeight: '600', marginBottom: '3px', color: '#1f2937' }}>
-                  {preset.name}
-                </div>
-                <div style={{ color: '#6b7280', fontSize: '9px' }}>
-                  {preset.width} × {preset.height} {preset.unit}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  ), [sizePresets, newPageConfig.size.preset, handleApplyPreset]);
-
-  // ✅ Renderizar miniatura de página mejorada
-  const renderPageThumbnail = useCallback((page, index) => {
-    const isActive = index === currentPageIndex;
-    const aspectRatio = page.size ? (page.size.width / page.size.height) : 0.707; // A4 ratio por defecto
-    const thumbnailHeight = 60;
-    const thumbnailWidth = Math.min(thumbnailHeight * aspectRatio, 80);
-
-    return (
-      <div
-        key={page.id || `page-${index}`}
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '10px',
-          border: isActive ? '2px solid #3b82f6' : '1px solid #d1d5db',
-          borderRadius: '8px',
-          background: isActive ? '#eff6ff' : 'white',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          minWidth: '110px',
-          boxShadow: isActive ? '0 4px 8px rgba(59, 130, 246, 0.15)' : '0 1px 3px rgba(0,0,0,0.1)'
-        }}
-        onClick={() => onGoToPage && onGoToPage(index)}
-        onMouseOver={(e) => {
-          if (!isActive) {
-            e.currentTarget.style.background = '#f8fafc';
-            e.currentTarget.style.borderColor = '#9ca3af';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }
-        }}
-        onMouseOut={(e) => {
-          if (!isActive) {
-            e.currentTarget.style.background = 'white';
-            e.currentTarget.style.borderColor = '#d1d5db';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }
-        }}
-      >
-        {/* Miniatura */}
-        <div style={{
-          width: thumbnailWidth,
-          height: thumbnailHeight,
-          background: 'white',
-          border: '1px solid #e5e7eb',
-          borderRadius: '3px',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          {/* Representación visual de elementos */}
-          {Array.isArray(page.elements) && page.elements.slice(0, 8).map((element, idx) => {
-            const elementX = Math.max(0, Math.min((element.x / 500) * thumbnailWidth, thumbnailWidth - 2));
-            const elementY = Math.max(0, Math.min((element.y / 700) * thumbnailHeight, thumbnailHeight - 2));
-            const elementW = Math.max(2, Math.min((element.width || 20) / 500 * thumbnailWidth, thumbnailWidth));
-            const elementH = Math.max(2, Math.min((element.height || 20) / 700 * thumbnailHeight, thumbnailHeight));
-            
-            return (
-              <div
-                key={element.id || idx}
-                style={{
-                  position: 'absolute',
-                  left: elementX,
-                  top: elementY,
-                  width: elementW,
-                  height: elementH,
-                  background: element.type === 'text' ? '#3b82f6' : 
-                             element.type === 'rectangle' ? '#10b981' : '#f59e0b',
-                  borderRadius: '1px',
-                  opacity: 0.7
-                }}
-              />
-            );
-          })}
-          
-          {/* Indicador de más elementos */}
-          {Array.isArray(page.elements) && page.elements.length > 8 && (
-            <div style={{
-              position: 'absolute',
-              bottom: '2px',
-              right: '2px',
-              background: '#6b7280',
-              color: 'white',
-              fontSize: '7px',
-              padding: '1px 3px',
-              borderRadius: '2px',
-              fontWeight: '600'
-            }}>
-              +{page.elements.length - 8}
-            </div>
-          )}
-
-          {/* Indicador de orientación */}
-          <div style={{
-            position: 'absolute',
-            top: '2px',
-            left: '2px',
-            fontSize: '8px',
-            color: '#6b7280'
-          }}>
-            {page.orientation === 'landscape' ? '📄' : '📃'}
-          </div>
-        </div>
-
-        {/* Información de página */}
-        <div style={{ textAlign: 'center', width: '100%' }}>
-          <div style={{
-            fontSize: '11px',
-            fontWeight: '600',
-            color: isActive ? '#1e40af' : '#374151',
-            marginBottom: '2px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
-            {index + 1}. {page.name || `Página ${index + 1}`}
-          </div>
-          
-          <div style={{
-            fontSize: '9px',
-            color: '#6b7280'
-          }}>
-            {page.size?.preset || 'Custom'} • {Array.isArray(page.elements) ? page.elements.length : 0} elem.
-          </div>
-        </div>
-
-        {/* Botones de acción */}
-        <div style={{
-          display: 'flex',
-          gap: '4px',
-          marginTop: '2px'
-        }}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEditPage(index);
-            }}
-            style={{
-              padding: '3px 6px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              background: 'white',
-              fontSize: '10px',
-              cursor: 'pointer',
-              color: '#3b82f6',
-              transition: 'all 0.2s'
-            }}
-            title="Editar página"
-            onMouseOver={(e) => {
-              e.target.style.background = '#eff6ff';
-              e.target.style.borderColor = '#3b82f6';
-            }}
-            onMouseOut={(e) => {
