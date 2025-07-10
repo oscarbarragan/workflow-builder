@@ -1,7 +1,8 @@
-// src/components/layoutDesigner/LayoutDesigner.jsx - CORRECCIÓN DEFINITIVA
+// src/components/layoutDesigner/LayoutDesigner.jsx - CORRECCIÓN DE MODAL
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLayoutDesigner } from './hooks/useLayoutDesigner';
-import { useDragAndDrop } from '../../hooks/useDragAndDrop'; // ✅ USAR EL HOOK EXISTENTE
+import { useDragAndDrop } from '../../hooks/useDragAndDrop';
 import { useVariableManager } from './hooks/useVariableManager';
 
 // Componentes principales
@@ -10,9 +11,106 @@ import Toolbar from './Toolbar';
 import PropertiesPanel from './PropertiesPanel';
 import PageManager from './PageManager/PageManager';
 import StylesSidebar from './StylesSidebar';
+import StyleEditorModal from './StyleEditor';
 
 // Constantes
 import { ELEMENT_TYPES } from './utils/constants';
+
+// Estilos de la modal (inline para evitar problemas de importación)
+const layoutDesignerStyles = {
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.8)',
+    zIndex: 999999,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    boxSizing: 'border-box'
+  },
+  modalContent: {
+    width: '95vw',
+    height: '90vh',
+    background: 'white',
+    borderRadius: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif'
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 20px',
+    borderBottom: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    flexShrink: 0
+  },
+  title: {
+    margin: 0,
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#1f2937'
+  },
+  headerControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  toggleButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    backgroundColor: 'white'
+  },
+  closeButton: {
+    background: '#fee2e2',
+    border: '1px solid #fecaca',
+    cursor: 'pointer',
+    padding: '8px 12px',
+    borderRadius: '6px',
+    color: '#dc2626',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s'
+  },
+  mainContent: {
+    display: 'flex',
+    flex: 1,
+    minHeight: 0,
+    overflow: 'hidden'
+  },
+  footer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 20px',
+    borderTop: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    flexShrink: 0
+  },
+  footerInfo: {
+    fontSize: '12px',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  footerButtons: {
+    display: 'flex',
+    gap: '12px'
+  }
+};
 
 const LayoutDesigner = ({ 
   isOpen, 
@@ -20,7 +118,8 @@ const LayoutDesigner = ({
   onSave, 
   initialData = null,
   availableVariables = {},
-  title = "Layout Designer"
+  availableData = {}, // Mantener compatibilidad con el código original
+  title = "🎨 Layout Designer - Estilo Inspire Designer"
 }) => {
   // ✅ Hook principal del Layout Designer
   const {
@@ -64,7 +163,7 @@ const LayoutDesigner = ({
     canRedo
   } = useLayoutDesigner(initialData);
 
-  // ✅ Hook para Drag & Drop (USAR EL EXISTENTE)
+  // ✅ Hook para Drag & Drop
   const {
     isDragging,
     draggedElement,
@@ -81,16 +180,45 @@ const LayoutDesigner = ({
     processedVariables,
     showVariableValues,
     setShowVariableValues
-  } = useVariableManager(availableVariables);
+  } = useVariableManager(availableVariables || availableData);
 
   // ✅ Estados locales del componente
-  const [showStylesSidebar, setShowStylesSidebar] = useState(false);
+  const [showStylesSidebar, setShowStylesSidebar] = useState(true);
   const [showPageManager, setShowPageManager] = useState(true);
+  const [showStyleEditor, setShowStyleEditor] = useState(false);
+  const [editingStyleType, setEditingStyleType] = useState(null);
+  const [editingStyleId, setEditingStyleId] = useState(null);
+  const [sidebarUpdateTrigger, setSidebarUpdateTrigger] = useState(0);
   const canvasRef = useRef(null);
+
+  // ✅ Efectos para el modal
+  useEffect(() => {
+    if (isOpen) {
+      // Deshabilitar scroll del body
+      document.body.style.overflow = 'hidden';
+      
+      // Deshabilitar interacciones con react-flow si existe
+      const reactFlowWrapper = document.querySelector('.react-flow');
+      if (reactFlowWrapper) {
+        reactFlowWrapper.style.pointerEvents = 'none';
+        reactFlowWrapper.style.userSelect = 'none';
+      }
+      
+      return () => {
+        document.body.style.overflow = 'unset';
+        if (reactFlowWrapper) {
+          reactFlowWrapper.style.pointerEvents = 'auto';
+          reactFlowWrapper.style.userSelect = 'auto';
+        }
+      };
+    }
+  }, [isOpen]);
 
   // ✅ Efectos para atajos de teclado
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (!isOpen) return;
+      
       if ((e.ctrlKey || e.metaKey)) {
         switch (e.key) {
           case 'z':
@@ -111,13 +239,13 @@ const LayoutDesigner = ({
               duplicateElement(selectedElement.id);
             }
             break;
-          case 'Backspace':
-          case 'Delete':
-            if (selectedElement && e.target.tagName !== 'INPUT') {
-              e.preventDefault();
-              deleteSelected();
-            }
-            break;
+        }
+      }
+      
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedElement && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          deleteSelected();
         }
       }
       
@@ -141,7 +269,7 @@ const LayoutDesigner = ({
   }, [clearSelection]);
 
   const handleElementMouseDown = useCallback((e, element) => {
-    console.log('🖱️ Element mouse down:', element.id);
+    e.preventDefault();
     e.stopPropagation();
     selectElement(element);
     dragMouseDown(e, element);
@@ -150,11 +278,13 @@ const LayoutDesigner = ({
   const handleElementDoubleClick = useCallback((element) => {
     if (element.type === ELEMENT_TYPES.TEXT) {
       console.log('🖋️ Edit text mode for:', element.id);
+    } else if (element.type === 'variable') {
+      console.log('🔗 Variable double clicked:', element.id);
     }
   }, []);
 
-  const handleTextChange = useCallback((elementId, newText) => {
-    updateElement(elementId, { text: newText });
+  const handleTextChange = useCallback((elementId, field, value) => {
+    updateElement(elementId, { [field]: value });
   }, [updateElement]);
 
   // ✅ Manejadores de toolbar
@@ -166,6 +296,18 @@ const LayoutDesigner = ({
     addElement(type, position);
   }, [addElement]);
 
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedElement) {
+      deleteSelected();
+    }
+  }, [selectedElement, deleteSelected]);
+
+  const handleDuplicateSelected = useCallback(() => {
+    if (selectedElement) {
+      duplicateElement(selectedElement.id);
+    }
+  }, [selectedElement, duplicateElement]);
+
   // ✅ Manejador de guardado
   const handleSave = useCallback(() => {
     const layoutData = getLayoutData();
@@ -174,91 +316,103 @@ const LayoutDesigner = ({
     if (onSave) {
       onSave(layoutData);
     }
-  }, [getLayoutData, onSave]);
+    onClose();
+  }, [getLayoutData, onSave, onClose]);
 
-  // ✅ Manejador de carga de archivo
-  const handleLoadFile = useCallback((file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const layoutData = JSON.parse(e.target.result);
-        loadLayoutData(layoutData);
-        console.log('📂 Layout loaded from file');
-      } catch (error) {
-        console.error('❌ Error loading file:', error);
-        alert('Error al cargar el archivo. Verifique que sea un archivo válido.');
-      }
-    };
-    reader.readAsText(file);
-  }, [loadLayoutData]);
+  // ✅ Manejador de cierre
+  const handleClose = useCallback(() => {
+    clearSelection();
+    onClose();
+  }, [clearSelection, onClose]);
 
-  // ✅ Manejador de exportación
-  const handleExport = useCallback(() => {
-    const layoutData = getLayoutData();
-    const blob = new Blob([JSON.stringify(layoutData, null, 2)], {
-      type: 'application/json'
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `layout-${Date.now()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [getLayoutData]);
+  // ✅ Manejadores de estilos
+  const handleApplyStyle = useCallback((elementId, styleType, styleId) => {
+    if (!elementId || !styleType || !styleId) return;
+
+    const styleIdField = `${styleType}Id`;
+    const updates = { [styleIdField]: styleId };
+
+    if (styleType === 'textStyle') {
+      updates.textStyle = null;
+    } else if (styleType === 'paragraphStyle') {
+      updates.paragraphStyle = null;
+    } else if (styleType === 'borderStyle') {
+      updates.borderStyle = null;
+    } else if (styleType === 'fillStyle') {
+      updates.fillStyle = null;
+    }
+
+    updateElement(elementId, updates);
+    setSidebarUpdateTrigger(prev => prev + 1);
+  }, [updateElement]);
+
+  const handleCreateNewStyle = useCallback((styleType) => {
+    setEditingStyleType(styleType);
+    setEditingStyleId(null);
+    setShowStyleEditor(true);
+  }, []);
+
+  const handleEditStyle = useCallback((styleType, styleId) => {
+    setEditingStyleType(styleType);
+    setEditingStyleId(styleId);
+    setShowStyleEditor(true);
+  }, []);
+
+  const handleStyleSaved = useCallback((styleId, styleData) => {
+    setSidebarUpdateTrigger(prev => prev + 1);
+    setShowStyleEditor(false);
+    setEditingStyleType(null);
+    setEditingStyleId(null);
+  }, []);
+
+  const handleStyleCreatedFromProperties = useCallback((styleType, styleId) => {
+    setSidebarUpdateTrigger(prev => prev + 1);
+  }, []);
+
+  const handleCloseStyleEditor = useCallback(() => {
+    setShowStyleEditor(false);
+    setEditingStyleType(null);
+    setEditingStyleId(null);
+  }, []);
+
+  // ✅ Manejador de toggle de variables
+  const handleToggleVariableValues = useCallback(() => {
+    setShowVariableValues(prev => !prev);
+  }, [setShowVariableValues]);
+
+  // ✅ Manejadores globales de mouse
+  const handleGlobalMouseMove = useCallback((e) => {
+    if (isDragging) {
+      dragMouseMove(e);
+    }
+  }, [isDragging, dragMouseMove]);
+
+  const handleGlobalMouseUp = useCallback((e) => {
+    if (isDragging) {
+      dragMouseUp(e);
+    }
+  }, [isDragging, dragMouseUp]);
 
   // No renderizar si no está abierto
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div 
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
-        zIndex: 999999,
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
-        boxSizing: 'border-box'
-      }}
-      onClick={(e) => {
-        // Cerrar solo si se hace clic en el overlay
+      style={layoutDesignerStyles.modalOverlay}
+      onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
-          onClose();
+          handleClose();
         }
       }}
     >
-      <div style={{
-        width: '95vw',
-        height: '90vh',
-        background: 'white',
-        borderRadius: '12px',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-      }}>
+      <div 
+        style={layoutDesignerStyles.modalContent}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '16px 20px',
-          borderBottom: '1px solid #e5e7eb',
-          background: '#f8fafc',
-          flexShrink: 0
-        }}>
-          <h2 style={{
-            margin: 0,
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#1f2937'
-          }}>
+        <div style={layoutDesignerStyles.header}>
+          <h2 style={layoutDesignerStyles.title}>
             {title}
             {pages.length > 1 && (
               <span style={{ 
@@ -272,24 +426,12 @@ const LayoutDesigner = ({
             )}
           </h2>
 
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
+          <div style={layoutDesignerStyles.headerControls}>
             {/* Toggle Page Manager */}
             <button
               onClick={() => setShowPageManager(!showPageManager)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
+                ...layoutDesignerStyles.toggleButton,
                 backgroundColor: showPageManager ? '#eff6ff' : 'white',
                 color: showPageManager ? '#2563eb' : '#6b7280'
               }}
@@ -300,38 +442,25 @@ const LayoutDesigner = ({
 
             {/* Toggle Variables */}
             <button
-              onClick={() => setShowVariableValues(!showVariableValues)}
+              onClick={handleToggleVariableValues}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
+                ...layoutDesignerStyles.toggleButton,
                 backgroundColor: showVariableValues ? '#f0fdf4' : 'white',
                 color: showVariableValues ? '#16a34a' : '#6b7280'
               }}
-              title="Mostrar/Ocultar valores de variables"
+              title={showVariableValues ? 'Mostrar nombres de variables' : 'Mostrar valores de variables'}
             >
-              🔗 Variables: {showVariableValues ? 'ON' : 'OFF'}
+              <span style={{ fontSize: '14px' }}>
+                {showVariableValues ? '👁️' : '🔗'}
+              </span>
+              {showVariableValues ? 'Ver Variables' : 'Ver Valores'}
             </button>
 
             {/* Toggle Styles Sidebar */}
             <button
               onClick={() => setShowStylesSidebar(!showStylesSidebar)}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 12px',
-                border: '1px solid #d1d5db',
-                borderRadius: '6px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
+                ...layoutDesignerStyles.toggleButton,
                 backgroundColor: showStylesSidebar ? '#fef3c7' : 'white',
                 color: showStylesSidebar ? '#d97706' : '#6b7280'
               }}
@@ -339,26 +468,15 @@ const LayoutDesigner = ({
             >
               🎨 Estilos
             </button>
-
-            {/* Botón de cerrar */}
-            <button
-              onClick={onClose}
-              style={{
-                background: '#fee2e2',
-                border: '1px solid #fecaca',
-                cursor: 'pointer',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                color: '#dc2626',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                transition: 'all 0.2s'
-              }}
-              title="Cerrar Layout Designer"
-            >
-              ✕
-            </button>
           </div>
+
+          <button 
+            onClick={handleClose}
+            style={layoutDesignerStyles.closeButton}
+            title="Cerrar Layout Designer"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Page Manager (opcional) */}
@@ -383,13 +501,24 @@ const LayoutDesigner = ({
           </div>
         )}
 
-        {/* Main Content */}
-        <div style={{
-          display: 'flex',
-          flex: 1,
-          minHeight: 0,
-          overflow: 'hidden'
+        {/* Toolbar */}
+        <div style={{ 
+          flexShrink: 0,
+          background: '#f3f4f6',
+          borderBottom: '1px solid #e5e7eb'
         }}>
+          <Toolbar
+            onAddElement={handleAddElement}
+            onDeleteSelected={handleDeleteSelected}
+            onDuplicateSelected={handleDuplicateSelected}
+            onClearAll={clearLayout}
+            selectedElement={selectedElement}
+            elementsCount={elements.length}
+          />
+        </div>
+
+        {/* Main Content */}
+        <div style={layoutDesignerStyles.mainContent}>
           {/* Styles Sidebar (opcional) */}
           {showStylesSidebar && (
             <div style={{ 
@@ -400,37 +529,16 @@ const LayoutDesigner = ({
             }}>
               <StylesSidebar
                 selectedElement={selectedElement}
-                onStyleApply={(styleType, styleId) => {
-                  if (selectedElement) {
-                    updateSelectedElement(`${styleType}Id`, styleId);
-                  }
-                }}
+                onApplyStyle={handleApplyStyle}
+                onCreateNewStyle={handleCreateNewStyle}
+                onEditStyle={handleEditStyle}
+                availableVariables={availableData || availableVariables}
+                showVariableValues={showVariableValues}
+                onToggleVariableValues={handleToggleVariableValues}
+                updateTrigger={sidebarUpdateTrigger}
               />
             </div>
           )}
-
-          {/* Toolbar */}
-          <div style={{ 
-            flexShrink: 0,
-            background: '#f3f4f6',
-            borderRight: '1px solid #e5e7eb'
-          }}>
-            <Toolbar
-              onAddElement={handleAddElement}
-              onSave={handleSave}
-              onLoadFile={handleLoadFile}
-              onExport={handleExport}
-              onClear={clearLayout}
-              onUndo={undo}
-              onRedo={redo}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              selectedElement={selectedElement}
-              onDuplicate={() => selectedElement && duplicateElement(selectedElement.id)}
-              onDelete={deleteSelected}
-              stats={stats}
-            />
-          </div>
 
           {/* Canvas */}
           <div style={{ 
@@ -446,14 +554,14 @@ const LayoutDesigner = ({
               selectedElement={selectedElement}
               isDragging={isDragging}
               isResizing={false}
-              onMouseMove={dragMouseMove}
-              onMouseUp={dragMouseUp}
+              onMouseMove={handleGlobalMouseMove}
+              onMouseUp={handleGlobalMouseUp}
               onCanvasClick={handleCanvasClick}
               onElementMouseDown={handleElementMouseDown}
               onResizeStart={() => {}}
               onTextChange={handleTextChange}
               onElementDoubleClick={handleElementDoubleClick}
-              availableVariables={processedVariables}
+              availableVariables={availableData || availableVariables}
               showVariableValues={showVariableValues}
             />
           </div>
@@ -467,34 +575,49 @@ const LayoutDesigner = ({
           }}>
             <PropertiesPanel
               selectedElement={selectedElement}
-              onElementUpdate={updateSelectedElement}
-              availableVariables={processedVariables}
+              onUpdateSelectedElement={updateSelectedElement}
+              availableData={availableData || availableVariables}
+              onCreateNewStyle={handleCreateNewStyle}
+              onStyleCreated={handleStyleCreatedFromProperties}
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '12px 20px',
-          borderTop: '1px solid #e5e7eb',
-          background: '#f8fafc',
-          flexShrink: 0
-        }}>
-          <div style={{
-            fontSize: '12px',
-            color: '#6b7280',
-            fontWeight: '500'
-          }}>
-            📊 {stats.totalElements} elementos en página actual
-            {stats.hasMultiplePages && ` • ${stats.totalPages} páginas`}
-            {selectedElement && ` • ${selectedElement.type} seleccionado`}
-            {isDragging && ` • Moviendo elemento`}
+        <div style={layoutDesignerStyles.footer}>
+          <div style={layoutDesignerStyles.footerInfo}>
+            <strong>📊 Elementos:</strong> {elements.length}
+            {selectedElement && (
+              <span style={{ marginLeft: '20px', color: '#3b82f6' }}>
+                <strong>🎯 Seleccionado:</strong> {selectedElement.type} 
+                <span style={{ marginLeft: '8px', fontSize: '11px' }}>
+                  ({Math.round(selectedElement.x)}, {Math.round(selectedElement.y)})
+                </span>
+              </span>
+            )}
+            <span style={{ marginLeft: '20px', color: showVariableValues ? '#16a34a' : '#f59e0b' }}>
+              <strong>👁️ Vista:</strong> {showVariableValues ? 'Valores' : 'Variables'}
+            </span>
           </div>
-
-          <div style={{ display: 'flex', gap: '12px' }}>
+          
+          <div style={layoutDesignerStyles.footerButtons}>
+            <button
+              onClick={handleClose}
+              style={{
+                padding: '8px 16px',
+                background: '#6b7280',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                transition: 'all 0.2s'
+              }}
+            >
+              Cancelar
+            </button>
+            
             <button
               onClick={handleSave}
               style={{
@@ -513,9 +636,20 @@ const LayoutDesigner = ({
             </button>
           </div>
         </div>
+
+        {/* Style Editor Modal */}
+        <StyleEditorModal
+          isOpen={showStyleEditor}
+          onClose={handleCloseStyleEditor}
+          styleType={editingStyleType}
+          editingStyleId={editingStyleId}
+          onStyleSaved={handleStyleSaved}
+        />
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };
 
 export default LayoutDesigner;
