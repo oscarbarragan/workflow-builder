@@ -1,10 +1,49 @@
-// src/components/layoutDesigner/hooks/useLayoutDesigner.js - UPDATED WITH PAGES
+// src/components/layoutDesigner/hooks/useLayoutDesigner.js - UPDATED WITH VARIABLES SUPPORT
 import { useState, useCallback, useRef } from 'react';
 import { ELEMENT_TYPES, DEFAULT_ELEMENT_PROPS } from '../utils/constants';
 import { usePageManager } from './usePageManager';
 
-export const useLayoutDesigner = (initialData = null) => {
-  // ✅ Integrar Page Manager
+export const useLayoutDesigner = (initialData = null, availableVariables = {}) => {
+  // ✅ NUEVO: Procesar variables disponibles
+  const processedAvailableVariables = (() => {
+    // Si no se proporcionan variables o están vacías, usar datos de ejemplo
+    if (!availableVariables || Object.keys(availableVariables).length === 0) {
+      return {
+        user_name: "Juan Pérez",
+        user_age: 30,
+        user: {
+          id: 123,
+          email: "juan@email.com",
+          active: true
+        },
+        orders: [
+          { id: 1, product: "Producto A", total: 100.50 },
+          { id: 2, product: "Producto B", total: 250.75 }
+        ],
+        company: {
+          name: "Mi Empresa",
+          employees: [
+            { name: "Ana García", position: "Gerente" },
+            { name: "Carlos López", position: "Desarrollador" }
+          ],
+          address: {
+            city: "Bogotá"
+          }
+        },
+        invoice: {
+          number: "FAC-001",
+          date: "2024-01-15",
+          lines: [
+            { description: "Servicio A", quantity: 2, price: 50.00 },
+            { description: "Servicio B", quantity: 1, price: 150.75 }
+          ]
+        }
+      };
+    }
+    return availableVariables;
+  })();
+
+  // ✅ Integrar Page Manager CON VARIABLES
   const {
     pages,
     currentPageIndex,
@@ -16,14 +55,33 @@ export const useLayoutDesigner = (initialData = null) => {
     reorderPages,
     updatePageConfig,
     updatePageElements,
+    updatePageFlowConfig, // ✅ NUEVO
     applyPageSizePreset,
     togglePageOrientation,
     getPageDimensionsInPixels,
     getPageSizePresets,
     exportPages,
     importPages,
-    getStatistics: getPageStatistics
-  } = usePageManager(initialData?.pages);
+    getStatistics: getPageStatistics,
+    
+    // ✅ NUEVO: Operaciones de flujo
+    evaluatePageFlow,
+    evaluateNextPage,
+    generatePageSequence,
+    getPageReferences,
+    validatePageFlowConfig,
+    updateAvailableVariables,
+    availableVariables: currentAvailableVariables,
+    setFlowEngineConfig,
+    flowEngineOptions,
+    getFlowExecutionLogs,
+    clearFlowLogs,
+    
+    // ✅ Constantes
+    PAGE_FLOW_TYPES,
+    NEXT_PAGE_TYPES,
+    DEFAULT_PAGE_FLOW_CONFIG
+  } = usePageManager(initialData?.pages, processedAvailableVariables);
 
   // ✅ Estados principales (ahora basados en página actual)
   const [selectedElement, setSelectedElement] = useState(null);
@@ -340,10 +398,22 @@ export const useLayoutDesigner = (initialData = null) => {
     goToPage: handlePageChange,
     reorderPages,
     updatePageConfig,
+    updatePageFlowConfig, // ✅ NUEVO
     applyPageSizePreset,
     togglePageOrientation,
     getPageSizePresets,
-    getPageDimensionsInPixels
+    getPageDimensionsInPixels,
+    
+    // ✅ NUEVO: Operaciones de flujo de páginas
+    evaluatePageFlow,
+    evaluateNextPage,
+    generatePageSequence,
+    getPageReferences,
+    validatePageFlowConfig,
+    updateAvailableVariables,
+    setFlowEngineConfig,
+    getFlowExecutionLogs,
+    clearFlowLogs
   };
 
   return {
@@ -356,6 +426,9 @@ export const useLayoutDesigner = (initialData = null) => {
     pages,
     currentPageIndex,
     currentPage,
+    
+    // ✅ NUEVO: Variables disponibles
+    availableVariables: currentAvailableVariables,
     
     // Operaciones de elementos
     addElement,
@@ -380,8 +453,13 @@ export const useLayoutDesigner = (initialData = null) => {
     canUndo,
     canRedo,
     
-    // Operaciones de páginas
+    // Operaciones de páginas (incluye operaciones de flujo)
     ...pageOperations,
+    
+    // ✅ NUEVO: Constantes de flujo
+    PAGE_FLOW_TYPES,
+    NEXT_PAGE_TYPES,
+    DEFAULT_PAGE_FLOW_CONFIG,
     
     // Utilidades
     getElementById

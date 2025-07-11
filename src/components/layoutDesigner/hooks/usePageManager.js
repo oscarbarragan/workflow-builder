@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/hooks/usePageManager.js - COMPLETE VERSION WITH FLOW
+// src/components/layoutDesigner/hooks/usePageManager.js - VERSIÓN COMPLETA CORREGIDA
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { PageFlowEngine } from '../utils/pageFlowEngine.js';
 import { 
@@ -7,7 +7,7 @@ import {
   NEXT_PAGE_TYPES 
 } from '../utils/pageFlow.constants.js';
 
-export const usePageManager = (initialPages = null, availableVariables = {}) => {
+export const usePageManager = (initialPages = null, initialAvailableVariables = {}) => {
   // ✅ Refs inicializados ANTES de uso
   const nextPageIdRef = useRef(1);
   const maxHistorySize = 50;
@@ -70,8 +70,45 @@ export const usePageManager = (initialPages = null, availableVariables = {}) => 
   const [pageHistory, setPageHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
-  // ✅ NUEVO: Estados para flujo de páginas
-  const [availableVariablesState, setAvailableVariablesState] = useState(availableVariables);
+  // ✅ NUEVO: Estados para flujo de páginas CON VARIABLES INICIALES
+  const [availableVariablesState, setAvailableVariablesState] = useState(() => {
+    // Si no se proporcionan variables, usar datos de ejemplo
+    if (!initialAvailableVariables || Object.keys(initialAvailableVariables).length === 0) {
+      return {
+        user_name: "Juan Pérez",
+        user_age: 30,
+        user: {
+          id: 123,
+          email: "juan@email.com", 
+          active: true
+        },
+        orders: [
+          { id: 1, product: "Producto A", total: 100.50 },
+          { id: 2, product: "Producto B", total: 250.75 }
+        ],
+        company: {
+          name: "Mi Empresa",
+          employees: [
+            { name: "Ana García", position: "Gerente" },
+            { name: "Carlos López", position: "Desarrollador" }
+          ],
+          address: {
+            city: "Bogotá"
+          }
+        },
+        invoice: {
+          number: "FAC-001",
+          date: "2024-01-15",
+          lines: [
+            { description: "Servicio A", quantity: 2, price: 50.00 },
+            { description: "Servicio B", quantity: 1, price: 150.75 }
+          ]
+        }
+      };
+    }
+    return initialAvailableVariables;
+  });
+
   const [flowEngineOptions, setFlowEngineOptions] = useState({
     debugMode: false,
     maxIterations: 1000,
@@ -111,6 +148,7 @@ export const usePageManager = (initialPages = null, availableVariables = {}) => 
 
   // ✅ NUEVO: Actualizar variables disponibles
   const updateAvailableVariables = useCallback((newVariables) => {
+    console.log('🔄 Updating available variables:', newVariables);
     setAvailableVariablesState(prev => ({
       ...prev,
       ...newVariables

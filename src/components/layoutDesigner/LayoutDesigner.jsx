@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/LayoutDesigner.jsx - HEADER OPTIMIZADO
+// src/components/layoutDesigner/LayoutDesigner.jsx - HEADER OPTIMIZADO + VARIABLES
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useLayoutDesigner } from './hooks/useLayoutDesigner';
@@ -128,7 +128,18 @@ const LayoutDesigner = ({
   availableData = {}, 
   title = "🎨 Layout Designer - Estilo Inspire Designer"
 }) => {
-  // ✅ Hook principal del Layout Designer
+  // ✅ CORREGIDO: Unificar variables disponibles
+  const unifiedAvailableVariables = React.useMemo(() => {
+    // Priorizar availableVariables sobre availableData para mantener compatibilidad
+    const variables = Object.keys(availableVariables).length > 0 
+      ? availableVariables 
+      : availableData;
+    
+    console.log('🔗 Unified available variables:', variables);
+    return variables;
+  }, [availableVariables, availableData]);
+
+  // ✅ Hook principal del Layout Designer CON VARIABLES
   const {
     elements,
     selectedElement,
@@ -136,6 +147,7 @@ const LayoutDesigner = ({
     currentPageIndex,
     currentPage,
     stats,
+    availableVariables: currentAvailableVariables, // ✅ NUEVO
     addElement,
     updateSelectedElement,
     updateElement,
@@ -149,6 +161,7 @@ const LayoutDesigner = ({
     deletePage,
     goToPage,
     updatePageConfig,
+    updatePageFlowConfig, // ✅ NUEVO
     applyPageSizePreset,
     togglePageOrientation,
     getPageSizePresets,
@@ -159,7 +172,7 @@ const LayoutDesigner = ({
     redo,
     canUndo,
     canRedo
-  } = useLayoutDesigner(initialData);
+  } = useLayoutDesigner(initialData, unifiedAvailableVariables);
 
   // ✅ Hook para Drag & Drop
   const {
@@ -178,7 +191,7 @@ const LayoutDesigner = ({
     processedVariables,
     showVariableValues,
     setShowVariableValues
-  } = useVariableManager(availableVariables || availableData);
+  } = useVariableManager(currentAvailableVariables);
 
   // ✅ Estados locales del componente
   const [showStylesSidebar, setShowStylesSidebar] = useState(true);
@@ -448,6 +461,19 @@ const LayoutDesigner = ({
               {showVariableValues ? '👁️' : '🔗'}
             </button>
 
+            {/* ✅ NUEVO: Indicador de variables disponibles */}
+            <div style={{
+              fontSize: '10px',
+              padding: '4px 6px',
+              background: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              borderRadius: '3px',
+              color: '#15803d',
+              fontWeight: '500'
+            }}>
+              📊 {Object.keys(currentAvailableVariables).length} vars
+            </div>
+
             {/* Toggle Styles Sidebar */}
             <button
               onClick={() => setShowStylesSidebar(!showStylesSidebar)}
@@ -471,7 +497,7 @@ const LayoutDesigner = ({
           </div>
         </div>
 
-        {/* ✅ Page Manager compacto */}
+        {/* ✅ Page Manager compacto CON VARIABLES */}
         {showPageManager && (
           <div style={{ 
             flexShrink: 0, 
@@ -486,9 +512,11 @@ const LayoutDesigner = ({
               onDeletePage={deletePage}
               onGoToPage={goToPage}
               onUpdatePageConfig={updatePageConfig}
+              onUpdatePageFlowConfig={updatePageFlowConfig} // ✅ NUEVO
               onToggleOrientation={togglePageOrientation}
               onApplyPreset={applyPageSizePreset}
               getPageSizePresets={getPageSizePresets}
+              availableVariables={currentAvailableVariables} // ✅ NUEVO
             />
           </div>
         )}
@@ -524,7 +552,7 @@ const LayoutDesigner = ({
                 onApplyStyle={handleApplyStyle}
                 onCreateNewStyle={handleCreateNewStyle}
                 onEditStyle={handleEditStyle}
-                availableVariables={availableData || availableVariables}
+                availableVariables={currentAvailableVariables} // ✅ CORREGIDO
                 showVariableValues={showVariableValues}
                 onToggleVariableValues={handleToggleVariableValues}
                 updateTrigger={sidebarUpdateTrigger}
@@ -553,7 +581,7 @@ const LayoutDesigner = ({
               onResizeStart={() => {}}
               onTextChange={handleTextChange}
               onElementDoubleClick={handleElementDoubleClick}
-              availableVariables={availableData || availableVariables}
+              availableVariables={currentAvailableVariables} // ✅ CORREGIDO
               showVariableValues={showVariableValues}
             />
           </div>
@@ -568,14 +596,14 @@ const LayoutDesigner = ({
             <PropertiesPanel
               selectedElement={selectedElement}
               onUpdateSelectedElement={updateSelectedElement}
-              availableData={availableData || availableVariables}
+              availableData={currentAvailableVariables} // ✅ CORREGIDO
               onCreateNewStyle={handleCreateNewStyle}
               onStyleCreated={handleStyleCreatedFromProperties}
             />
           </div>
         </div>
 
-        {/* ✅ Footer compacto */}
+        {/* ✅ Footer compacto CON INFORMACIÓN DE VARIABLES */}
         <div style={layoutDesignerStyles.footer}>
           <div style={layoutDesignerStyles.footerInfo}>
             <strong>📊</strong> {elements.length} elem.
@@ -589,6 +617,10 @@ const LayoutDesigner = ({
             )}
             <span style={{ marginLeft: '16px', color: showVariableValues ? '#16a34a' : '#f59e0b' }}>
               <strong>👁️</strong> {showVariableValues ? 'Valores' : 'Variables'}
+            </span>
+            {/* ✅ NUEVO: Información de variables */}
+            <span style={{ marginLeft: '16px', color: '#8b5cf6' }}>
+              <strong>🔗</strong> {Object.keys(currentAvailableVariables).length} vars disponibles
             </span>
           </div>
           
