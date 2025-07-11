@@ -1,12 +1,18 @@
-// src/components/layoutDesigner/hooks/usePageManager.js - MÁRGENES CERO POR DEFECTO
-import { useState, useCallback, useRef } from 'react';
+// src/components/layoutDesigner/hooks/usePageManager.js - COMPLETE VERSION WITH FLOW
+import { useState, useCallback, useRef, useMemo } from 'react';
+import { PageFlowEngine } from '../utils/pageFlowEngine.js';
+import { 
+  PAGE_FLOW_TYPES, 
+  DEFAULT_PAGE_FLOW_CONFIG,
+  NEXT_PAGE_TYPES 
+} from '../utils/pageFlow.constants.js';
 
-export const usePageManager = (initialPages = null) => {
-  // ✅ CORREGIDO: Inicializar refs ANTES de usarlos
+export const usePageManager = (initialPages = null, availableVariables = {}) => {
+  // ✅ Refs inicializados ANTES de uso
   const nextPageIdRef = useRef(1);
   const maxHistorySize = 50;
 
-  // ✅ Función para crear página por defecto (movida después de refs) - MÁRGENES CERO
+  // ✅ Función para crear página por defecto - MÁRGENES CERO + FLOW CONFIG
   const createDefaultPage = useCallback(() => {
     return {
       id: `page_${Date.now()}_${nextPageIdRef.current++}`,
@@ -17,12 +23,12 @@ export const usePageManager = (initialPages = null) => {
         unit: 'mm',
         preset: 'A4'
       },
-      orientation: 'portrait', // 'portrait' | 'landscape'
+      orientation: 'portrait',
       margins: {
-        top: 0,      // ✅ CAMBIADO: Era 10, ahora 0
-        right: 0,    // ✅ CAMBIADO: Era 10, ahora 0
-        bottom: 0,   // ✅ CAMBIADO: Era 10, ahora 0
-        left: 0,     // ✅ CAMBIADO: Era 10, ahora 0
+        top: 0,      
+        right: 0,    
+        bottom: 0,   
+        left: 0,     
         unit: 'mm'
       },
       background: {
@@ -31,15 +37,31 @@ export const usePageManager = (initialPages = null) => {
         opacity: 1
       },
       elements: [],
+      
+      // ✅ NUEVA: Configuración de flujo de página
+      flowConfig: {
+        ...DEFAULT_PAGE_FLOW_CONFIG,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
   }, []);
 
-  // ✅ Estados principales de páginas (ahora usando la función callback)
+  // ✅ Estados principales
   const [pages, setPages] = useState(() => {
     if (initialPages && Array.isArray(initialPages) && initialPages.length > 0) {
-      return initialPages;
+      // Asegurar que todas las páginas tengan flowConfig
+      return initialPages.map(page => ({
+        ...page,
+        flowConfig: page.flowConfig || {
+          ...DEFAULT_PAGE_FLOW_CONFIG,
+          createdAt: page.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      }));
     }
     return [createDefaultPage()];
   });
@@ -47,6 +69,19 @@ export const usePageManager = (initialPages = null) => {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [pageHistory, setPageHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  
+  // ✅ NUEVO: Estados para flujo de páginas
+  const [availableVariablesState, setAvailableVariablesState] = useState(availableVariables);
+  const [flowEngineOptions, setFlowEngineOptions] = useState({
+    debugMode: false,
+    maxIterations: 1000,
+    allowUnsafeExpressions: false
+  });
+
+  // ✅ NUEVO: Motor de flujo de páginas (memoizado)
+  const pageFlowEngine = useMemo(() => {
+    return new PageFlowEngine(availableVariablesState, pages, flowEngineOptions);
+  }, [availableVariablesState, pages, flowEngineOptions]);
 
   // ✅ Generar ID único para páginas
   const generatePageId = useCallback(() => {
@@ -74,22 +109,44 @@ export const usePageManager = (initialPages = null) => {
     return pages[currentPageIndex] || null;
   }, [pages, currentPageIndex]);
 
-  // ✅ Agregar nueva página - CON MÁRGENES CERO POR DEFECTO
+  // ✅ NUEVO: Actualizar variables disponibles
+  const updateAvailableVariables = useCallback((newVariables) => {
+    setAvailableVariablesState(prev => ({
+      ...prev,
+      ...newVariables
+    }));
+  }, []);
+
+  // ✅ NUEVO: Configurar opciones del motor de flujo
+  const setFlowEngineConfig = useCallback((options) => {
+    setFlowEngineOptions(prev => ({
+      ...prev,
+      ...options
+    }));
+  }, []);
+
+  // ✅ Agregar nueva página - CON CONFIGURACIÓN DE FLUJO
   const addPage = useCallback((position = null, pageConfig = {}) => {
-    console.log('➕ Adding new page');
+    console.log('➕ Adding new page with flow config');
     
     const newPage = {
       ...createDefaultPage(),
       id: generatePageId(),
       name: pageConfig.name || `Página ${pages.length + 1}`,
       ...pageConfig,
-      // ✅ ASEGURAR que si no se especifican márgenes, sean cero
       margins: pageConfig.margins || {
         top: 0,
         right: 0,
         bottom: 0,
         left: 0,
         unit: pageConfig.size?.unit || 'mm'
+      },
+      // ✅ NUEVO: Configuración de flujo
+      flowConfig: {
+        ...DEFAULT_PAGE_FLOW_CONFIG,
+        ...pageConfig.flowConfig,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -99,11 +156,9 @@ export const usePageManager = (initialPages = null) => {
       let newPages;
       
       if (position === null || position >= prev.length) {
-        // Agregar al final
         newPages = [...prev, newPage];
         setCurrentPageIndex(newPages.length - 1);
       } else {
-        // Insertar en posición específica
         newPages = [
           ...prev.slice(0, position),
           newPage,
@@ -116,16 +171,16 @@ export const usePageManager = (initialPages = null) => {
       return newPages;
     });
 
-    console.log('✅ Page added with zero margins:', newPage.id);
+    console.log('✅ Page added with flow config:', newPage.id);
     return newPage;
   }, [pages, generatePageId, saveToHistory, createDefaultPage]);
 
-  // ✅ Duplicar página
+  // ✅ Duplicar página (manteniendo configuración de flujo)
   const duplicatePage = useCallback((pageIndex = currentPageIndex) => {
     const pageToClone = pages[pageIndex];
     if (!pageToClone) return null;
 
-    console.log('📋 Duplicating page:', pageToClone.id);
+    console.log('📋 Duplicating page with flow config:', pageToClone.id);
 
     const duplicatedPage = {
       ...pageToClone,
@@ -135,6 +190,12 @@ export const usePageManager = (initialPages = null) => {
         ...element,
         id: `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       })),
+      // ✅ Duplicar configuración de flujo
+      flowConfig: {
+        ...pageToClone.flowConfig,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -166,7 +227,6 @@ export const usePageManager = (initialPages = null) => {
     setPages(prev => {
       const newPages = prev.filter((_, index) => index !== pageIndex);
       
-      // Ajustar índice actual si es necesario
       let newCurrentIndex = currentPageIndex;
       if (pageIndex <= currentPageIndex) {
         newCurrentIndex = Math.max(0, currentPageIndex - 1);
@@ -211,6 +271,30 @@ export const usePageManager = (initialPages = null) => {
     });
   }, [currentPageIndex, saveToHistory]);
 
+  // ✅ NUEVO: Actualizar configuración de flujo de página específica
+  const updatePageFlowConfig = useCallback((pageIndex = currentPageIndex, flowUpdates) => {
+    console.log('🔄 Updating page flow config:', pageIndex, flowUpdates);
+
+    setPages(prev => {
+      const newPages = prev.map((page, index) => 
+        index === pageIndex 
+          ? { 
+              ...page, 
+              flowConfig: {
+                ...page.flowConfig,
+                ...flowUpdates,
+                updatedAt: new Date().toISOString()
+              },
+              updatedAt: new Date().toISOString() 
+            }
+          : page
+      );
+      
+      saveToHistory(newPages);
+      return newPages;
+    });
+  }, [currentPageIndex, saveToHistory]);
+
   // ✅ Actualizar elementos de página
   const updatePageElements = useCallback((pageIndex = currentPageIndex, elements) => {
     setPages(prev => {
@@ -240,7 +324,6 @@ export const usePageManager = (initialPages = null) => {
       const [movedPage] = newPages.splice(fromIndex, 1);
       newPages.splice(toIndex, 0, movedPage);
       
-      // Ajustar índice actual
       let newCurrentIndex = currentPageIndex;
       if (fromIndex === currentPageIndex) {
         newCurrentIndex = toIndex;
@@ -259,11 +342,10 @@ export const usePageManager = (initialPages = null) => {
   // ✅ Obtener dimensiones de página en píxeles
   const getPageDimensionsInPixels = useCallback((pageIndex = currentPageIndex) => {
     const page = pages[pageIndex];
-    if (!page) return { width: 794, height: 1123 }; // A4 default en px
+    if (!page) return { width: 794, height: 1123 };
 
     const { width, height, unit } = page.size;
     
-    // Factores de conversión a píxeles (96 DPI)
     const conversionFactors = {
       'mm': 3.779527559,
       'cm': 37.79527559,
@@ -280,7 +362,7 @@ export const usePageManager = (initialPages = null) => {
     };
   }, [pages, currentPageIndex]);
 
-  // ✅ Presets de tamaños de página mejorados para PDF
+  // ✅ Presets de tamaños de página
   const getPageSizePresets = useCallback(() => {
     return {
       iso: [
@@ -346,7 +428,158 @@ export const usePageManager = (initialPages = null) => {
     console.log('🔄 Toggled orientation for page:', pageIndex, 'to:', newOrientation);
   }, [pages, currentPageIndex, updatePageConfig]);
 
-  // ✅ Exportar todas las páginas
+  // ✅ NUEVO: Evaluar flujo de página específica
+  const evaluatePageFlow = useCallback((pageIndex, contextData = {}) => {
+    try {
+      return pageFlowEngine.evaluatePageFlow(pageIndex, contextData);
+    } catch (error) {
+      console.error('Error evaluating page flow:', error);
+      return null;
+    }
+  }, [pageFlowEngine]);
+
+  // ✅ NUEVO: Evaluar próxima página
+  const evaluateNextPage = useCallback((pageIndex, contextData = {}) => {
+    try {
+      return pageFlowEngine.evaluateNextPage(pageIndex, contextData);
+    } catch (error) {
+      console.error('Error evaluating next page:', error);
+      return { type: NEXT_PAGE_TYPES.AUTO, targetPageIndex: pageIndex + 1 };
+    }
+  }, [pageFlowEngine]);
+
+  // ✅ NUEVO: Generar secuencia completa de páginas
+  const generatePageSequence = useCallback((startPageIndex = 0, contextData = {}) => {
+    try {
+      return pageFlowEngine.generatePageSequence(startPageIndex, contextData);
+    } catch (error) {
+      console.error('Error generating page sequence:', error);
+      return [];
+    }
+  }, [pageFlowEngine]);
+
+  // ✅ NUEVO: Obtener páginas que referencian a una página específica
+  const getPageReferences = useCallback((targetPageIndex) => {
+    const references = [];
+    
+    pages.forEach((page, index) => {
+      if (!page.flowConfig) return;
+      
+      // Verificar referencias en configuración simple
+      if (page.flowConfig.simple?.targetPageIndex === targetPageIndex) {
+        references.push({
+          pageIndex: index,
+          type: 'simple',
+          pageName: page.name
+        });
+      }
+      
+      // Verificar referencias en condiciones
+      if (page.flowConfig.conditional?.conditions) {
+        page.flowConfig.conditional.conditions.forEach((condition, condIndex) => {
+          if (condition.targetPageIndex === targetPageIndex) {
+            references.push({
+              pageIndex: index,
+              type: 'conditional',
+              conditionIndex: condIndex,
+              pageName: page.name,
+              conditionDescription: condition.description
+            });
+          }
+        });
+      }
+      
+      // Verificar referencias en páginas repetidas
+      if (page.flowConfig.repeated?.templatePageIndex === targetPageIndex) {
+        references.push({
+          pageIndex: index,
+          type: 'repeated',
+          pageName: page.name
+        });
+      }
+      
+      // Verificar referencias en nextPage
+      if (page.flowConfig.nextPage?.targetPageIndex === targetPageIndex) {
+        references.push({
+          pageIndex: index,
+          type: 'nextPage',
+          pageName: page.name
+        });
+      }
+    });
+    
+    return references;
+  }, [pages]);
+
+  // ✅ NUEVO: Validar configuración de flujo
+  const validatePageFlowConfig = useCallback((pageIndex = currentPageIndex) => {
+    const page = pages[pageIndex];
+    if (!page?.flowConfig) {
+      return { isValid: false, errors: ['No flow configuration found'] };
+    }
+    
+    const errors = [];
+    const warnings = [];
+    const config = page.flowConfig;
+    
+    // Validar configuración según tipo
+    switch (config.type) {
+      case PAGE_FLOW_TYPES.SIMPLE:
+        if (config.simple?.targetPageIndex >= pages.length) {
+          errors.push('Target page index is out of bounds');
+        }
+        break;
+        
+      case PAGE_FLOW_TYPES.CONDITIONAL:
+        if (!config.conditional?.conditions?.length) {
+          warnings.push('No conditions defined for conditional page');
+        }
+        config.conditional?.conditions?.forEach((condition, index) => {
+          if (!condition.variable && !condition.script) {
+            errors.push(`Condition ${index + 1}: No variable or script defined`);
+          }
+          if (condition.targetPageIndex >= pages.length) {
+            errors.push(`Condition ${index + 1}: Target page index is out of bounds`);
+          }
+        });
+        break;
+        
+      case PAGE_FLOW_TYPES.REPEATED:
+        if (!config.repeated?.dataSource?.variableName) {
+          errors.push('No data source variable defined for repeated page');
+        }
+        if (config.repeated?.templatePageIndex >= pages.length) {
+          errors.push('Template page index is out of bounds');
+        }
+        break;
+    }
+    
+    // Validar nextPage
+    if (config.nextPage?.targetPageIndex >= pages.length) {
+      errors.push('Next page index is out of bounds');
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }, [pages, currentPageIndex]);
+
+  // ✅ NUEVO: Obtener logs del motor de flujo
+  const getFlowExecutionLogs = useCallback(() => {
+    return {
+      logs: pageFlowEngine.getExecutionLog(),
+      errors: pageFlowEngine.getErrors()
+    };
+  }, [pageFlowEngine]);
+
+  // ✅ NUEVO: Limpiar logs del motor de flujo
+  const clearFlowLogs = useCallback(() => {
+    pageFlowEngine.clearLogs();
+  }, [pageFlowEngine]);
+
+  // ✅ Exportar todas las páginas (incluyendo configuración de flujo)
   const exportPages = useCallback(() => {
     return {
       pages: pages.map(page => ({
@@ -355,36 +588,58 @@ export const usePageManager = (initialPages = null) => {
       })),
       currentPageIndex,
       totalPages: pages.length,
+      flowEngineOptions,
+      availableVariables: availableVariablesState,
       exportedAt: new Date().toISOString(),
-      version: '1.0'
+      version: '2.0' // Incrementar versión para flujo
     };
-  }, [pages, currentPageIndex]);
+  }, [pages, currentPageIndex, flowEngineOptions, availableVariablesState]);
 
-  // ✅ Importar páginas
+  // ✅ Importar páginas (incluyendo configuración de flujo)
   const importPages = useCallback((pagesData) => {
-    console.log('📥 Importing pages:', pagesData);
+    console.log('📥 Importing pages with flow config:', pagesData);
     
     if (pagesData?.pages && Array.isArray(pagesData.pages) && pagesData.pages.length > 0) {
-      setPages(pagesData.pages);
+      // Asegurar que todas las páginas tengan flowConfig
+      const pagesWithFlow = pagesData.pages.map(page => ({
+        ...page,
+        flowConfig: page.flowConfig || {
+          ...DEFAULT_PAGE_FLOW_CONFIG,
+          createdAt: page.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      }));
+      
+      setPages(pagesWithFlow);
       setCurrentPageIndex(
-        Math.min(pagesData.currentPageIndex || 0, pagesData.pages.length - 1)
+        Math.min(pagesData.currentPageIndex || 0, pagesWithFlow.length - 1)
       );
       
+      // Importar configuración del motor de flujo
+      if (pagesData.flowEngineOptions) {
+        setFlowEngineOptions(pagesData.flowEngineOptions);
+      }
+      
+      // Importar variables disponibles
+      if (pagesData.availableVariables) {
+        setAvailableVariablesState(pagesData.availableVariables);
+      }
+      
       // Actualizar referencia de ID
-      const maxId = pagesData.pages.reduce((max, page) => {
+      const maxId = pagesWithFlow.reduce((max, page) => {
         const match = page.id.match(/page_\d+_(\d+)/);
         return match ? Math.max(max, parseInt(match[1])) : max;
       }, 0);
       nextPageIdRef.current = maxId + 1;
       
-      saveToHistory(pagesData.pages);
-      console.log('✅ Pages imported successfully');
+      saveToHistory(pagesWithFlow);
+      console.log('✅ Pages with flow config imported successfully');
     } else {
       console.warn('⚠️ Invalid pages data for import');
     }
   }, [saveToHistory]);
 
-  // ✅ Estadísticas
+  // ✅ Estadísticas (incluyendo información de flujo)
   const getStatistics = useCallback(() => {
     const totalElements = pages.reduce((sum, page) => sum + page.elements.length, 0);
     const avgElementsPerPage = pages.length > 0 ? totalElements / pages.length : 0;
@@ -394,6 +649,22 @@ export const usePageManager = (initialPages = null) => {
       acc[preset] = (acc[preset] || 0) + 1;
       return acc;
     }, {});
+    
+    // Estadísticas de flujo
+    const flowTypeDistribution = pages.reduce((acc, page) => {
+      const flowType = page.flowConfig?.type || PAGE_FLOW_TYPES.SIMPLE;
+      acc[flowType] = (acc[flowType] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const pagesWithConditions = pages.filter(page => 
+      page.flowConfig?.type === PAGE_FLOW_TYPES.CONDITIONAL &&
+      page.flowConfig.conditional?.conditions?.length > 0
+    ).length;
+    
+    const pagesWithRepeating = pages.filter(page => 
+      page.flowConfig?.type === PAGE_FLOW_TYPES.REPEATED
+    ).length;
 
     return {
       totalPages: pages.length,
@@ -401,44 +672,75 @@ export const usePageManager = (initialPages = null) => {
       totalElements,
       avgElementsPerPage: Math.round(avgElementsPerPage * 10) / 10,
       sizeDistribution,
-      hasMultiplePages: pages.length > 1
+      hasMultiplePages: pages.length > 1,
+      
+      // Estadísticas de flujo
+      flowTypeDistribution,
+      pagesWithConditions,
+      pagesWithRepeating,
+      hasAdvancedFlow: pagesWithConditions > 0 || pagesWithRepeating > 0
     };
   }, [pages, currentPageIndex]);
 
   return {
-    // Estado
+    // Estado básico
     pages,
     currentPageIndex,
     currentPage: getCurrentPage(),
     
-    // Operaciones de páginas
+    // Operaciones básicas de páginas
     addPage,
     duplicatePage,
     deletePage,
     goToPage,
     reorderPages,
     
-    // Configuración
+    // Configuración básica
     updatePageConfig,
     updatePageElements,
     applyPageSizePreset,
     togglePageOrientation,
     
-    // Utilidades
+    // ✅ NUEVO: Operaciones de flujo de páginas
+    updatePageFlowConfig,
+    evaluatePageFlow,
+    evaluateNextPage,
+    generatePageSequence,
+    getPageReferences,
+    validatePageFlowConfig,
+    
+    // ✅ NUEVO: Manejo de variables
+    updateAvailableVariables,
+    availableVariables: availableVariablesState,
+    
+    // ✅ NUEVO: Configuración del motor
+    setFlowEngineConfig,
+    flowEngineOptions,
+    
+    // ✅ NUEVO: Logs y debugging
+    getFlowExecutionLogs,
+    clearFlowLogs,
+    
+    // Utilidades básicas
     getPageDimensionsInPixels,
     getPageSizePresets,
     
-    // Import/Export
+    // Import/Export (actualizado)
     exportPages,
     importPages,
     
-    // Estadísticas
+    // Estadísticas (actualizado)
     getStatistics,
     
-    // Navegación
+    // Navegación básica
     canGoToNextPage: currentPageIndex < pages.length - 1,
     canGoToPrevPage: currentPageIndex > 0,
     nextPage: () => goToPage(currentPageIndex + 1),
-    prevPage: () => goToPage(currentPageIndex - 1)
+    prevPage: () => goToPage(currentPageIndex - 1),
+    
+    // ✅ NUEVO: Constantes de flujo
+    PAGE_FLOW_TYPES,
+    NEXT_PAGE_TYPES,
+    DEFAULT_PAGE_FLOW_CONFIG
   };
 };

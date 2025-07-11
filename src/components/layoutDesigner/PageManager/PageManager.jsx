@@ -1,9 +1,11 @@
-// src/components/layoutDesigner/PageManager/PageManager.jsx - CORREGIDO
+// src/components/layoutDesigner/PageManager/PageManager.jsx - COMPLETE VERSION WITH FLOW
 import React, { useState, useCallback } from 'react';
 import Button from '../../common/Button/Button';
 import PageThumbnail from './PageThumbnail';
 import PageConfigurationModal from './PageConfigurationModal';
 import QuickSizeModal from './QuickSizeModal';
+import PageFlowConfigModal from './PageFlowConfigModal'; // ✅ NUEVO
+import PageFlowIndicator, { PageFlowIndicatorGroup } from './PageFlowIndicator'; // ✅ NUEVO
 
 const PageManager = ({ 
   pages = [],
@@ -13,15 +15,19 @@ const PageManager = ({
   onDeletePage,
   onGoToPage,
   onUpdatePageConfig,
+  onUpdatePageFlowConfig, // ✅ NUEVA función
   onToggleOrientation,
   onApplyPreset,
   getPageSizePresets = () => ({ iso: [], northAmerica: [], custom: [] }),
+  availableVariables = {}, // ✅ NUEVO para configuración de flujo
   compact = false
 }) => {
   // Estados locales
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showQuickSizeModal, setShowQuickSizeModal] = useState(false);
+  const [showFlowConfigModal, setShowFlowConfigModal] = useState(false); // ✅ NUEVO
   const [editingPageIndex, setEditingPageIndex] = useState(null);
+  const [flowConfigPageIndex, setFlowConfigPageIndex] = useState(null); // ✅ NUEVO
 
   // Protección contra datos vacíos
   const safePages = Array.isArray(pages) ? pages : [];
@@ -39,18 +45,21 @@ const PageManager = ({
     setShowConfigModal(true);
   }, []);
 
-  // ✅ CORREGIDO: Guardar configuración de página usando el hook
+  // ✅ NUEVO: Configurar flujo de página
+  const handleConfigurePageFlow = useCallback((pageIndex) => {
+    setFlowConfigPageIndex(pageIndex);
+    setShowFlowConfigModal(true);
+  }, []);
+
+  // ✅ Guardar configuración de página
   const handleSavePageConfig = useCallback((config) => {
     console.log('💾 Saving page config:', config);
     
     if (editingPageIndex !== null) {
-      // Editar página existente
       console.log('✏️ Editing existing page at index:', editingPageIndex);
       onUpdatePageConfig && onUpdatePageConfig(editingPageIndex, config);
     } else {
-      // ✅ CORREGIDO: Crear nueva página - pasar config completo
       console.log('➕ Creating new page with config:', config);
-      // El hook usePageManager espera (position, pageConfig), así que pasamos null como position
       onAddPage && onAddPage(null, config);
     }
     
@@ -58,11 +67,25 @@ const PageManager = ({
     setEditingPageIndex(null);
   }, [editingPageIndex, onUpdatePageConfig, onAddPage]);
 
+  // ✅ NUEVO: Guardar configuración de flujo
+  const handleSaveFlowConfig = useCallback((flowConfig) => {
+    console.log('🔄 Saving flow config for page:', flowConfigPageIndex, flowConfig);
+    
+    if (flowConfigPageIndex !== null && onUpdatePageFlowConfig) {
+      onUpdatePageFlowConfig(flowConfigPageIndex, flowConfig);
+    }
+    
+    setShowFlowConfigModal(false);
+    setFlowConfigPageIndex(null);
+  }, [flowConfigPageIndex, onUpdatePageFlowConfig]);
+
   // ✅ Cerrar modales
   const handleCloseModals = useCallback(() => {
     setShowConfigModal(false);
     setShowQuickSizeModal(false);
+    setShowFlowConfigModal(false); // ✅ NUEVO
     setEditingPageIndex(null);
+    setFlowConfigPageIndex(null); // ✅ NUEVO
   }, []);
 
   // ✅ Aplicar preset rápido
@@ -72,6 +95,14 @@ const PageManager = ({
     }
     setShowQuickSizeModal(false);
   }, [onApplyPreset, currentPageIndex]);
+
+  // ✅ NUEVO: Verificar si hay páginas con flujo avanzado
+  const hasAdvancedFlowPages = safePages.some(page => 
+    page.flowConfig && (
+      page.flowConfig.type !== 'simple' ||
+      (page.flowConfig.nextPage && page.flowConfig.nextPage.type !== 'auto')
+    )
+  );
 
   // ✅ Renderizado compacto (para uso en header)
   if (compact) {
@@ -103,6 +134,20 @@ const PageManager = ({
           </span>
         )}
 
+        {/* ✅ NUEVO: Indicador de flujo avanzado */}
+        {hasAdvancedFlowPages && (
+          <span style={{
+            color: '#f59e0b',
+            background: '#fef3c7',
+            padding: '1px 4px',
+            borderRadius: '6px',
+            fontSize: '8px',
+            fontWeight: '500'
+          }}>
+            🔄 Flujo
+          </span>
+        )}
+
         {/* Botón nueva página */}
         <button
           onClick={handleCreatePage}
@@ -119,7 +164,26 @@ const PageManager = ({
           ➕
         </button>
 
-        {/* Modal */}
+        {/* ✅ NUEVO: Botón configurar flujo */}
+        {currentPage && (
+          <button
+            onClick={() => handleConfigurePageFlow(currentPageIndex)}
+            style={{
+              padding: '3px 6px',
+              border: '1px solid #f59e0b',
+              borderRadius: '3px',
+              background: '#fef3c7',
+              color: '#d97706',
+              fontSize: '9px',
+              cursor: 'pointer'
+            }}
+            title="Configurar flujo de página"
+          >
+            🔄
+          </button>
+        )}
+
+        {/* Modales */}
         <PageConfigurationModal
           isOpen={showConfigModal}
           onClose={handleCloseModals}
@@ -127,6 +191,17 @@ const PageManager = ({
           pageData={editingPageIndex !== null ? safePages[editingPageIndex] : null}
           mode={editingPageIndex !== null ? 'edit' : 'create'}
           getPageSizePresets={getPageSizePresets}
+        />
+
+        {/* ✅ NUEVO: Modal de configuración de flujo */}
+        <PageFlowConfigModal
+          isOpen={showFlowConfigModal}
+          onClose={handleCloseModals}
+          onSave={handleSaveFlowConfig}
+          pageData={flowConfigPageIndex !== null ? safePages[flowConfigPageIndex] : null}
+          pageIndex={flowConfigPageIndex}
+          pages={safePages}
+          availableVariables={availableVariables}
         />
       </div>
     );
@@ -175,6 +250,21 @@ const PageManager = ({
           }}>
             {safePages.length} total{safePages.length > 1 ? ` • ${currentPageIndex + 1} activa` : ''}
           </div>
+
+          {/* ✅ NUEVO: Indicador de páginas con flujo avanzado */}
+          {hasAdvancedFlowPages && (
+            <div style={{
+              background: '#fef3c7',
+              padding: '2px 6px',
+              borderRadius: '8px',
+              fontSize: '10px',
+              color: '#d97706',
+              fontWeight: '500',
+              border: '1px solid #fbbf24'
+            }}>
+              🔄 Flujo Avanzado
+            </div>
+          )}
         </div>
 
         {/* Controles principales */}
@@ -244,6 +334,33 @@ const PageManager = ({
               >
                 🔄 {currentPage.orientation === 'portrait' ? '📄→📃' : '📃→📄'}
               </button>
+
+              {/* ✅ NUEVO: Botón configurar flujo */}
+              <button
+                onClick={() => handleConfigurePageFlow(currentPageIndex)}
+                style={{
+                  padding: '6px 8px',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '4px',
+                  background: hasAdvancedFlowPages ? '#fef3c7' : 'white',
+                  fontSize: '11px',
+                  cursor: 'pointer',
+                  color: '#d97706',
+                  transition: 'all 0.2s',
+                  fontWeight: hasAdvancedFlowPages ? '600' : '400'
+                }}
+                title="Configurar flujo de página"
+                onMouseEnter={(e) => {
+                  e.target.style.background = '#fef3c7';
+                  e.target.style.borderColor = '#f59e0b';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = hasAdvancedFlowPages ? '#fef3c7' : 'white';
+                  e.target.style.borderColor = '#f59e0b';
+                }}
+              >
+                🔄 Flujo
+              </button>
             </>
           )}
         </div>
@@ -256,6 +373,33 @@ const PageManager = ({
         background: '#e5e7eb',
         flexShrink: 0
       }} />
+
+      {/* ✅ NUEVO: Indicadores de flujo de páginas */}
+      {hasAdvancedFlowPages && (
+        <div style={{
+          flexShrink: 0,
+          maxWidth: '200px',
+          overflow: 'hidden'
+        }}>
+          <PageFlowIndicatorGroup
+            pages={safePages}
+            currentPageIndex={currentPageIndex}
+            onPageFlowClick={handleConfigurePageFlow}
+            size="small"
+            maxVisible={3}
+          />
+        </div>
+      )}
+
+      {/* Separador (si hay indicadores de flujo) */}
+      {hasAdvancedFlowPages && (
+        <div style={{
+          width: '1px',
+          height: '24px',
+          background: '#e5e7eb',
+          flexShrink: 0
+        }} />
+      )}
 
       {/* Lista de páginas */}
       <div style={{
@@ -293,6 +437,7 @@ const PageManager = ({
               onEdit={handleEditPage}
               onDuplicate={onDuplicatePage}
               onDelete={onDeletePage}
+              onFlowConfig={handleConfigurePageFlow} // ✅ NUEVA prop
               thumbnailSize="normal"
             />
           ))
@@ -306,7 +451,7 @@ const PageManager = ({
           fontSize: '10px',
           color: '#6b7280',
           textAlign: 'right',
-          minWidth: '100px',
+          minWidth: '120px',
           padding: '8px 12px',
           background: '#ffffff',
           border: '1px solid #e5e7eb',
@@ -334,6 +479,21 @@ const PageManager = ({
               📏 M: {currentPage.margins.top}×{currentPage.margins.right}×{currentPage.margins.bottom}×{currentPage.margins.left}
             </div>
           )}
+          
+          {/* ✅ NUEVO: Indicador de flujo en información de página */}
+          {currentPage.flowConfig && currentPage.flowConfig.type !== 'simple' && (
+            <div style={{ 
+              marginTop: '4px',
+              fontSize: '8px'
+            }}>
+              <PageFlowIndicator
+                page={currentPage}
+                size="small"
+                showDetails={false}
+                onClick={() => handleConfigurePageFlow(currentPageIndex)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -358,6 +518,18 @@ const PageManager = ({
           handleEditPage(currentPageIndex);
         }}
         getPageSizePresets={getPageSizePresets}
+      />
+
+      {/* ✅ NUEVO: Modal de configuración de flujo */}
+      <PageFlowConfigModal
+        isOpen={showFlowConfigModal}
+        onClose={handleCloseModals}
+        onSave={handleSaveFlowConfig}
+        pageData={flowConfigPageIndex !== null ? safePages[flowConfigPageIndex] : null}
+        pageIndex={flowConfigPageIndex}
+        pages={safePages}
+        availableVariables={availableVariables}
+        mode="edit"
       />
     </div>
   );
