@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PageManager/PageFlowConfigModal.jsx - SIMPLIFIED VERSION
+// src/components/layoutDesigner/PageManager/PageFlowConfigModal.jsx - MODAL MÁS GRANDE
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   PAGE_FLOW_TYPES, 
@@ -6,7 +6,7 @@ import {
   OPERATORS,
   CONDITION_TEMPLATES,
   DEFAULT_PAGE_FLOW_CONFIG
-} from '../utils/pageFlow.constants.js';
+} from '../../utils/pageFlow.constants';
 
 // Importar componentes de pestañas
 import PageFlowTypeTab from './PageFlowTypeTab';
@@ -194,8 +194,8 @@ const PageFlowConfigModal = ({
       <div style={{
         background: 'white',
         borderRadius: '12px',
-        width: '900px',
-        height: '700px',
+        width: '1200px',        // ✅ CAMBIADO: Era 900px
+        height: '850px',        // ✅ CAMBIADO: Era 700px, ahora 850px
         maxWidth: '95vw',
         maxHeight: '95vh',
         display: 'flex',
@@ -251,6 +251,10 @@ const PageFlowConfigModal = ({
             <span style={{ marginLeft: '16px', color: '#6b7280' }}>
               <strong>Tamaño:</strong> {pageData?.size?.preset || 'Personalizado'}
             </span>
+            {/* ✅ NUEVO: Indicador de variables disponibles */}
+            <span style={{ marginLeft: '16px', color: '#16a34a' }}>
+              <strong>Variables:</strong> {Object.keys(availableVariables).length} disponibles
+            </span>
           </div>
         </div>
 
@@ -281,12 +285,14 @@ const PageFlowConfigModal = ({
           ))}
         </div>
 
-        {/* Contenido principal */}
+        {/* Contenido principal - MÁS ESPACIO */}
         <div style={{ 
           flex: 1,
           padding: '32px',
           overflowY: 'auto',
-          minHeight: 0
+          minHeight: 0,
+          // ✅ NUEVO: Más espacio para Monaco Editor
+          maxHeight: 'calc(850px - 200px)' // Ajustar según altura del modal
         }}>
           <ActiveTabComponent
             flowConfig={flowConfig}
@@ -317,6 +323,10 @@ const PageFlowConfigModal = ({
                 • {Object.keys(errors).length} error{Object.keys(errors).length !== 1 ? 'es' : ''}
               </span>
             )}
+            {/* ✅ NUEVO: Información adicional en footer */}
+            <span style={{ marginLeft: '16px', color: '#16a34a' }}>
+              • Monaco Editor habilitado para scripts avanzados
+            </span>
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>

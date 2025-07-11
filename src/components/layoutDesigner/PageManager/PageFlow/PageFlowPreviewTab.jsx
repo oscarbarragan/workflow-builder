@@ -1,6 +1,6 @@
 // src/components/layoutDesigner/PageManager/PageFlowPreviewTab.jsx
 import React from 'react';
-import { PAGE_FLOW_TYPES, NEXT_PAGE_TYPES } from '../utils/pageFlow.constants.js';
+import { PAGE_FLOW_TYPES, NEXT_PAGE_TYPES } from '../../utils/pageFlow.constants';
 
 const PageFlowPreviewTab = ({ flowConfig }) => {
   return (

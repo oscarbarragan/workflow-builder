@@ -1,6 +1,6 @@
 // src/components/layoutDesigner/PageManager/PageFlowTypeTab.jsx
 import React from 'react';
-import { PAGE_FLOW_TYPES } from '../utils/pageFlow.constants.js';
+import { PAGE_FLOW_TYPES } from '../../utils/pageFlow.constants';
 
 const PageFlowTypeTab = ({ flowConfig, updateFlowConfig }) => {
   return (

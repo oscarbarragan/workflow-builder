@@ -4,8 +4,8 @@ import Button from '../../common/Button/Button';
 import PageThumbnail from './PageThumbnail';
 import PageConfigurationModal from './PageConfigurationModal';
 import QuickSizeModal from './QuickSizeModal';
-import PageFlowConfigModal from './PageFlowConfigModal'; // ✅ NUEVO
-import PageFlowIndicator, { PageFlowIndicatorGroup } from './PageFlowIndicator'; // ✅ NUEVO
+import PageFlowConfigModal from './PageFlow/PageFlowConfigModal'; // ✅ NUEVO
+import PageFlowIndicator, { PageFlowIndicatorGroup } from './PageFlow/PageFlowIndicator'; 
 
 const PageManager = ({ 
   pages = [],

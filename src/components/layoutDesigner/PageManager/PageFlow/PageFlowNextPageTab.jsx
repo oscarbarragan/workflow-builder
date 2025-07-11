@@ -1,6 +1,6 @@
 // src/components/layoutDesigner/PageManager/PageFlowNextPageTab.jsx
 import React from 'react';
-import { NEXT_PAGE_TYPES } from '../utils/pageFlow.constants.js';
+import { NEXT_PAGE_TYPES } from '../../utils/pageFlow.constants';
 
 const PageFlowNextPageTab = ({ flowConfig, updateFlowConfig, pages }) => {
   // Obtener lista de páginas para seleccionar

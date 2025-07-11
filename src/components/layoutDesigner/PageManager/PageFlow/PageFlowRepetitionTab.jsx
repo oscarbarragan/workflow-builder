@@ -1,6 +1,6 @@
 // src/components/layoutDesigner/PageManager/PageFlowRepetitionTab.jsx - CORREGIDO
 import React from 'react';
-import { textBoxUtils } from '../components/TextBox/textbox.utils.js'; // ✅ IMPORTAR UTILS
+import { textBoxUtils } from '../../components/TextBox/textbox.utils.js'; // ✅ IMPORTAR UTILS
 
 const PageFlowRepetitionTab = ({ 
   flowConfig, 
