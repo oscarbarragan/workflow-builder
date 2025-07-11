@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PageManager/PageConfigurationModal.jsx - USANDO COMPONENTES SEPARADOS
+// src/components/layoutDesigner/PageManager/PageConfigurationModal.jsx - FOOTER CORREGIDO
 import React, { useState, useEffect, useCallback } from 'react';
 import Modal from '../../common/Modal/Modal';
 import Button from '../../common/Button/Button';
@@ -26,10 +26,10 @@ const PageConfigurationModal = ({
     },
     orientation: 'portrait',
     margins: {
-      top: 10,
-      right: 10,
-      bottom: 10,
-      left: 10,
+      top: 0,     // ✅ CAMBIADO: Era 10, ahora 0
+      right: 0,   // ✅ CAMBIADO: Era 10, ahora 0
+      bottom: 0,  // ✅ CAMBIADO: Era 10, ahora 0
+      left: 0,    // ✅ CAMBIADO: Era 10, ahora 0
       unit: 'mm'
     },
     customSize: false,
@@ -63,7 +63,7 @@ const PageConfigurationModal = ({
         name: pageData.name || `Página ${Date.now()}`,
         size: pageData.size || { preset: 'A4', width: 210, height: 297, unit: 'mm' },
         orientation: pageData.orientation || 'portrait',
-        margins: pageData.margins || { top: 10, right: 10, bottom: 10, left: 10, unit: 'mm' },
+        margins: pageData.margins || { top: 0, right: 0, bottom: 0, left: 0, unit: 'mm' }, // ✅ FALLBACK CON MÁRGENES CERO
         customSize: pageData.size?.preset === 'Custom' || false,
         workingUnit: pageData.workingUnit || pageData.size?.unit || 'mm',
         dpi: pageData.dpi || 300
@@ -75,7 +75,7 @@ const PageConfigurationModal = ({
         name: defaultName,
         size: { preset: 'A4', width: 210, height: 297, unit: 'mm' },
         orientation: 'portrait',
-        margins: { top: 10, right: 10, bottom: 10, left: 10, unit: 'mm' },
+        margins: { top: 0, right: 0, bottom: 0, left: 0, unit: 'mm' }, // ✅ MÁRGENES CERO
         customSize: false,
         workingUnit: 'mm',
         dpi: 300
@@ -263,24 +263,72 @@ const PageConfigurationModal = ({
 
   if (!isOpen) return null;
 
+  // ✅ RENDERIZACIÓN DIRECTA SIN COMPONENTE MODAL PARA CONTROL TOTAL
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={mode === 'edit' ? '✏️ Editar Página' : '➕ Nueva Página'}
-      size="large"
-    >
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        height: '600px',
-        maxHeight: '70vh'
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+      padding: '20px',
+      boxSizing: 'border-box'
+    }}>
+      <div style={{
+        background: 'white',
+        borderRadius: '8px',
+        width: '1200px',
+        height: '850px',
+        maxWidth: '95vw',
+        maxHeight: '95vh',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        overflow: 'hidden'
       }}>
-        {/* Pestañas */}
+        {/* ✅ HEADER FIJO */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '24px 32px',
+          borderBottom: '1px solid #e5e7eb',
+          flexShrink: 0
+        }}>
+          <h2 style={{
+            margin: 0,
+            fontSize: '20px',
+            fontWeight: '600',
+            color: '#1f2937'
+          }}>
+            {mode === 'edit' ? '✏️ Editar Página' : '➕ Nueva Página'}
+          </h2>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: '#6b7280',
+              padding: '4px',
+              borderRadius: '4px'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* ✅ PESTAÑAS FIJAS */}
         <div style={{
           display: 'flex',
           borderBottom: '1px solid #e5e7eb',
-          marginBottom: '20px'
+          flexShrink: 0
         }}>
           {[
             { id: 'size', label: '📐 Tamaño' },
@@ -291,12 +339,12 @@ const PageConfigurationModal = ({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                padding: '12px 16px',
+                padding: '18px 24px',
                 border: 'none',
-                borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === tab.id ? '3px solid #3b82f6' : '3px solid transparent',
                 background: activeTab === tab.id ? '#eff6ff' : 'transparent',
                 color: activeTab === tab.id ? '#1e40af' : '#6b7280',
-                fontSize: '12px',
+                fontSize: '15px',
                 fontWeight: '500',
                 cursor: 'pointer',
                 transition: 'all 0.2s'
@@ -307,11 +355,11 @@ const PageConfigurationModal = ({
           ))}
         </div>
 
-        {/* Contenido de pestañas */}
+        {/* ✅ CONTENIDO PRINCIPAL - FLEX 1 PARA OCUPAR ESPACIO */}
         <div style={{ 
-          flex: 1, 
+          flex: 1,
+          padding: '32px',
           overflowY: 'auto',
-          padding: '0 20px',
           minHeight: 0
         }}>
           {activeTab === 'size' && (
@@ -349,18 +397,17 @@ const PageConfigurationModal = ({
           )}
         </div>
 
-        {/* Botones de acción */}
+        {/* ✅ FOOTER FIJO EN LA PARTE INFERIOR */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          padding: '16px 20px',
+          padding: '24px 32px',
           borderTop: '1px solid #e5e7eb',
-          backgroundColor: 'white',
-          marginTop: 'auto',
+          backgroundColor: '#f8fafc',
           flexShrink: 0
         }}>
-          <div style={{ fontSize: '11px', color: '#6b7280' }}>
+          <div style={{ fontSize: '12px', color: '#6b7280' }}>
             {mode === 'edit' ? 'Editando página existente' : 'Creando nueva página'}
             {customSizes.length > 0 && (
               <span style={{ marginLeft: '12px', color: '#16a34a' }}>
@@ -370,16 +417,42 @@ const PageConfigurationModal = ({
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>
-            <Button onClick={onClose} variant="secondary">
+            <button
+              onClick={onClose}
+              style={{
+                padding: '12px 24px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                background: 'white',
+                color: '#374151',
+                fontSize: '15px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
               Cancelar
-            </Button>
-            <Button onClick={handleSave} variant="primary">
+            </button>
+            <button
+              onClick={handleSave}
+              style={{
+                padding: '12px 24px',
+                border: 'none',
+                borderRadius: '6px',
+                background: '#3b82f6',
+                color: 'white',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
               {mode === 'edit' ? '💾 Actualizar' : '➕ Crear Página'}
-            </Button>
+            </button>
           </div>
         </div>
       </div>
-    </Modal>
+    </div>
   );
 };
 

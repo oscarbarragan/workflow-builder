@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/hooks/usePageManager.js - CORREGIDO
+// src/components/layoutDesigner/hooks/usePageManager.js - MÁRGENES CERO POR DEFECTO
 import { useState, useCallback, useRef } from 'react';
 
 export const usePageManager = (initialPages = null) => {
@@ -6,7 +6,7 @@ export const usePageManager = (initialPages = null) => {
   const nextPageIdRef = useRef(1);
   const maxHistorySize = 50;
 
-  // ✅ Función para crear página por defecto (movida después de refs)
+  // ✅ Función para crear página por defecto (movida después de refs) - MÁRGENES CERO
   const createDefaultPage = useCallback(() => {
     return {
       id: `page_${Date.now()}_${nextPageIdRef.current++}`,
@@ -19,10 +19,10 @@ export const usePageManager = (initialPages = null) => {
       },
       orientation: 'portrait', // 'portrait' | 'landscape'
       margins: {
-        top: 10,
-        right: 10,
-        bottom: 10,
-        left: 10,
+        top: 0,      // ✅ CAMBIADO: Era 10, ahora 0
+        right: 0,    // ✅ CAMBIADO: Era 10, ahora 0
+        bottom: 0,   // ✅ CAMBIADO: Era 10, ahora 0
+        left: 0,     // ✅ CAMBIADO: Era 10, ahora 0
         unit: 'mm'
       },
       background: {
@@ -74,7 +74,7 @@ export const usePageManager = (initialPages = null) => {
     return pages[currentPageIndex] || null;
   }, [pages, currentPageIndex]);
 
-  // ✅ Agregar nueva página
+  // ✅ Agregar nueva página - CON MÁRGENES CERO POR DEFECTO
   const addPage = useCallback((position = null, pageConfig = {}) => {
     console.log('➕ Adding new page');
     
@@ -83,6 +83,14 @@ export const usePageManager = (initialPages = null) => {
       id: generatePageId(),
       name: pageConfig.name || `Página ${pages.length + 1}`,
       ...pageConfig,
+      // ✅ ASEGURAR que si no se especifican márgenes, sean cero
+      margins: pageConfig.margins || {
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        unit: pageConfig.size?.unit || 'mm'
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -108,7 +116,7 @@ export const usePageManager = (initialPages = null) => {
       return newPages;
     });
 
-    console.log('✅ Page added:', newPage.id);
+    console.log('✅ Page added with zero margins:', newPage.id);
     return newPage;
   }, [pages, generatePageId, saveToHistory, createDefaultPage]);
 
