@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PageManager/PageFlowConfigModal.jsx - MODAL MÁS GRANDE
+// src/components/layoutDesigner/PageManager/PageFlow/PageFlowConfigModal.jsx - SIN NEXT PAGE TAB
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   PAGE_FLOW_TYPES, 
@@ -8,11 +8,10 @@ import {
   DEFAULT_PAGE_FLOW_CONFIG
 } from '../../utils/pageFlow.constants';
 
-// Importar componentes de pestañas
+// Importar componentes de pestañas (sin NextPageTab)
 import PageFlowTypeTab from './PageFlowTypeTab';
 import PageFlowConditionsTab from './PageFlowConditionsTab';
 import PageFlowRepetitionTab from './PageFlowRepetitionTab';
-import PageFlowNextPageTab from './PageFlowNextPageTab';
 import PageFlowPreviewTab from './PageFlowPreviewTab';
 
 const PageFlowConfigModal = ({
@@ -69,6 +68,10 @@ const PageFlowConfigModal = ({
           if (!condition.variable && !condition.script) {
             newErrors[`condition_${index}`] = 'Variable o script requerido';
           }
+          // ✅ ACTUALIZADO: Validar startPageIndex en lugar de targetPageIndex
+          if (condition.startPageIndex >= pages.length) {
+            newErrors[`condition_${index}`] = 'Página de inicio seleccionada no válida';
+          }
         });
         break;
         
@@ -76,12 +79,23 @@ const PageFlowConfigModal = ({
         if (!flowConfig.repeated?.dataSource?.variableName) {
           newErrors.dataSource = 'Variable de datos requerida';
         }
+        // ✅ ACTUALIZADO: Validar startPageIndex en lugar de templatePageIndex
+        if (flowConfig.repeated?.startPageIndex >= pages.length) {
+          newErrors.startPage = 'Página de inicio seleccionada no válida';
+        }
+        break;
+        
+      case PAGE_FLOW_TYPES.SIMPLE:
+        // ✅ ACTUALIZADO: Validar startPageIndex para páginas simples también
+        if (flowConfig.simple?.startPageIndex >= pages.length) {
+          newErrors.startPage = 'Página de inicio seleccionada no válida';
+        }
         break;
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [flowConfig]);
+  }, [flowConfig, pages.length]);
 
   // Guardar configuración
   const handleSave = useCallback(() => {
@@ -102,12 +116,13 @@ const PageFlowConfigModal = ({
   const addCondition = useCallback(() => {
     const newCondition = {
       id: `condition_${Date.now()}`,
+      type: CONDITION_TYPES.VARIABLE, // ✅ Agregar tipo por defecto
       variable: '',
       operator: OPERATORS.EQUALS,
       value: '',
       script: '',
-      targetPageId: null,
-      targetPageIndex: null,
+      startPageId: null,     // ✅ CAMBIADO: de targetPageId a startPageId
+      startPageIndex: 0,     // ✅ CAMBIADO: de targetPageIndex a startPageIndex, default primera página
       description: ''
     };
 
@@ -154,28 +169,6 @@ const PageFlowConfigModal = ({
 
   if (!isOpen) return null;
 
-  // Definir pestañas disponibles
-  const availableTabs = [
-    { id: 'type', label: '🎯 Tipo de Página', component: PageFlowTypeTab },
-    { 
-      id: 'conditions', 
-      label: '📋 Condiciones', 
-      component: PageFlowConditionsTab,
-      show: flowConfig.type === PAGE_FLOW_TYPES.CONDITIONAL 
-    },
-    { 
-      id: 'repetition', 
-      label: '🔁 Repetición', 
-      component: PageFlowRepetitionTab,
-      show: flowConfig.type === PAGE_FLOW_TYPES.REPEATED 
-    },
-    { id: 'nextPage', label: '➡️ Página Siguiente', component: PageFlowNextPageTab },
-    { id: 'preview', label: '👁️ Vista Previa', component: PageFlowPreviewTab }
-  ].filter(tab => tab.show !== false);
-
-  // Obtener componente de pestaña activa
-  const ActiveTabComponent = availableTabs.find(tab => tab.id === activeTab)?.component || PageFlowTypeTab;
-
   return (
     <div style={{
       position: 'fixed',
@@ -194,8 +187,8 @@ const PageFlowConfigModal = ({
       <div style={{
         background: 'white',
         borderRadius: '12px',
-        width: '1200px',        // ✅ CAMBIADO: Era 900px
-        height: '850px',        // ✅ CAMBIADO: Era 700px, ahora 850px
+        width: '1000px',        // ✅ REDUCIDO: Era 1200px
+        height: '700px',        // ✅ REDUCIDO: Era 850px
         maxWidth: '95vw',
         maxHeight: '95vh',
         display: 'flex',
@@ -218,7 +211,7 @@ const PageFlowConfigModal = ({
             fontWeight: '600',
             color: '#1f2937'
           }}>
-            🔄 Configuración de Flujo de Página
+            🏁 Configuración de Flujo de Página (Página de Inicio)
           </h2>
           <button
             onClick={onClose}
@@ -256,54 +249,185 @@ const PageFlowConfigModal = ({
               <strong>Variables:</strong> {Object.keys(availableVariables).length} disponibles
             </span>
           </div>
+          
+          {/* ✅ NUEVA: Explicación del concepto */}
+          <div style={{ 
+            marginTop: '8px', 
+            fontSize: '12px', 
+            color: '#6b7280',
+            fontStyle: 'italic'
+          }}>
+            💡 <strong>Configurar página de inicio:</strong> Determina en cuál página interna comenzará este documento cuando se renderice
+          </div>
         </div>
 
-        {/* Pestañas */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '1px solid #e5e7eb',
-          flexShrink: 0
-        }}>
-          {availableTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '16px 20px',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid #3b82f6' : '3px solid transparent',
-                background: activeTab === tab.id ? '#eff6ff' : 'transparent',
-                color: activeTab === tab.id ? '#1e40af' : '#6b7280',
-                fontSize: '14px',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Contenido principal - MÁS ESPACIO */}
+        {/* Contenido principal - REDISEÑADO MÁS COMPACTO */}
         <div style={{ 
           flex: 1,
-          padding: '32px',
-          overflowY: 'auto',
-          minHeight: 0,
-          // ✅ NUEVO: Más espacio para Monaco Editor
-          maxHeight: 'calc(850px - 200px)' // Ajustar según altura del modal
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0
         }}>
-          <ActiveTabComponent
-            flowConfig={flowConfig}
-            updateFlowConfig={updateFlowConfig}
-            errors={errors}
-            pages={pages}
-            availableVariables={availableVariables}
-            addCondition={addCondition}
-            removeCondition={removeCondition}
-            applyConditionTemplate={applyConditionTemplate}
-          />
+          {/* ✅ NUEVO: Selector de tipo en la parte superior */}
+          <div style={{
+            padding: '24px 32px 16px 32px',
+            borderBottom: '1px solid #e5e7eb',
+            flexShrink: 0
+          }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', margin: 0 }}>
+              🎯 Tipo de Página
+            </h3>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              {Object.entries(PAGE_FLOW_TYPES).map(([key, value]) => {
+                const configs = {
+                  [PAGE_FLOW_TYPES.SIMPLE]: {
+                    title: '📄 Simple',
+                    description: 'Inicia en página específica',
+                    color: '#10b981'
+                  },
+                  [PAGE_FLOW_TYPES.CONDITIONAL]: {
+                    title: '🔀 Condicional',
+                    description: 'Según condiciones de datos',
+                    color: '#f59e0b'
+                  },
+                  [PAGE_FLOW_TYPES.REPEATED]: {
+                    title: '🔁 Repetida',
+                    description: 'Por cada elemento del array',
+                    color: '#8b5cf6'
+                  }
+                };
+                
+                const config = configs[value];
+                const isSelected = flowConfig.type === value;
+                
+                return (
+                  <button
+                    key={value}
+                    onClick={() => updateFlowConfig('type', value)}
+                    style={{
+                      flex: 1,
+                      padding: '16px',
+                      border: isSelected ? `2px solid ${config.color}` : '2px solid #e5e7eb',
+                      borderRadius: '8px',
+                      background: isSelected ? `${config.color}15` : 'white',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      marginBottom: '4px',
+                      color: isSelected ? config.color : '#374151'
+                    }}>
+                      {config.title}
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#6b7280',
+                      lineHeight: '1.3'
+                    }}>
+                      {config.description}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ✅ NUEVO: Selector de página de inicio para Simple */}
+            {flowConfig.type === PAGE_FLOW_TYPES.SIMPLE && (
+              <div style={{ 
+                marginTop: '16px',
+                padding: '12px',
+                background: '#f0fdf4',
+                borderRadius: '6px',
+                border: '1px solid #bbf7d0'
+              }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '12px',
+                  fontWeight: '500',
+                  marginBottom: '6px',
+                  color: '#166534'
+                }}>
+                  🏁 Página de inicio:
+                </label>
+                <select
+                  value={flowConfig.simple?.startPageIndex ?? 0}
+                  onChange={(e) => {
+                    const pageIndex = parseInt(e.target.value);
+                    const pageId = pages[pageIndex]?.id || null;
+                    updateFlowConfig('simple.startPageIndex', pageIndex);
+                    updateFlowConfig('simple.startPageId', pageId);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    backgroundColor: 'white'
+                  }}
+                >
+                  {pages.map((page, index) => (
+                    <option key={index} value={index}>
+                      {index + 1}. {page.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* ✅ NUEVO: Configuración específica según tipo */}
+          <div style={{
+            flex: 1,
+            padding: '24px 32px',
+            overflowY: 'auto',
+            minHeight: 0
+          }}>
+            {/* Solo mostrar configuración adicional para Condicional y Repetida */}
+            {flowConfig.type === PAGE_FLOW_TYPES.CONDITIONAL && (
+              <PageFlowConditionsTab
+                flowConfig={flowConfig}
+                updateFlowConfig={updateFlowConfig}
+                errors={errors}
+                pages={pages}
+                availableVariables={availableVariables}
+                addCondition={addCondition}
+                removeCondition={removeCondition}
+                applyConditionTemplate={applyConditionTemplate}
+              />
+            )}
+            
+            {flowConfig.type === PAGE_FLOW_TYPES.REPEATED && (
+              <PageFlowRepetitionTab
+                flowConfig={flowConfig}
+                updateFlowConfig={updateFlowConfig}
+                errors={errors}
+                pages={pages}
+                availableVariables={availableVariables}
+              />
+            )}
+
+            {flowConfig.type === PAGE_FLOW_TYPES.SIMPLE && (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px',
+                color: '#6b7280'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>✅</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>
+                  Configuración Completa
+                </div>
+                <div style={{ fontSize: '14px' }}>
+                  La página simple está configurada para iniciar en la página seleccionada arriba.
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -317,16 +441,16 @@ const PageFlowConfigModal = ({
           flexShrink: 0
         }}>
           <div style={{ fontSize: '12px', color: '#6b7280' }}>
-            Configurando flujo para: <strong>{pageData?.name || 'Página sin nombre'}</strong>
+            <strong>Configurando flujo para:</strong> {pageData?.name || 'Página sin nombre'}
             {Object.keys(errors).length > 0 && (
               <span style={{ color: '#ef4444', marginLeft: '12px' }}>
                 • {Object.keys(errors).length} error{Object.keys(errors).length !== 1 ? 'es' : ''}
               </span>
             )}
-            {/* ✅ NUEVO: Información adicional en footer */}
-            <span style={{ marginLeft: '16px', color: '#16a34a' }}>
-              • Monaco Editor habilitado para scripts avanzados
-            </span>
+            {/* ✅ NUEVA: Información sobre el concepto */}
+            <div style={{ marginTop: '4px', fontSize: '11px', color: '#8b5cf6' }}>
+              🏁 Sin Next Page: Solo página de inicio • Monaco Editor habilitado para scripts avanzados
+            </div>
           </div>
           
           <div style={{ display: 'flex', gap: '12px' }}>

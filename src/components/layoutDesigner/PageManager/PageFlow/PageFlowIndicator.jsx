@@ -1,6 +1,7 @@
-// src/components/layoutDesigner/PageManager/PageFlowIndicator.jsx
+// src/components/layoutDesigner/PageManager/PageFlow/PageFlowIndicator.jsx - SIN NEXT PAGE
 import React from 'react';
-import { PAGE_FLOW_TYPES, NEXT_PAGE_TYPES } from '../../utils/pageFlow.constants';
+import { PAGE_FLOW_TYPES } from '../../utils/pageFlow.constants';
+// ✅ ELIMINADO: NEXT_PAGE_TYPES - ya no se usa
 
 const PageFlowIndicator = ({ 
   page, 
@@ -77,19 +78,29 @@ const PageFlowIndicator = ({
     }
   };
 
-  // Obtener información de página siguiente
-  const getNextPageInfo = () => {
-    const nextPageType = flowConfig.nextPage?.type || NEXT_PAGE_TYPES.AUTO;
-    switch (nextPageType) {
-      case NEXT_PAGE_TYPES.SIMPLE:
-        return { icon: '➡️', label: 'Específica' };
-      case NEXT_PAGE_TYPES.CONDITIONAL:
-        return { icon: '🔀', label: 'Condicional' };
-      case NEXT_PAGE_TYPES.NONE:
-        return { icon: '🛑', label: 'Finalizar' };
-      case NEXT_PAGE_TYPES.AUTO:
+  // ✅ ACTUALIZADO: Obtener información de página de inicio (en lugar de página siguiente)
+  const getStartPageInfo = () => {
+    switch (flowConfig.type) {
+      case PAGE_FLOW_TYPES.SIMPLE:
+        return { 
+          icon: '🏁', 
+          label: `Página ${(flowConfig.simple?.startPageIndex ?? 0) + 1}` 
+        };
+      case PAGE_FLOW_TYPES.CONDITIONAL:
+        return { 
+          icon: '🔀', 
+          label: 'Condicional' 
+        };
+      case PAGE_FLOW_TYPES.REPEATED:
+        return { 
+          icon: '🔁', 
+          label: `Página ${(flowConfig.repeated?.startPageIndex ?? 0) + 1}` 
+        };
       default:
-        return { icon: '🔄', label: 'Auto' };
+        return { 
+          icon: '🏁', 
+          label: 'Auto' 
+        };
     }
   };
 
@@ -110,7 +121,7 @@ const PageFlowIndicator = ({
   };
 
   const flowTypeInfo = getFlowTypeInfo();
-  const nextPageInfo = getNextPageInfo();
+  const startPageInfo = getStartPageInfo(); // ✅ CAMBIADO: de nextPageInfo a startPageInfo
   const configCounts = getConfigCounts();
 
   return (
@@ -194,12 +205,12 @@ const PageFlowIndicator = ({
             margin: '0 2px'
           }} />
 
-          {/* Información de página siguiente */}
+          {/* ✅ ACTUALIZADO: Información de página de inicio */}
           <span style={{ fontSize: sizeConfig.iconSize }}>
-            {nextPageInfo.icon}
+            {startPageInfo.icon}
           </span>
           <span style={{ fontSize: sizeConfig.fontSize === '12px' ? '10px' : '9px' }}>
-            {nextPageInfo.label}
+            {startPageInfo.label}
           </span>
         </>
       )}
@@ -299,11 +310,26 @@ export const PageFlowIndicatorGroup = ({
   );
 };
 
-// Componente para tooltip con información detallada
+// ✅ ACTUALIZADO: Componente para tooltip con información detallada (sin next page)
 export const PageFlowTooltip = ({ page, isVisible = false, position = { x: 0, y: 0 } }) => {
   if (!isVisible || !page?.flowConfig) return null;
 
   const flowConfig = page.flowConfig;
+
+  // ✅ NUEVA: Función para obtener información de página de inicio
+  const getStartPageInfo = () => {
+    switch (flowConfig.type) {
+      case PAGE_FLOW_TYPES.SIMPLE:
+        return `Página ${(flowConfig.simple?.startPageIndex ?? 0) + 1}`;
+      case PAGE_FLOW_TYPES.CONDITIONAL:
+        const defaultIndex = flowConfig.conditional?.defaultStartPageIndex ?? 0;
+        return `Por defecto: Página ${defaultIndex + 1}`;
+      case PAGE_FLOW_TYPES.REPEATED:
+        return `Plantilla: Página ${(flowConfig.repeated?.startPageIndex ?? 0) + 1}`;
+      default:
+        return 'Página 1';
+    }
+  };
 
   return (
     <div style={{
@@ -328,6 +354,11 @@ export const PageFlowTooltip = ({ page, isVisible = false, position = { x: 0, y:
         <strong>Tipo:</strong> {flowConfig.type}
       </div>
 
+      {/* ✅ ACTUALIZADO: Mostrar página de inicio en lugar de next page */}
+      <div style={{ marginBottom: '6px' }}>
+        <strong>🏁 Página de inicio:</strong> {getStartPageInfo()}
+      </div>
+
       {flowConfig.type === PAGE_FLOW_TYPES.CONDITIONAL && (
         <div style={{ marginBottom: '6px' }}>
           <strong>Condiciones:</strong> {flowConfig.conditional?.conditions?.length || 0}
@@ -339,10 +370,6 @@ export const PageFlowTooltip = ({ page, isVisible = false, position = { x: 0, y:
           <strong>Variable:</strong> {flowConfig.repeated?.dataSource?.variableName || 'No configurada'}
         </div>
       )}
-
-      <div>
-        <strong>Página siguiente:</strong> {flowConfig.nextPage?.type || 'Auto'}
-      </div>
 
       {flowConfig.description && (
         <div style={{ 

@@ -1,24 +1,21 @@
-// src/components/layoutDesigner/hooks/usePageManager.js - VERSIÓN COMPLETA CORREGIDA
+// src/components/layoutDesigner/hooks/usePageManager.js - SIN NEXT PAGE TYPES
 import { useState, useCallback, useRef, useMemo } from 'react';
 import { PageFlowEngine } from '../utils/pageFlowEngine.js';
 import { 
   PAGE_FLOW_TYPES, 
-  DEFAULT_PAGE_FLOW_CONFIG,
-  NEXT_PAGE_TYPES 
+  DEFAULT_PAGE_FLOW_CONFIG
 } from '../utils/pageFlow.constants.js';
 
 export const usePageManager = (initialPages = null, initialAvailableVariables = {}) => {
-  // ✅ Refs inicializados ANTES de uso
   const nextPageIdRef = useRef(1);
   const maxHistorySize = 50;
 
-  // ✅ Función para crear página por defecto - MÁRGENES CERO + FLOW CONFIG
   const createDefaultPage = useCallback(() => {
     return {
       id: `page_${Date.now()}_${nextPageIdRef.current++}`,
       name: 'Página 1',
       size: {
-        width: 210,  // A4 en mm
+        width: 210,
         height: 297,
         unit: 'mm',
         preset: 'A4'
@@ -37,23 +34,18 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         opacity: 1
       },
       elements: [],
-      
-      // ✅ NUEVA: Configuración de flujo de página
       flowConfig: {
         ...DEFAULT_PAGE_FLOW_CONFIG,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       },
-      
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
   }, []);
 
-  // ✅ Estados principales
   const [pages, setPages] = useState(() => {
     if (initialPages && Array.isArray(initialPages) && initialPages.length > 0) {
-      // Asegurar que todas las páginas tengan flowConfig
       return initialPages.map(page => ({
         ...page,
         flowConfig: page.flowConfig || {
@@ -70,9 +62,7 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
   const [pageHistory, setPageHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
-  // ✅ NUEVO: Estados para flujo de páginas CON VARIABLES INICIALES
   const [availableVariablesState, setAvailableVariablesState] = useState(() => {
-    // Si no se proporcionan variables, usar datos de ejemplo
     if (!initialAvailableVariables || Object.keys(initialAvailableVariables).length === 0) {
       return {
         user_name: "Juan Pérez",
@@ -115,17 +105,14 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     allowUnsafeExpressions: false
   });
 
-  // ✅ NUEVO: Motor de flujo de páginas (memoizado)
   const pageFlowEngine = useMemo(() => {
     return new PageFlowEngine(availableVariablesState, pages, flowEngineOptions);
   }, [availableVariablesState, pages, flowEngineOptions]);
 
-  // ✅ Generar ID único para páginas
   const generatePageId = useCallback(() => {
     return `page_${Date.now()}_${nextPageIdRef.current++}`;
   }, []);
 
-  // ✅ Guardar estado en historial
   const saveToHistory = useCallback((pagesState) => {
     setPageHistory(prev => {
       const newHistory = prev.slice(0, historyIndex + 1);
@@ -141,12 +128,10 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     });
   }, [historyIndex]);
 
-  // ✅ Obtener página actual
   const getCurrentPage = useCallback(() => {
     return pages[currentPageIndex] || null;
   }, [pages, currentPageIndex]);
 
-  // ✅ NUEVO: Actualizar variables disponibles
   const updateAvailableVariables = useCallback((newVariables) => {
     console.log('🔄 Updating available variables:', newVariables);
     setAvailableVariablesState(prev => ({
@@ -155,7 +140,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     }));
   }, []);
 
-  // ✅ NUEVO: Configurar opciones del motor de flujo
   const setFlowEngineConfig = useCallback((options) => {
     setFlowEngineOptions(prev => ({
       ...prev,
@@ -163,7 +147,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     }));
   }, []);
 
-  // ✅ Agregar nueva página - CON CONFIGURACIÓN DE FLUJO
   const addPage = useCallback((position = null, pageConfig = {}) => {
     console.log('➕ Adding new page with flow config');
     
@@ -179,7 +162,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         left: 0,
         unit: pageConfig.size?.unit || 'mm'
       },
-      // ✅ NUEVO: Configuración de flujo
       flowConfig: {
         ...DEFAULT_PAGE_FLOW_CONFIG,
         ...pageConfig.flowConfig,
@@ -213,7 +195,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     return newPage;
   }, [pages, generatePageId, saveToHistory, createDefaultPage]);
 
-  // ✅ Duplicar página (manteniendo configuración de flujo)
   const duplicatePage = useCallback((pageIndex = currentPageIndex) => {
     const pageToClone = pages[pageIndex];
     if (!pageToClone) return null;
@@ -228,7 +209,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         ...element,
         id: `element_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       })),
-      // ✅ Duplicar configuración de flujo
       flowConfig: {
         ...pageToClone.flowConfig,
         createdAt: new Date().toISOString(),
@@ -253,7 +233,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     return duplicatedPage;
   }, [pages, currentPageIndex, generatePageId, saveToHistory]);
 
-  // ✅ Eliminar página
   const deletePage = useCallback((pageIndex = currentPageIndex) => {
     if (pages.length <= 1) {
       console.warn('⚠️ Cannot delete the last page');
@@ -281,7 +260,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     return true;
   }, [pages, currentPageIndex, saveToHistory]);
 
-  // ✅ Cambiar a página específica
   const goToPage = useCallback((pageIndex) => {
     if (pageIndex >= 0 && pageIndex < pages.length && pageIndex !== currentPageIndex) {
       console.log('📄 Switching to page:', pageIndex);
@@ -289,7 +267,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     }
   }, [pages.length, currentPageIndex]);
 
-  // ✅ Actualizar configuración de página
   const updatePageConfig = useCallback((pageIndex = currentPageIndex, updates) => {
     console.log('📝 Updating page config:', pageIndex, updates);
 
@@ -309,7 +286,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     });
   }, [currentPageIndex, saveToHistory]);
 
-  // ✅ NUEVO: Actualizar configuración de flujo de página específica
   const updatePageFlowConfig = useCallback((pageIndex = currentPageIndex, flowUpdates) => {
     console.log('🔄 Updating page flow config:', pageIndex, flowUpdates);
 
@@ -333,7 +309,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     });
   }, [currentPageIndex, saveToHistory]);
 
-  // ✅ Actualizar elementos de página
   const updatePageElements = useCallback((pageIndex = currentPageIndex, elements) => {
     setPages(prev => {
       const newPages = prev.map((page, index) => 
@@ -351,7 +326,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     });
   }, [currentPageIndex, saveToHistory]);
 
-  // ✅ Reordenar páginas
   const reorderPages = useCallback((fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
 
@@ -377,7 +351,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     });
   }, [currentPageIndex, saveToHistory]);
 
-  // ✅ Obtener dimensiones de página en píxeles
   const getPageDimensionsInPixels = useCallback((pageIndex = currentPageIndex) => {
     const page = pages[pageIndex];
     if (!page) return { width: 794, height: 1123 };
@@ -400,7 +373,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     };
   }, [pages, currentPageIndex]);
 
-  // ✅ Presets de tamaños de página
   const getPageSizePresets = useCallback(() => {
     return {
       iso: [
@@ -424,7 +396,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     };
   }, []);
 
-  // ✅ Aplicar preset de tamaño
   const applyPageSizePreset = useCallback((presetName, pageIndex = currentPageIndex) => {
     const allPresets = getPageSizePresets();
     const preset = [
@@ -446,7 +417,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     }
   }, [currentPageIndex, getPageSizePresets, updatePageConfig]);
 
-  // ✅ Alternar orientación
   const togglePageOrientation = useCallback((pageIndex = currentPageIndex) => {
     const page = pages[pageIndex];
     if (!page) return;
@@ -466,7 +436,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     console.log('🔄 Toggled orientation for page:', pageIndex, 'to:', newOrientation);
   }, [pages, currentPageIndex, updatePageConfig]);
 
-  // ✅ NUEVO: Evaluar flujo de página específica
   const evaluatePageFlow = useCallback((pageIndex, contextData = {}) => {
     try {
       return pageFlowEngine.evaluatePageFlow(pageIndex, contextData);
@@ -476,35 +445,31 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     }
   }, [pageFlowEngine]);
 
-  // ✅ NUEVO: Evaluar próxima página
-  const evaluateNextPage = useCallback((pageIndex, contextData = {}) => {
+  const getStartPage = useCallback((pageIndex, contextData = {}) => {
     try {
-      return pageFlowEngine.evaluateNextPage(pageIndex, contextData);
+      return pageFlowEngine.getStartPage(pageIndex, contextData);
     } catch (error) {
-      console.error('Error evaluating next page:', error);
-      return { type: NEXT_PAGE_TYPES.AUTO, targetPageIndex: pageIndex + 1 };
+      console.error('Error getting start page:', error);
+      return { startPageIndex: 0, startPageId: null };
     }
   }, [pageFlowEngine]);
 
-  // ✅ NUEVO: Generar secuencia completa de páginas
-  const generatePageSequence = useCallback((startPageIndex = 0, contextData = {}) => {
+  const generateRenderSequence = useCallback((pageIndex = 0, contextData = {}) => {
     try {
-      return pageFlowEngine.generatePageSequence(startPageIndex, contextData);
+      return pageFlowEngine.generateRenderSequence(pageIndex, contextData);
     } catch (error) {
-      console.error('Error generating page sequence:', error);
+      console.error('Error generating render sequence:', error);
       return [];
     }
   }, [pageFlowEngine]);
 
-  // ✅ NUEVO: Obtener páginas que referencian a una página específica
   const getPageReferences = useCallback((targetPageIndex) => {
     const references = [];
     
     pages.forEach((page, index) => {
       if (!page.flowConfig) return;
       
-      // Verificar referencias en configuración simple
-      if (page.flowConfig.simple?.targetPageIndex === targetPageIndex) {
+      if (page.flowConfig.simple?.startPageIndex === targetPageIndex) {
         references.push({
           pageIndex: index,
           type: 'simple',
@@ -512,10 +477,9 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         });
       }
       
-      // Verificar referencias en condiciones
       if (page.flowConfig.conditional?.conditions) {
         page.flowConfig.conditional.conditions.forEach((condition, condIndex) => {
-          if (condition.targetPageIndex === targetPageIndex) {
+          if (condition.startPageIndex === targetPageIndex) {
             references.push({
               pageIndex: index,
               type: 'conditional',
@@ -527,20 +491,10 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         });
       }
       
-      // Verificar referencias en páginas repetidas
-      if (page.flowConfig.repeated?.templatePageIndex === targetPageIndex) {
+      if (page.flowConfig.repeated?.startPageIndex === targetPageIndex) {
         references.push({
           pageIndex: index,
           type: 'repeated',
-          pageName: page.name
-        });
-      }
-      
-      // Verificar referencias en nextPage
-      if (page.flowConfig.nextPage?.targetPageIndex === targetPageIndex) {
-        references.push({
-          pageIndex: index,
-          type: 'nextPage',
           pageName: page.name
         });
       }
@@ -549,7 +503,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     return references;
   }, [pages]);
 
-  // ✅ NUEVO: Validar configuración de flujo
   const validatePageFlowConfig = useCallback((pageIndex = currentPageIndex) => {
     const page = pages[pageIndex];
     if (!page?.flowConfig) {
@@ -560,11 +513,10 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     const warnings = [];
     const config = page.flowConfig;
     
-    // Validar configuración según tipo
     switch (config.type) {
       case PAGE_FLOW_TYPES.SIMPLE:
-        if (config.simple?.targetPageIndex >= pages.length) {
-          errors.push('Target page index is out of bounds');
+        if (config.simple?.startPageIndex >= pages.length) {
+          errors.push('Start page index is out of bounds');
         }
         break;
         
@@ -576,8 +528,8 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
           if (!condition.variable && !condition.script) {
             errors.push(`Condition ${index + 1}: No variable or script defined`);
           }
-          if (condition.targetPageIndex >= pages.length) {
-            errors.push(`Condition ${index + 1}: Target page index is out of bounds`);
+          if (condition.startPageIndex >= pages.length) {
+            errors.push(`Condition ${index + 1}: Start page index is out of bounds`);
           }
         });
         break;
@@ -586,15 +538,10 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         if (!config.repeated?.dataSource?.variableName) {
           errors.push('No data source variable defined for repeated page');
         }
-        if (config.repeated?.templatePageIndex >= pages.length) {
-          errors.push('Template page index is out of bounds');
+        if (config.repeated?.startPageIndex >= pages.length) {
+          errors.push('Start page index is out of bounds');
         }
         break;
-    }
-    
-    // Validar nextPage
-    if (config.nextPage?.targetPageIndex >= pages.length) {
-      errors.push('Next page index is out of bounds');
     }
     
     return {
@@ -604,7 +551,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     };
   }, [pages, currentPageIndex]);
 
-  // ✅ NUEVO: Obtener logs del motor de flujo
   const getFlowExecutionLogs = useCallback(() => {
     return {
       logs: pageFlowEngine.getExecutionLog(),
@@ -612,12 +558,10 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     };
   }, [pageFlowEngine]);
 
-  // ✅ NUEVO: Limpiar logs del motor de flujo
   const clearFlowLogs = useCallback(() => {
     pageFlowEngine.clearLogs();
   }, [pageFlowEngine]);
 
-  // ✅ Exportar todas las páginas (incluyendo configuración de flujo)
   const exportPages = useCallback(() => {
     return {
       pages: pages.map(page => ({
@@ -629,16 +573,14 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
       flowEngineOptions,
       availableVariables: availableVariablesState,
       exportedAt: new Date().toISOString(),
-      version: '2.0' // Incrementar versión para flujo
+      version: '2.1'
     };
   }, [pages, currentPageIndex, flowEngineOptions, availableVariablesState]);
 
-  // ✅ Importar páginas (incluyendo configuración de flujo)
   const importPages = useCallback((pagesData) => {
     console.log('📥 Importing pages with flow config:', pagesData);
     
     if (pagesData?.pages && Array.isArray(pagesData.pages) && pagesData.pages.length > 0) {
-      // Asegurar que todas las páginas tengan flowConfig
       const pagesWithFlow = pagesData.pages.map(page => ({
         ...page,
         flowConfig: page.flowConfig || {
@@ -653,17 +595,14 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
         Math.min(pagesData.currentPageIndex || 0, pagesWithFlow.length - 1)
       );
       
-      // Importar configuración del motor de flujo
       if (pagesData.flowEngineOptions) {
         setFlowEngineOptions(pagesData.flowEngineOptions);
       }
       
-      // Importar variables disponibles
       if (pagesData.availableVariables) {
         setAvailableVariablesState(pagesData.availableVariables);
       }
       
-      // Actualizar referencia de ID
       const maxId = pagesWithFlow.reduce((max, page) => {
         const match = page.id.match(/page_\d+_(\d+)/);
         return match ? Math.max(max, parseInt(match[1])) : max;
@@ -677,7 +616,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
     }
   }, [saveToHistory]);
 
-  // ✅ Estadísticas (incluyendo información de flujo)
   const getStatistics = useCallback(() => {
     const totalElements = pages.reduce((sum, page) => sum + page.elements.length, 0);
     const avgElementsPerPage = pages.length > 0 ? totalElements / pages.length : 0;
@@ -688,7 +626,6 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
       return acc;
     }, {});
     
-    // Estadísticas de flujo
     const flowTypeDistribution = pages.reduce((acc, page) => {
       const flowType = page.flowConfig?.type || PAGE_FLOW_TYPES.SIMPLE;
       acc[flowType] = (acc[flowType] || 0) + 1;
@@ -711,74 +648,63 @@ export const usePageManager = (initialPages = null, initialAvailableVariables = 
       avgElementsPerPage: Math.round(avgElementsPerPage * 10) / 10,
       sizeDistribution,
       hasMultiplePages: pages.length > 1,
-      
-      // Estadísticas de flujo
       flowTypeDistribution,
       pagesWithConditions,
       pagesWithRepeating,
-      hasAdvancedFlow: pagesWithConditions > 0 || pagesWithRepeating > 0
+      hasAdvancedFlow: pagesWithConditions > 0 || pagesWithRepeating > 0,
+      pagesWithCustomStartPage: pages.filter(page => {
+        const config = page.flowConfig;
+        if (!config) return false;
+        
+        switch (config.type) {
+          case PAGE_FLOW_TYPES.SIMPLE:
+            return config.simple?.startPageIndex !== 0;
+          case PAGE_FLOW_TYPES.CONDITIONAL:
+            return config.conditional?.defaultStartPageIndex !== 0;
+          case PAGE_FLOW_TYPES.REPEATED:
+            return config.repeated?.startPageIndex !== 0;
+          default:
+            return false;
+        }
+      }).length
     };
   }, [pages, currentPageIndex]);
 
   return {
-    // Estado básico
     pages,
     currentPageIndex,
     currentPage: getCurrentPage(),
-    
-    // Operaciones básicas de páginas
     addPage,
     duplicatePage,
     deletePage,
     goToPage,
     reorderPages,
-    
-    // Configuración básica
     updatePageConfig,
     updatePageElements,
     applyPageSizePreset,
     togglePageOrientation,
-    
-    // ✅ NUEVO: Operaciones de flujo de páginas
     updatePageFlowConfig,
     evaluatePageFlow,
-    evaluateNextPage,
-    generatePageSequence,
+    getStartPage,
+    generateRenderSequence,
     getPageReferences,
     validatePageFlowConfig,
-    
-    // ✅ NUEVO: Manejo de variables
     updateAvailableVariables,
     availableVariables: availableVariablesState,
-    
-    // ✅ NUEVO: Configuración del motor
     setFlowEngineConfig,
     flowEngineOptions,
-    
-    // ✅ NUEVO: Logs y debugging
     getFlowExecutionLogs,
     clearFlowLogs,
-    
-    // Utilidades básicas
     getPageDimensionsInPixels,
     getPageSizePresets,
-    
-    // Import/Export (actualizado)
     exportPages,
     importPages,
-    
-    // Estadísticas (actualizado)
     getStatistics,
-    
-    // Navegación básica
     canGoToNextPage: currentPageIndex < pages.length - 1,
     canGoToPrevPage: currentPageIndex > 0,
     nextPage: () => goToPage(currentPageIndex + 1),
     prevPage: () => goToPage(currentPageIndex - 1),
-    
-    // ✅ NUEVO: Constantes de flujo
     PAGE_FLOW_TYPES,
-    NEXT_PAGE_TYPES,
     DEFAULT_PAGE_FLOW_CONFIG
   };
 };

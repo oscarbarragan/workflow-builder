@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PageManager/PageFlowRepetitionTab.jsx - CORREGIDO
+// src/components/layoutDesigner/PageManager/PageFlow/PageFlowRepetitionTab.jsx - CON START PAGE
 import React from 'react';
 import { textBoxUtils } from '../../components/TextBox/textbox.utils.js'; // ✅ IMPORTAR UTILS
 
@@ -6,8 +6,18 @@ const PageFlowRepetitionTab = ({
   flowConfig, 
   updateFlowConfig, 
   errors,
+  pages,
   availableVariables
 }) => {
+
+  // ✅ NUEVA: Obtener lista de páginas para página de inicio
+  const getStartPageOptions = () => {
+    return pages.map((page, index) => ({
+      value: index,
+      label: `${index + 1}. ${page.name}`,
+      id: page.id
+    }));
+  };
 
   // ✅ CORREGIDO: Obtener lista de variables disponibles usando el mismo procesamiento que TextBox
   const getVariableOptions = () => {
@@ -105,7 +115,88 @@ const PageFlowRepetitionTab = ({
           • Variables primitivas: {primitiveVariables.length}
           <br />
           • Procesamiento automático con notación de punto
+          <br />
+          • <strong>🏁 La página seleccionada se repetirá por cada elemento del array</strong>
         </div>
+      </div>
+
+      {/* ✅ NUEVO: Selección de página de inicio/plantilla */}
+      <div style={{
+        padding: '20px',
+        border: '2px solid #8b5cf6',
+        borderRadius: '8px',
+        background: '#faf5ff'
+      }}>
+        <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', color: '#7c3aed' }}>
+          🏁 Página de Inicio (Plantilla)
+        </h4>
+        
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '6px', color: '#7c3aed' }}>
+            Página que se repetirá por cada elemento del array
+          </label>
+          
+          <select
+            value={flowConfig.repeated?.startPageIndex ?? 0}
+            onChange={(e) => {
+              const pageIndex = parseInt(e.target.value);
+              const pageId = pages[pageIndex]?.id || null;
+              updateFlowConfig('repeated.startPageIndex', pageIndex);
+              updateFlowConfig('repeated.startPageId', pageId);
+            }}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              border: '2px solid #8b5cf6',
+              borderRadius: '6px',
+              fontSize: '14px',
+              backgroundColor: 'white',
+              fontWeight: '500'
+            }}
+          >
+            {pages.length === 0 ? (
+              <option value={0}>No hay páginas disponibles</option>
+            ) : (
+              getStartPageOptions().map(page => (
+                <option key={page.value} value={page.value}>
+                  {page.label}
+                </option>
+              ))
+            )}
+          </select>
+          
+          {pages.length === 0 && (
+            <div style={{
+              fontSize: '11px',
+              color: '#ef4444',
+              marginTop: '4px',
+              fontWeight: '500'
+            }}>
+              ⚠️ Necesitas crear al menos una página para configurar la repetición
+            </div>
+          )}
+        </div>
+
+        {/* Vista previa de la página seleccionada */}
+        {pages.length > 0 && (
+          <div style={{
+            padding: '12px',
+            background: '#f0f9ff',
+            borderRadius: '6px',
+            border: '1px solid #0ea5e9'
+          }}>
+            <div style={{ fontSize: '11px', color: '#0c4a6e', fontWeight: '600', marginBottom: '4px' }}>
+              📋 Página Seleccionada:
+            </div>
+            <div style={{ fontSize: '11px', color: '#0c4a6e' }}>
+              {(() => {
+                const currentIndex = flowConfig.repeated?.startPageIndex ?? 0;
+                const currentPage = pages[currentIndex];
+                return `"${currentPage?.name || `Página ${currentIndex + 1}`}" se repetirá por cada elemento del array seleccionado`;
+              })()}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Origen de datos */}
@@ -318,6 +409,8 @@ const PageFlowRepetitionTab = ({
               const arrayVar = flowConfig.repeated.dataSource.variableName;
               const itemVar = flowConfig.repeated.itemVariableName || 'item';
               const indexVar = flowConfig.repeated.indexVariableName || 'index';
+              const startPageIndex = flowConfig.repeated?.startPageIndex ?? 0;
+              const startPageName = pages[startPageIndex]?.name || `Página ${startPageIndex + 1}`;
               
               const selectedArray = arrayVariables.find(v => v.value === arrayVar);
               
@@ -334,7 +427,11 @@ const PageFlowRepetitionTab = ({
                     </div>
                     
                     <div style={{ marginBottom: '8px' }}>
-                      <strong>En cada iteración podrás usar:</strong>
+                      <strong>🏁 Página que se repetirá:</strong> <code>"{startPageName}"</code>
+                    </div>
+                    
+                    <div style={{ marginBottom: '8px' }}>
+                      <strong>En cada repetición podrás usar:</strong>
                     </div>
                     
                     <div style={{ 
@@ -368,7 +465,7 @@ const PageFlowRepetitionTab = ({
                     </div>
                     
                     <div style={{ marginTop: '8px', fontSize: '11px', fontStyle: 'italic' }}>
-                      💡 Estas variables estarán disponibles en los elementos de texto de esta página durante la repetición
+                      💡 Estas variables estarán disponibles en los elementos de texto de "{startPageName}" durante cada repetición
                     </div>
                   </div>
                 );
@@ -376,6 +473,7 @@ const PageFlowRepetitionTab = ({
                 return (
                   <div>
                     <div><strong>Array:</strong> <code>{arrayVar}</code></div>
+                    <div><strong>🏁 Página que se repetirá:</strong> <code>"{startPageName}"</code></div>
                     <div><strong>Variable del elemento:</strong> <code>{`{{${itemVar}}}`}</code></div>
                     <div><strong>Variable del índice:</strong> <code>{`{{${indexVar}}}`}</code></div>
                     <div style={{ marginTop: '4px', fontSize: '11px', fontStyle: 'italic' }}>
@@ -402,13 +500,16 @@ const PageFlowRepetitionTab = ({
           </h4>
           <div style={{ fontSize: '12px', color: '#92400e', lineHeight: '1.4' }}>
             <div style={{ marginBottom: '8px' }}>
-              1. <strong>Selecciona un array</strong> de datos (ej: <code>orders</code>, <code>invoice.lines</code>)
+              1. <strong>🏁 Selecciona una página de inicio</strong> que servirá como plantilla
             </div>
             <div style={{ marginBottom: '8px' }}>
-              2. <strong>Define nombres de variables</strong> para el elemento actual e índice
+              2. <strong>Selecciona un array</strong> de datos (ej: <code>orders</code>, <code>invoice.lines</code>)
             </div>
             <div style={{ marginBottom: '8px' }}>
-              3. <strong>En los elementos de texto</strong> de esta página podrás usar:
+              3. <strong>Define nombres de variables</strong> para el elemento actual e índice
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              4. <strong>En los elementos de texto</strong> de la página seleccionada podrás usar:
               <div style={{ 
                 marginTop: '4px', 
                 padding: '4px 8px', 
@@ -422,7 +523,7 @@ const PageFlowRepetitionTab = ({
               </div>
             </div>
             <div>
-              4. <strong>La página se generará</strong> una vez por cada elemento del array
+              5. <strong>La página se generará</strong> una vez por cada elemento del array, <strong>iniciando siempre en la página seleccionada</strong>
             </div>
           </div>
         </div>

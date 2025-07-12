@@ -1,4 +1,4 @@
-// src/components/layoutDesigner/PageManager/PageFlow/PageFlowConditionsTab.jsx - CON MONACO REUTILIZADO
+// src/components/layoutDesigner/PageManager/PageFlow/PageFlowConditionsTab.jsx - CON START PAGE
 import React, { useState } from 'react';
 
 // ✅ CAMBIAR ESTAS RUTAS (agregar un nivel más):
@@ -7,9 +7,6 @@ import { textBoxUtils } from '../../components/TextBox/textbox.utils.js';
 
 // ✅ ESTA RUTA ESTÁ CORRECTA (mismo directorio):
 import MonacoConditionWrapper from './MonacoConditionWrapper.jsx';
-
-// ✅ IMPORTACIÓN OPCIONAL - comenta si no tienes ScriptEngine
-// import ScriptEngine from '../utils/scriptEngine.js';
 
 const PageFlowConditionsTab = ({ 
   flowConfig, 
@@ -24,16 +21,9 @@ const PageFlowConditionsTab = ({
   // ✅ Estados para manejo de scripts
   const [scriptValidation, setScriptValidation] = useState({});
   const [showVariableList, setShowVariableList] = useState({});
-  
-  // ✅ ScriptEngine opcional - comenta si no lo tienes
-  /*
-  const scriptEngine = React.useMemo(() => {
-    return new ScriptEngine(availableVariables);
-  }, [availableVariables]);
-  */
 
-  // Obtener lista de páginas para seleccionar
-  const getPageOptions = () => {
+  // ✅ ACTUALIZADO: Obtener lista de páginas para página de inicio
+  const getStartPageOptions = () => {
     return pages.map((page, index) => ({
       value: index,
       label: `${index + 1}. ${page.name}`,
@@ -176,6 +166,8 @@ const PageFlowConditionsTab = ({
           • <strong>Scripts avanzados con Monaco Editor VS Code</strong> para lógica compleja
           <br />
           • Autocompletado inteligente y validación en tiempo real
+          <br />
+          • <strong>🏁 Cada condición determina la página de inicio del documento</strong>
         </div>
         
         {/* Variables más comunes */}
@@ -550,18 +542,18 @@ const PageFlowConditionsTab = ({
                   )}
                 </div>
 
-                {/* Página objetivo */}
+                {/* ✅ ACTUALIZADO: Página de inicio en lugar de página objetivo */}
                 <div>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
-                    Ir a Página
+                    🏁 Página de Inicio (si se cumple)
                   </label>
                   <select
-                    value={condition.targetPageIndex ?? ''}
+                    value={condition.startPageIndex ?? ''}
                     onChange={(e) => {
                       const pageIndex = e.target.value ? parseInt(e.target.value) : null;
-                      updateFlowConfig(`conditional.conditions.${index}.targetPageIndex`, pageIndex);
+                      updateFlowConfig(`conditional.conditions.${index}.startPageIndex`, pageIndex);
                       if (pageIndex !== null) {
-                        updateFlowConfig(`conditional.conditions.${index}.targetPageId`, pages[pageIndex]?.id);
+                        updateFlowConfig(`conditional.conditions.${index}.startPageId`, pages[pageIndex]?.id);
                       }
                     }}
                     style={{
@@ -572,8 +564,8 @@ const PageFlowConditionsTab = ({
                       fontSize: '13px'
                     }}
                   >
-                    <option value="">Seleccionar página...</option>
-                    {getPageOptions().map(page => (
+                    <option value="">Seleccionar página de inicio...</option>
+                    {getStartPageOptions().map(page => (
                       <option key={page.value} value={page.value}>
                         {page.label}
                       </option>
@@ -583,19 +575,19 @@ const PageFlowConditionsTab = ({
               </div>
             )}
 
-            {/* Página objetivo para scripts (fuera del grid) */}
+            {/* ✅ ACTUALIZADO: Página de inicio para scripts (fuera del grid) */}
             {condition.type === 'script' && (
               <div style={{ marginTop: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '500', marginBottom: '4px' }}>
-                  Ir a Página (si el script retorna true)
+                  🏁 Página de Inicio (si el script retorna true)
                 </label>
                 <select
-                  value={condition.targetPageIndex ?? ''}
+                  value={condition.startPageIndex ?? ''}
                   onChange={(e) => {
                     const pageIndex = e.target.value ? parseInt(e.target.value) : null;
-                    updateFlowConfig(`conditional.conditions.${index}.targetPageIndex`, pageIndex);
+                    updateFlowConfig(`conditional.conditions.${index}.startPageIndex`, pageIndex);
                     if (pageIndex !== null) {
-                      updateFlowConfig(`conditional.conditions.${index}.targetPageId`, pages[pageIndex]?.id);
+                      updateFlowConfig(`conditional.conditions.${index}.startPageId`, pages[pageIndex]?.id);
                     }
                   }}
                   style={{
@@ -606,8 +598,8 @@ const PageFlowConditionsTab = ({
                     fontSize: '13px'
                   }}
                 >
-                  <option value="">Seleccionar página...</option>
-                  {getPageOptions().map(page => (
+                  <option value="">Seleccionar página de inicio...</option>
+                  {getStartPageOptions().map(page => (
                     <option key={page.value} value={page.value}>
                       {page.label}
                     </option>
@@ -637,7 +629,7 @@ const PageFlowConditionsTab = ({
               />
             </div>
 
-            {/* Vista previa de la condición */}
+            {/* ✅ ACTUALIZADO: Vista previa de la condición con página de inicio */}
             {((condition.type === 'script' && condition.script) || (condition.type !== 'script' && condition.variable && condition.operator)) && (
               <div style={{
                 marginTop: '12px',
@@ -652,7 +644,7 @@ const PageFlowConditionsTab = ({
                 <div style={{ fontSize: '11px', color: '#0c4a6e', fontFamily: 'monospace' }}>
                   {condition.type === 'script' ? (
                     <>
-                      Si <strong>script Monaco</strong> retorna <strong>true</strong> → Ir a página {(condition.targetPageIndex ?? 0) + 1}
+                      Si <strong>script Monaco</strong> retorna <strong>true</strong> → 🏁 Iniciar en página {(condition.startPageIndex ?? 0) + 1}
                       <div style={{ marginTop: '4px', fontSize: '10px', color: '#6b7280' }}>
                         Script: {condition.script.substring(0, 50)}{condition.script.length > 50 ? '...' : ''}
                       </div>
@@ -663,7 +655,7 @@ const PageFlowConditionsTab = ({
                         condition.operator === OPERATORS.IS_EMPTY || condition.operator === OPERATORS.IS_NOT_EMPTY 
                           ? '(vacío)' 
                           : `"${condition.value || '(sin valor)'}"`
-                      } → Ir a página {(condition.targetPageIndex ?? 0) + 1}
+                      } → 🏁 Iniciar en página {(condition.startPageIndex ?? 0) + 1}
                     </>
                   )}
                 </div>
@@ -712,7 +704,7 @@ const PageFlowConditionsTab = ({
         ))}
       </div>
 
-      {/* Página por defecto */}
+      {/* ✅ ACTUALIZADO: Página por defecto como página de inicio */}
       <div style={{
         padding: '16px',
         background: '#f8fafc',
@@ -720,18 +712,18 @@ const PageFlowConditionsTab = ({
         border: '1px solid #e2e8f0'
       }}>
         <h4 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '12px' }}>
-          📄 Página por Defecto
+          🏁 Página de Inicio por Defecto
         </h4>
         <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>
-          Se mostrará si ninguna condición se cumple
+          Se iniciará en esta página si ninguna condición se cumple
         </div>
         <select
-          value={flowConfig.conditional?.defaultTargetPageIndex ?? ''}
+          value={flowConfig.conditional?.defaultStartPageIndex ?? ''}
           onChange={(e) => {
             const pageIndex = e.target.value ? parseInt(e.target.value) : null;
-            updateFlowConfig('conditional.defaultTargetPageIndex', pageIndex);
+            updateFlowConfig('conditional.defaultStartPageIndex', pageIndex);
             if (pageIndex !== null) {
-              updateFlowConfig('conditional.defaultTargetPageId', pages[pageIndex]?.id);
+              updateFlowConfig('conditional.defaultStartPageId', pages[pageIndex]?.id);
             }
           }}
           style={{
@@ -743,7 +735,7 @@ const PageFlowConditionsTab = ({
           }}
         >
           <option value="">Sin página por defecto</option>
-          {getPageOptions().map(page => (
+          {getStartPageOptions().map(page => (
             <option key={page.value} value={page.value}>
               {page.label}
             </option>
@@ -751,7 +743,7 @@ const PageFlowConditionsTab = ({
         </select>
       </div>
 
-      {/* Resumen de condiciones */}
+      {/* ✅ ACTUALIZADO: Resumen de condiciones con páginas de inicio */}
       {flowConfig.conditional?.conditions?.length > 0 && (
         <div style={{
           padding: '16px',
@@ -777,7 +769,7 @@ const PageFlowConditionsTab = ({
                       }}>
                         MONACO
                       </span>
-                      Script Monaco → Página {(condition.targetPageIndex ?? 0) + 1}
+                      Script Monaco → 🏁 Iniciar en página {(condition.startPageIndex ?? 0) + 1}
                       {condition.script && (
                         <div style={{ fontSize: '10px', fontFamily: 'monospace', marginLeft: '20px', color: '#6b7280' }}>
                           {condition.script.substring(0, 60)}{condition.script.length > 60 ? '...' : ''}
@@ -796,7 +788,7 @@ const PageFlowConditionsTab = ({
                         VAR
                       </span>
                       {condition.variable || 'Sin variable'} {condition.operator} {condition.value || '(vacío)'} 
-                      → Página {(condition.targetPageIndex ?? 0) + 1}
+                      → 🏁 Iniciar en página {(condition.startPageIndex ?? 0) + 1}
                     </>
                   )
                 }
@@ -825,7 +817,7 @@ const PageFlowConditionsTab = ({
           marginBottom: '12px'
         }}>
           <h4 style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1', margin: 0 }}>
-            ✨ Monaco Editor: Tu Editor Existente Reutilizado
+            ✨ Flujo de Páginas Condicional: Tu Editor Monaco Reutilizado
           </h4>
           <div style={{
             fontSize: '10px',
@@ -835,7 +827,7 @@ const PageFlowConditionsTab = ({
             borderRadius: '3px',
             border: '1px solid #fbbf24'
           }}>
-            Mismo que usas en workflow
+            Igual que workflow
           </div>
         </div>
         
@@ -852,14 +844,14 @@ const PageFlowConditionsTab = ({
             <div>• Configuración visual rápida</div>
             <div>• Ideal para comparaciones básicas</div>
             <div>• Sin código necesario</div>
-            <div>• Operadores predefinidos</div>
+            <div>• <strong>🏁 Determina página de inicio</strong></div>
           </div>
           <div>
             <div><strong>📜 Monaco Editor:</strong></div>
             <div>• <strong>Reutiliza tu editor existente</strong></div>
             <div>• IntelliSense con tus variables</div>
             <div>• Validación en tiempo real</div>
-            <div>• Lógica compleja JavaScript</div>
+            <div>• <strong>🏁 Lógica compleja para página inicial</strong></div>
           </div>
         </div>
         
@@ -871,11 +863,11 @@ const PageFlowConditionsTab = ({
           border: '1px solid #0ea5e9'
         }}>
           <div style={{ fontSize: '10px', color: '#0369a1', fontWeight: '600', marginBottom: '4px' }}>
-            🔄 Sin Duplicación de Código:
+            🏁 Concepto Clave - Página de Inicio:
           </div>
           <div style={{ fontSize: '10px', color: '#0369a1' }}>
-            Usamos el mismo <code>MonacoScriptEditor</code> que ya tienes en 
-            <code>workflow/nodes/ScriptProcessor</code> con un wrapper adaptador para condiciones.
+            Las condiciones determinan en cuál página interna empezará el documento cuando se renderice.
+            <strong> No navega entre páginas</strong> - simplemente decide el punto de partida del Page.
           </div>
         </div>
       </div>
